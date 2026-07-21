@@ -1,31 +1,11 @@
 import { useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
+import { computeProgressPercent } from '../lib/calculations/progress'
 import { CheckInForm } from '../components/forms/CheckInForm'
 import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedChart'
+import { StatCard } from '../components/StatCard'
 import { formatCurrency } from '../lib/format'
-
-function StatCard({
-  label,
-  value,
-  hint,
-}: {
-  label: string
-  value: string
-  hint?: string
-}) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
-      <p className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-        {label}
-      </p>
-      <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-slate-100">
-        {value}
-      </p>
-      {hint && <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{hint}</p>}
-    </div>
-  )
-}
 
 export function ProgressTrackerPage() {
   const profile = useAppStore((s) => s.profile)
@@ -43,10 +23,7 @@ export function ProgressTrackerPage() {
   const sortedCheckIns = [...checkIns].sort((a, b) => b.date.localeCompare(a.date))
   const latestCheckIn = sortedCheckIns[0]
   const latestNetWorth = latestCheckIn ? latestCheckIn.netWorthAmount : assumptions.currentNetWorth
-  const progressPercent =
-    Number.isFinite(result.fireNumber) && result.fireNumber > 0
-      ? (latestNetWorth / result.fireNumber) * 100
-      : null
+  const progressPercent = computeProgressPercent(latestNetWorth, result.fireNumber)
 
   const editingCheckIn = editingId ? checkIns.find((c) => c.id === editingId) : undefined
 

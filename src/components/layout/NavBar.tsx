@@ -14,6 +14,9 @@ export function NavBar() {
         <span className="mr-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
           個人財富管理工具
         </span>
+        <NavLink to="/" end className={linkClass}>
+          儀表板
+        </NavLink>
         <NavLink to="/fire" className={linkClass}>
           FIRE 試算
         </NavLink>

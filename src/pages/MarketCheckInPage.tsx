@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
 import { computeAdvice } from '../lib/calculations/adviceRules'
 import { fetchRecentTaiexAndTw0050, todayIsoDate } from '../lib/market/twse'
+import { isReviewDue } from '../lib/reviewSchedule'
 import { MarketPriceChart } from '../components/charts/MarketPriceChart'
+import { AdviceSummary } from '../components/AdviceSummary'
 import {
   MarketCheckInForm,
   MARKET_PHASE_LABELS,
@@ -10,12 +12,6 @@ import {
   INTEREST_RATE_LABELS,
   type MarketCheckInFormValues,
 } from '../components/forms/MarketCheckInForm'
-
-function nextReviewDate(latestDate: string, reviewCadenceMonths: number): Date {
-  const next = new Date(latestDate)
-  next.setMonth(next.getMonth() + reviewCadenceMonths)
-  return next
-}
 
 export function MarketCheckInPage() {
   const marketPriceHistory = useAppStore((s) => s.marketPriceHistory)
@@ -53,9 +49,7 @@ export function MarketCheckInPage() {
     ? marketCheckIns.find((c) => c.id === editingId)
     : undefined
 
-  const reviewDue = latestCheckIn
-    ? nextReviewDate(latestCheckIn.date, guardrails.reviewCadenceMonths) <= new Date()
-    : true
+  const reviewDue = isReviewDue(latestCheckIn?.date, guardrails.reviewCadenceMonths)
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -101,35 +95,12 @@ export function MarketCheckInPage() {
 
       <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">目前建議</h2>
-        {advice ? (
-          <div className="mt-4 space-y-2 text-sm text-slate-700 dark:text-slate-300">
-            <p>
-              <span className="font-medium text-slate-900 dark:text-slate-100">再平衡：</span>
-              {advice.rebalancingSuggestion}
-            </p>
-            <p>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                定期定額：
-              </span>
-              {advice.dcaPacingSuggestion}
-            </p>
-            <p>
-              <span className="font-medium text-slate-900 dark:text-slate-100">
-                配置微調：
-              </span>
-              {advice.allocationTiltSuggestion}
-            </p>
-            <p className="text-slate-500 dark:text-slate-400">{advice.phaseNote}</p>
-            <p className="text-slate-500 dark:text-slate-400">{advice.rateNote}</p>
-            <p className="mt-3 rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-900/40 dark:text-slate-400">
-              {advice.disclaimer}
-            </p>
-          </div>
-        ) : (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-            新增第一筆市場評估後，這裡會顯示對應的長期配置建議。
-          </p>
-        )}
+        <div className="mt-4">
+          <AdviceSummary
+            advice={advice}
+            emptyMessage="新增第一筆市場評估後，這裡會顯示對應的長期配置建議。"
+          />
+        </div>
       </div>
 
       <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
