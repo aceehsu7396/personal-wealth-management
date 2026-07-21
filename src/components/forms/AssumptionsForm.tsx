@@ -3,11 +3,10 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAppStore } from '../../lib/storage/appStore'
+import { Field, inputClass } from './FormField'
 
 const formSchema = z
   .object({
-    currentAge: z.coerce.number().min(0).max(120),
-    currency: z.string().min(1),
     currentNetWorth: z.coerce.number().min(0),
     monthlyIncome: z.coerce.number().min(0),
     savingsMode: z.enum(['amount', 'rate']),
@@ -29,33 +28,8 @@ const formSchema = z
 type FormInput = z.input<typeof formSchema>
 type FormOutput = z.output<typeof formSchema>
 
-const inputClass =
-  'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
-const labelClass = 'text-sm font-medium text-slate-700 dark:text-slate-300'
-const errorClass = 'mt-1 text-xs text-red-600 dark:text-red-400'
-
-function Field({
-  label,
-  error,
-  children,
-}: {
-  label: string
-  error?: string
-  children: React.ReactNode
-}) {
-  return (
-    <label className="block">
-      <span className={labelClass}>{label}</span>
-      {children}
-      {error && <p className={errorClass}>{error}</p>}
-    </label>
-  )
-}
-
 export function AssumptionsForm() {
-  const profile = useAppStore((s) => s.profile)
   const assumptions = useAppStore((s) => s.assumptions)
-  const setProfile = useAppStore((s) => s.setProfile)
   const setAssumptions = useAppStore((s) => s.setAssumptions)
 
   const {
@@ -66,8 +40,6 @@ export function AssumptionsForm() {
     resolver: zodResolver(formSchema),
     mode: 'onChange',
     defaultValues: {
-      currentAge: profile.currentAge,
-      currency: profile.currency,
       currentNetWorth: assumptions.currentNetWorth,
       monthlyIncome: assumptions.monthlyIncome,
       savingsMode: assumptions.savingsMode,
@@ -84,40 +56,15 @@ export function AssumptionsForm() {
     const subscription = watch((values) => {
       const result = formSchema.safeParse(values)
       if (!result.success) return
-      const v = result.data
-      setProfile({ currentAge: v.currentAge, currency: v.currency })
-      setAssumptions({
-        currentNetWorth: v.currentNetWorth,
-        monthlyIncome: v.monthlyIncome,
-        savingsMode: v.savingsMode,
-        monthlySavingsAmount: v.monthlySavingsAmount,
-        savingsRatePercent: v.savingsRatePercent,
-        monthlyExpenses: v.monthlyExpenses,
-        expectedAnnualReturnPercent: v.expectedAnnualReturnPercent,
-        expectedInflationPercent: v.expectedInflationPercent,
-        safeWithdrawalRatePercent: v.safeWithdrawalRatePercent,
-      })
+      setAssumptions(result.data)
     })
     return () => subscription.unsubscribe()
-  }, [watch, setProfile, setAssumptions])
+  }, [watch, setAssumptions])
 
   const savingsMode = watch('savingsMode')
 
   return (
     <form className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-      <Field label="目前年齡" error={errors.currentAge?.message}>
-        <input type="number" className={inputClass} {...register('currentAge')} />
-      </Field>
-
-      <Field label="幣別" error={errors.currency?.message}>
-        <select className={inputClass} {...register('currency')}>
-          <option value="TWD">TWD 新台幣</option>
-          <option value="USD">USD 美元</option>
-          <option value="JPY">JPY 日圓</option>
-          <option value="HKD">HKD 港幣</option>
-        </select>
-      </Field>
-
       <Field label="目前淨資產" error={errors.currentNetWorth?.message}>
         <input type="number" className={inputClass} {...register('currentNetWorth')} />
       </Field>

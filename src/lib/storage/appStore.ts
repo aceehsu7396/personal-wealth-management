@@ -64,6 +64,23 @@ interface AppStore extends AppData {
     fetchedOn: string,
   ) => void
   resetAllData: () => void
+  importData: (data: AppData) => void
+}
+
+function toAppData(state: AppData): AppData {
+  return {
+    schemaVersion: state.schemaVersion,
+    profile: state.profile,
+    assumptions: state.assumptions,
+    guardrails: state.guardrails,
+    checkIns: state.checkIns,
+    marketCheckIns: state.marketCheckIns,
+    marketPriceHistory: state.marketPriceHistory,
+  }
+}
+
+export function exportAppData(): AppData {
+  return toAppData(useAppStore.getState())
 }
 
 function mergeByDate(existing: DailyClose[], incoming: DailyClose[]): DailyClose[] {
@@ -140,20 +157,14 @@ export const useAppStore = create<AppStore>()(
         })),
 
       resetAllData: () => set(createDefaultAppData()),
+
+      importData: (data) => set(toAppData(data)),
     }),
     {
       name: STORAGE_KEY,
       version: SCHEMA_VERSION,
       storage: createJSONStorage(() => validatingStorage),
-      partialize: (state): AppData => ({
-        schemaVersion: state.schemaVersion,
-        profile: state.profile,
-        assumptions: state.assumptions,
-        guardrails: state.guardrails,
-        checkIns: state.checkIns,
-        marketCheckIns: state.marketCheckIns,
-        marketPriceHistory: state.marketPriceHistory,
-      }),
+      partialize: (state) => toAppData(state),
     },
   ),
 )

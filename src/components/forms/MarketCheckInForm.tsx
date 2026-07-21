@@ -6,6 +6,7 @@ import {
   MarketPhaseSchema,
   ValuationZoneSchema,
 } from '../../lib/storage/schema'
+import { errorClass, inputClass, labelClass } from './FormField'
 
 const schema = z.object({
   date: z.string().min(1, '請選擇日期'),
@@ -40,11 +41,6 @@ const INTEREST_RATE_LABELS: Record<string, string> = {
   high: '偏高',
   unsure: '不確定',
 }
-
-const inputClass =
-  'mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100'
-const labelClass = 'text-sm font-medium text-slate-700 dark:text-slate-300'
-const errorClass = 'mt-1 text-xs text-red-600 dark:text-red-400'
 
 interface Props {
   initialValues?: MarketCheckInFormValues

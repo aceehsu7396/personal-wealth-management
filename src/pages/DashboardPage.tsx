@@ -34,6 +34,12 @@ export function DashboardPage() {
       ? '50 年內無法達成'
       : `約 ${formatYearsToFire(result.yearsToFire)}`
 
+  const isFirstRun =
+    checkIns.length === 0 &&
+    marketCheckIns.length === 0 &&
+    assumptions.currentNetWorth === 0 &&
+    assumptions.monthlyExpenses === 0
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">儀表板</h1>
@@ -41,7 +47,17 @@ export function DashboardPage() {
         財富自由計畫的整體現況一覽。
       </p>
 
-      {reviewDue && (
+      {isFirstRun && (
+        <div className="mt-6 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+          歡迎使用！建議先到{' '}
+          <Link to="/fire" className="font-medium underline">
+            FIRE 試算
+          </Link>{' '}
+          填入現況與假設，開始估算你的財富自由時間點。
+        </div>
+      )}
+
+      {!isFirstRun && reviewDue && (
         <div className="mt-6 flex items-center justify-between gap-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
           <span>
             {latestMarketCheckIn
