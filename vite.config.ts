@@ -5,6 +5,7 @@ import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/personal-wealth-management/',
   plugins: [react(), tailwindcss()],
   test: {
     environment: 'node',
