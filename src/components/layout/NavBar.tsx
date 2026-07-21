@@ -17,6 +17,9 @@ export function NavBar() {
         <NavLink to="/fire" className={linkClass}>
           FIRE 試算
         </NavLink>
+        <NavLink to="/market" className={linkClass}>
+          市場檢視
+        </NavLink>
         <NavLink to="/progress" className={linkClass}>
           進度追蹤
         </NavLink>

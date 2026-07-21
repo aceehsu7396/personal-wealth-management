@@ -53,6 +53,10 @@ interface AppStore extends AppData {
   updateCheckIn: (id: string, entry: Partial<Omit<NetWorthCheckIn, 'id' | 'createdAt'>>) => void
   removeCheckIn: (id: string) => void
   addMarketCheckIn: (entry: Omit<MarketCheckIn, 'id' | 'createdAt'>) => void
+  updateMarketCheckIn: (
+    id: string,
+    entry: Partial<Omit<MarketCheckIn, 'id' | 'createdAt'>>,
+  ) => void
   removeMarketCheckIn: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
@@ -112,6 +116,13 @@ export const useAppStore = create<AppStore>()(
             ...state.marketCheckIns,
             { ...entry, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
           ],
+        })),
+
+      updateMarketCheckIn: (id, entry) =>
+        set((state) => ({
+          marketCheckIns: state.marketCheckIns.map((c) =>
+            c.id === id ? { ...c, ...entry } : c,
+          ),
         })),
 
       removeMarketCheckIn: (id) =>
