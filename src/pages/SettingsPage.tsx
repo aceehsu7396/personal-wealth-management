@@ -1,6 +1,7 @@
 import { ProfileForm } from '../components/forms/ProfileForm'
 import { GuardrailsForm } from '../components/forms/GuardrailsForm'
 import { DataManagement } from '../components/DataManagement'
+import { AiKeySettings } from '../components/AiKeySettings'
 
 export function SettingsPage() {
   return (
@@ -26,6 +27,18 @@ export function SettingsPage() {
         </p>
         <div className="mt-4">
           <GuardrailsForm />
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          AI 研究摘要設定
+        </h2>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          用於「市場檢視」頁面產生大盤與 0050 的 AI 研究摘要。
+        </p>
+        <div className="mt-4">
+          <AiKeySettings />
         </div>
       </div>
 

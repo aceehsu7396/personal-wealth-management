@@ -5,6 +5,7 @@ import { fetchRecentTaiexAndTw0050, todayIsoDate } from '../lib/market/twse'
 import { isReviewDue } from '../lib/reviewSchedule'
 import { MarketPriceChart } from '../components/charts/MarketPriceChart'
 import { AdviceSummary } from '../components/AdviceSummary'
+import { AiResearchSummary } from '../components/AiResearchSummary'
 import {
   MarketCheckInForm,
   MARKET_PHASE_LABELS,
@@ -89,6 +90,22 @@ export function MarketCheckInPage() {
             label="0050"
             color="#2563eb"
             gradientId="tw0050Fill"
+          />
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          AI 研究摘要
+        </h2>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          依大盤與 0050 收盤價自動產生的描述性摘要，輔助你自行判斷估值區間，不是進出場訊號。
+        </p>
+        <div className="mt-4">
+          <AiResearchSummary
+            taiex={marketPriceHistory.taiex}
+            tw0050={marketPriceHistory.tw0050}
+            latestCheckIn={latestCheckIn}
           />
         </div>
       </div>
