@@ -4,6 +4,7 @@ import { DashboardPage } from './pages/DashboardPage'
 import { FireCalculatorPage } from './pages/FireCalculatorPage'
 import { ProgressTrackerPage } from './pages/ProgressTrackerPage'
 import { MarketCheckInPage } from './pages/MarketCheckInPage'
+import { MonthlyRecordsPage } from './pages/MonthlyRecordsPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
           <Route path="/fire" element={<FireCalculatorPage />} />
           <Route path="/market" element={<MarketCheckInPage />} />
           <Route path="/progress" element={<ProgressTrackerPage />} />
+          <Route path="/records" element={<MonthlyRecordsPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </div>

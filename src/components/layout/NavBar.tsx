@@ -26,6 +26,9 @@ export function NavBar() {
         <NavLink to="/progress" className={linkClass}>
           進度追蹤
         </NavLink>
+        <NavLink to="/records" className={linkClass}>
+          收支記錄
+        </NavLink>
         <NavLink to="/settings" className={linkClass}>
           設定
         </NavLink>

@@ -66,6 +66,26 @@ export const MarketCheckInSchema = z.object({
 })
 export type MarketCheckIn = z.infer<typeof MarketCheckInSchema>
 
+export const InvestmentEntrySchema = z.object({
+  name: z.string().min(1, '請輸入投資項目名稱'),
+  amount: z.number().nonnegative('金額不可為負數'),
+})
+export type InvestmentEntry = z.infer<typeof InvestmentEntrySchema>
+
+export const MonthlyRecordSchema = z.object({
+  id: z.string(),
+  month: z.string().regex(/^\d{4}-\d{2}$/, '格式須為 YYYY-MM'),
+  salaryIncome: z.number().nonnegative(),
+  dividendIncome: z.number().nonnegative(),
+  generalExpense: z.number().nonnegative(),
+  householdExpense: z.number().nonnegative(),
+  mortgageExpense: z.number().nonnegative(),
+  investments: z.array(InvestmentEntrySchema).default([]),
+  note: z.string().optional(),
+  createdAt: z.string(),
+})
+export type MonthlyRecord = z.infer<typeof MonthlyRecordSchema>
+
 export const AdviceGuardrailsSchema = z.object({
   rebalancingBandPercent: z.number(),
   maxTiltPercent: z.number(),
@@ -95,6 +115,7 @@ export const AppDataSchema = z.object({
   checkIns: z.array(NetWorthCheckInSchema),
   marketCheckIns: z.array(MarketCheckInSchema),
   marketPriceHistory: MarketPriceHistorySchema,
+  monthlyRecords: z.array(MonthlyRecordSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -131,5 +152,6 @@ export function createDefaultAppData(): AppData {
       tw0050: [],
       lastFetchedDate: null,
     },
+    monthlyRecords: [],
   }
 }

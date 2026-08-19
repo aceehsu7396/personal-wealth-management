@@ -3,6 +3,7 @@ import { useAppStore } from '../lib/storage/appStore'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
 import { computeProgressPercent } from '../lib/calculations/progress'
 import { computeAdvice } from '../lib/calculations/adviceRules'
+import { computeNetCashFlow } from '../lib/calculations/netCashFlow'
 import { isReviewDue } from '../lib/reviewSchedule'
 import { StatCard } from '../components/StatCard'
 import { AdviceSummary } from '../components/AdviceSummary'
@@ -14,6 +15,7 @@ export function DashboardPage() {
   const assumptions = useAppStore((s) => s.assumptions)
   const checkIns = useAppStore((s) => s.checkIns)
   const marketCheckIns = useAppStore((s) => s.marketCheckIns)
+  const monthlyRecords = useAppStore((s) => s.monthlyRecords)
   const guardrails = useAppStore((s) => s.guardrails)
 
   const result = computeFireProjection(profile, assumptions)
@@ -27,6 +29,12 @@ export function DashboardPage() {
   const latestMarketCheckIn = sortedMarketCheckIns[0]
   const advice = latestMarketCheckIn ? computeAdvice(latestMarketCheckIn, guardrails) : null
   const reviewDue = isReviewDue(latestMarketCheckIn?.date, guardrails.reviewCadenceMonths)
+
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const currentMonthRecord = monthlyRecords.find((r) => r.month === currentMonth)
+  const currentMonthNetCashFlow = currentMonthRecord
+    ? computeNetCashFlow(currentMonthRecord).netCashFlow
+    : null
 
   const progressStat = result.alreadyFire
     ? '已達成財富自由'
@@ -70,7 +78,7 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="最新淨值"
           value={formatCurrency(latestNetWorth, profile.currency)}
@@ -90,6 +98,17 @@ export function DashboardPage() {
           value={progressStat}
           hint={result.targetDate ? formatDate(result.targetDate) : undefined}
         />
+        <Link to="/records" className="block">
+          <StatCard
+            label="本月淨收支"
+            value={
+              currentMonthNetCashFlow !== null
+                ? formatCurrency(currentMonthNetCashFlow, profile.currency)
+                : '—'
+            }
+            hint={currentMonthRecord ? undefined : '尚無本月紀錄'}
+          />
+        </Link>
       </div>
 
       <div className="mt-8 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">

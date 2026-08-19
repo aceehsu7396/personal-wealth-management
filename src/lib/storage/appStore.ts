@@ -11,6 +11,7 @@ import {
   type NetWorthCheckIn,
   type MarketCheckIn,
   type DailyClose,
+  type MonthlyRecord,
 } from './schema'
 
 export const STORAGE_KEY = 'pfm:appData'
@@ -58,6 +59,12 @@ interface AppStore extends AppData {
     entry: Partial<Omit<MarketCheckIn, 'id' | 'createdAt'>>,
   ) => void
   removeMarketCheckIn: (id: string) => void
+  addMonthlyRecord: (entry: Omit<MonthlyRecord, 'id' | 'createdAt'>) => void
+  updateMonthlyRecord: (
+    id: string,
+    entry: Partial<Omit<MonthlyRecord, 'id' | 'createdAt'>>,
+  ) => void
+  removeMonthlyRecord: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -76,6 +83,7 @@ function toAppData(state: AppData): AppData {
     checkIns: state.checkIns,
     marketCheckIns: state.marketCheckIns,
     marketPriceHistory: state.marketPriceHistory,
+    monthlyRecords: state.monthlyRecords,
   }
 }
 
@@ -145,6 +153,26 @@ export const useAppStore = create<AppStore>()(
       removeMarketCheckIn: (id) =>
         set((state) => ({
           marketCheckIns: state.marketCheckIns.filter((c) => c.id !== id),
+        })),
+
+      addMonthlyRecord: (entry) =>
+        set((state) => ({
+          monthlyRecords: [
+            ...state.monthlyRecords,
+            { ...entry, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
+          ],
+        })),
+
+      updateMonthlyRecord: (id, entry) =>
+        set((state) => ({
+          monthlyRecords: state.monthlyRecords.map((r) =>
+            r.id === id ? { ...r, ...entry } : r,
+          ),
+        })),
+
+      removeMonthlyRecord: (id) =>
+        set((state) => ({
+          monthlyRecords: state.monthlyRecords.filter((r) => r.id !== id),
         })),
 
       mergeMarketPriceHistory: (taiex, tw0050, fetchedOn) =>
