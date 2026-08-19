@@ -66,25 +66,64 @@ export const MarketCheckInSchema = z.object({
 })
 export type MarketCheckIn = z.infer<typeof MarketCheckInSchema>
 
-export const InvestmentEntrySchema = z.object({
-  name: z.string().min(1, '請輸入投資項目名稱'),
+export const MonthlyLineItemSchema = z.object({
+  name: z.string().min(1, '請輸入項目名稱'),
   amount: z.number().nonnegative('金額不可為負數'),
 })
-export type InvestmentEntry = z.infer<typeof InvestmentEntrySchema>
+export type MonthlyLineItem = z.infer<typeof MonthlyLineItemSchema>
 
-export const MonthlyRecordSchema = z.object({
+const MonthlyRecordShapeSchema = z.object({
   id: z.string(),
   month: z.string().regex(/^\d{4}-\d{2}$/, '格式須為 YYYY-MM'),
-  salaryIncome: z.number().nonnegative(),
-  dividendIncome: z.number().nonnegative(),
-  generalExpense: z.number().nonnegative(),
-  householdExpense: z.number().nonnegative(),
-  mortgageExpense: z.number().nonnegative(),
-  investments: z.array(InvestmentEntrySchema).default([]),
+  income: z.array(MonthlyLineItemSchema).default([]),
+  expenses: z.array(MonthlyLineItemSchema).default([]),
+  investments: z.array(MonthlyLineItemSchema).default([]),
   note: z.string().optional(),
   createdAt: z.string(),
 })
-export type MonthlyRecord = z.infer<typeof MonthlyRecordSchema>
+
+// Records created before income/expenses became free-form lists stored them as
+// fixed number fields. Detect that legacy shape and fold it into the current
+// one so old localStorage data survives instead of silently losing its values.
+function normalizeMonthlyRecordInput(raw: unknown): unknown {
+  if (raw !== null && typeof raw === 'object' && 'salaryIncome' in raw) {
+    const legacy = raw as {
+      id: string
+      month: string
+      salaryIncome: number
+      dividendIncome: number
+      generalExpense: number
+      householdExpense: number
+      mortgageExpense: number
+      investments?: MonthlyLineItem[]
+      note?: string
+      createdAt: string
+    }
+    return {
+      id: legacy.id,
+      month: legacy.month,
+      income: [
+        { name: '薪資收入', amount: legacy.salaryIncome },
+        { name: '股息收入', amount: legacy.dividendIncome },
+      ],
+      expenses: [
+        { name: '一般消費', amount: legacy.generalExpense },
+        { name: '家庭消費', amount: legacy.householdExpense },
+        { name: '房貸', amount: legacy.mortgageExpense },
+      ],
+      investments: legacy.investments ?? [],
+      note: legacy.note,
+      createdAt: legacy.createdAt,
+    }
+  }
+  return raw
+}
+
+export const MonthlyRecordSchema = z.preprocess(
+  normalizeMonthlyRecordInput,
+  MonthlyRecordShapeSchema,
+)
+export type MonthlyRecord = z.infer<typeof MonthlyRecordShapeSchema>
 
 export const AdviceGuardrailsSchema = z.object({
   rebalancingBandPercent: z.number(),

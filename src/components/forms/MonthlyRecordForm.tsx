@@ -3,19 +3,16 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { errorClass, inputClass, labelClass } from './FormField'
 
-const investmentSchema = z.object({
+const lineItemSchema = z.object({
   name: z.string().min(1, '請輸入項目名稱'),
   amount: z.coerce.number().nonnegative('金額不可為負數'),
 })
 
 const schema = z.object({
   month: z.string().regex(/^\d{4}-\d{2}$/, '請選擇月份'),
-  salaryIncome: z.coerce.number().nonnegative('金額不可為負數'),
-  dividendIncome: z.coerce.number().nonnegative('金額不可為負數'),
-  generalExpense: z.coerce.number().nonnegative('金額不可為負數'),
-  householdExpense: z.coerce.number().nonnegative('金額不可為負數'),
-  mortgageExpense: z.coerce.number().nonnegative('金額不可為負數'),
-  investments: z.array(investmentSchema),
+  income: z.array(lineItemSchema),
+  expenses: z.array(lineItemSchema),
+  investments: z.array(lineItemSchema),
   note: z.string().optional(),
 })
 
@@ -31,11 +28,15 @@ interface Props {
 function blankDefaults(month: string): FormInput {
   return {
     month,
-    salaryIncome: 0,
-    dividendIncome: 0,
-    generalExpense: 0,
-    householdExpense: 0,
-    mortgageExpense: 0,
+    income: [
+      { name: '薪資收入', amount: 0 },
+      { name: '股息收入', amount: 0 },
+    ],
+    expenses: [
+      { name: '一般消費', amount: 0 },
+      { name: '家庭消費', amount: 0 },
+      { name: '房貸', amount: 0 },
+    ],
     investments: [],
     note: '',
   }
@@ -54,7 +55,9 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
     defaultValues: initialValues ?? blankDefaults(currentMonth),
   })
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'investments' })
+  const income = useFieldArray({ control, name: 'income' })
+  const expenses = useFieldArray({ control, name: 'expenses' })
+  const investments = useFieldArray({ control, name: 'investments' })
 
   const submit = handleSubmit((values) => {
     onSubmit(values)
@@ -72,47 +75,104 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
       </label>
 
       <div>
-        <h3 className={labelClass}>收入</h3>
-        <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <label className="block">
-            <span className={labelClass}>薪資收入</span>
-            <input type="number" className={inputClass} {...register('salaryIncome')} />
-            {errors.salaryIncome && <p className={errorClass}>{errors.salaryIncome.message}</p>}
-          </label>
-          <label className="block">
-            <span className={labelClass}>股息收入</span>
-            <input type="number" className={inputClass} {...register('dividendIncome')} />
-            {errors.dividendIncome && (
-              <p className={errorClass}>{errors.dividendIncome.message}</p>
-            )}
-          </label>
+        <div className="flex items-center justify-between">
+          <h3 className={labelClass}>收入</h3>
+          <button
+            type="button"
+            onClick={() => income.append({ name: '', amount: 0 })}
+            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+          >
+            + 新增收入項目
+          </button>
+        </div>
+        <div className="mt-2 space-y-2">
+          {income.fields.length === 0 && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">尚未新增任何收入項目。</p>
+          )}
+          {income.fields.map((field, index) => (
+            <div key={field.id} className="flex items-start gap-2">
+              <label className="block flex-1">
+                {index === 0 && <span className={labelClass}>項目名稱</span>}
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="例如：薪資收入"
+                  {...register(`income.${index}.name` as const)}
+                />
+                {errors.income?.[index]?.name && (
+                  <p className={errorClass}>{errors.income[index]?.name?.message}</p>
+                )}
+              </label>
+              <label className="block w-32">
+                {index === 0 && <span className={labelClass}>金額</span>}
+                <input
+                  type="number"
+                  className={inputClass}
+                  {...register(`income.${index}.amount` as const)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => income.remove(index)}
+                className={`text-xs font-medium text-red-600 hover:underline dark:text-red-400 ${
+                  index === 0 ? 'mt-7' : 'mt-1'
+                }`}
+              >
+                移除
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
       <div>
-        <h3 className={labelClass}>支出</h3>
-        <div className="mt-2 grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <label className="block">
-            <span className={labelClass}>一般消費</span>
-            <input type="number" className={inputClass} {...register('generalExpense')} />
-            {errors.generalExpense && (
-              <p className={errorClass}>{errors.generalExpense.message}</p>
-            )}
-          </label>
-          <label className="block">
-            <span className={labelClass}>家庭消費</span>
-            <input type="number" className={inputClass} {...register('householdExpense')} />
-            {errors.householdExpense && (
-              <p className={errorClass}>{errors.householdExpense.message}</p>
-            )}
-          </label>
-          <label className="block">
-            <span className={labelClass}>房貸</span>
-            <input type="number" className={inputClass} {...register('mortgageExpense')} />
-            {errors.mortgageExpense && (
-              <p className={errorClass}>{errors.mortgageExpense.message}</p>
-            )}
-          </label>
+        <div className="flex items-center justify-between">
+          <h3 className={labelClass}>支出</h3>
+          <button
+            type="button"
+            onClick={() => expenses.append({ name: '', amount: 0 })}
+            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+          >
+            + 新增支出項目
+          </button>
+        </div>
+        <div className="mt-2 space-y-2">
+          {expenses.fields.length === 0 && (
+            <p className="text-xs text-slate-500 dark:text-slate-400">尚未新增任何支出項目。</p>
+          )}
+          {expenses.fields.map((field, index) => (
+            <div key={field.id} className="flex items-start gap-2">
+              <label className="block flex-1">
+                {index === 0 && <span className={labelClass}>項目名稱</span>}
+                <input
+                  type="text"
+                  className={inputClass}
+                  placeholder="例如：一般消費"
+                  {...register(`expenses.${index}.name` as const)}
+                />
+                {errors.expenses?.[index]?.name && (
+                  <p className={errorClass}>{errors.expenses[index]?.name?.message}</p>
+                )}
+              </label>
+              <label className="block w-32">
+                {index === 0 && <span className={labelClass}>金額</span>}
+                <input
+                  type="number"
+                  className={inputClass}
+                  {...register(`expenses.${index}.amount` as const)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => expenses.remove(index)}
+                className={`text-xs font-medium text-red-600 hover:underline dark:text-red-400 ${
+                  index === 0 ? 'mt-7' : 'mt-1'
+                }`}
+              >
+                移除
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -121,19 +181,19 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
           <h3 className={labelClass}>投資</h3>
           <button
             type="button"
-            onClick={() => append({ name: '', amount: 0 })}
+            onClick={() => investments.append({ name: '', amount: 0 })}
             className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
           >
             + 新增投資項目
           </button>
         </div>
         <div className="mt-2 space-y-2">
-          {fields.length === 0 && (
+          {investments.fields.length === 0 && (
             <p className="text-xs text-slate-500 dark:text-slate-400">
               本月尚未新增任何投資項目。
             </p>
           )}
-          {fields.map((field, index) => (
+          {investments.fields.map((field, index) => (
             <div key={field.id} className="flex items-start gap-2">
               <label className="block flex-1">
                 {index === 0 && <span className={labelClass}>項目名稱</span>}
@@ -157,7 +217,7 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
               </label>
               <button
                 type="button"
-                onClick={() => remove(index)}
+                onClick={() => investments.remove(index)}
                 className={`text-xs font-medium text-red-600 hover:underline dark:text-red-400 ${
                   index === 0 ? 'mt-7' : 'mt-1'
                 }`}

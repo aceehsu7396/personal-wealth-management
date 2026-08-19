@@ -7,10 +7,14 @@ export interface NetCashFlowResult {
   netCashFlow: number
 }
 
+function sumAmounts(items: { amount: number }[]): number {
+  return items.reduce((sum, item) => sum + item.amount, 0)
+}
+
 export function computeNetCashFlow(record: MonthlyRecord): NetCashFlowResult {
-  const incomeTotal = record.salaryIncome + record.dividendIncome
-  const expenseTotal = record.generalExpense + record.householdExpense + record.mortgageExpense
-  const investmentTotal = record.investments.reduce((sum, i) => sum + i.amount, 0)
+  const incomeTotal = sumAmounts(record.income)
+  const expenseTotal = sumAmounts(record.expenses)
+  const investmentTotal = sumAmounts(record.investments)
   const netCashFlow = incomeTotal - expenseTotal - investmentTotal
   return { incomeTotal, expenseTotal, investmentTotal, netCashFlow }
 }

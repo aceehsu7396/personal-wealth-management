@@ -32,7 +32,10 @@ const validatingStorage: StateStorage = {
         )
         return null
       }
-      return raw
+      // Return the validated/transformed data, not the raw string — zod
+      // defaults and preprocess-based migrations (e.g. schema evolutions)
+      // only take effect if callers see result.data, not the original JSON.
+      return JSON.stringify({ ...parsed, state: result.data })
     } catch (error) {
       localStorage.setItem(`${name}${BACKUP_SUFFIX}`, raw)
       console.warn(
