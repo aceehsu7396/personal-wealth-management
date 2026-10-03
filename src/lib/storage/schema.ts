@@ -188,6 +188,72 @@ export const MacroCheckInSchema = z.object({
 })
 export type MacroCheckIn = z.infer<typeof MacroCheckInSchema>
 
+export const MarketSchema = z.enum(['TW', 'US'])
+export type Market = z.infer<typeof MarketSchema>
+
+export const LynchCategorySchema = z.enum([
+  'slow_grower',
+  'stalwart',
+  'fast_grower',
+  'cyclical',
+  'turnaround',
+  'asset_play',
+])
+export type LynchCategory = z.infer<typeof LynchCategorySchema>
+
+export const ThesisStatusSchema = z.enum(['watch', 'holding', 'exited'])
+export type ThesisStatus = z.infer<typeof ThesisStatusSchema>
+
+const Score1to5 = z.number().min(1).max(5)
+const Score0to5 = z.number().min(0).max(5)
+
+export const StockThesisSchema = z.object({
+  id: z.string(),
+  ticker: z.string(),
+  name: z.string(),
+  market: MarketSchema,
+  sector: z.string(),
+  lynchCategory: LynchCategorySchema,
+  inCircleOfCompetence: z.boolean(),
+  status: ThesisStatusSchema,
+  thesis: z.string(),
+  drivers: z.string(),
+  killCriteria: z.string(),
+  sources: z.string(),
+  preMortem: z.string(),
+  policyRisk: z.string().optional(),
+  fiveForces: z.object({
+    rivalry: Score1to5,
+    newEntrants: Score1to5,
+    substitutes: Score1to5,
+    buyerPower: Score1to5,
+    supplierPower: Score1to5,
+  }),
+  powers: z.object({
+    scaleEconomies: Score0to5,
+    networkEconomies: Score0to5,
+    counterPositioning: Score0to5,
+    switchingCosts: Score0to5,
+    branding: Score0to5,
+    corneredResource: Score0to5,
+    processPower: Score0to5,
+  }),
+  fScore: z.number().min(0).max(9),
+  roicPercent: z.number().optional(),
+  waccPercent: z.number().optional(),
+  hasUnexplainedRedFlags: z.boolean(),
+  fairValueBear: z.number(),
+  fairValueBase: z.number(),
+  fairValueBull: z.number(),
+  currentPrice: z.number(),
+  impliedGrowthPercent: z.number().optional(),
+  historicalGrowthPercent: z.number().optional(),
+  marginOfSafetyOverridePercent: z.number().optional(),
+  updatedAt: z.string(),
+  createdAt: z.string(),
+})
+export type StockThesis = z.infer<typeof StockThesisSchema>
+
 export const InvestmentPolicySchema = z.object({
   targetYears: z.number(),
   coreTwEquityPercent: z.number(),
@@ -236,6 +302,7 @@ export const AppDataSchema = z.object({
   monthlyRecords: z.array(MonthlyRecordSchema).default([]),
   investmentPolicy: InvestmentPolicySchema.default(createDefaultInvestmentPolicy),
   macroCheckIns: z.array(MacroCheckInSchema).default([]),
+  stockTheses: z.array(StockThesisSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -275,5 +342,6 @@ export function createDefaultAppData(): AppData {
     monthlyRecords: [],
     investmentPolicy: createDefaultInvestmentPolicy(),
     macroCheckIns: [],
+    stockTheses: [],
   }
 }

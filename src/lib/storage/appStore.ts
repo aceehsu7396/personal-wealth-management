@@ -14,6 +14,7 @@ import {
   type MonthlyRecord,
   type InvestmentPolicy,
   type MacroCheckIn,
+  type StockThesis,
 } from './schema'
 
 export const STORAGE_KEY = 'pfm:appData'
@@ -74,6 +75,12 @@ interface AppStore extends AppData {
   addMacroCheckIn: (entry: Omit<MacroCheckIn, 'id' | 'createdAt'>) => void
   updateMacroCheckIn: (id: string, entry: Partial<Omit<MacroCheckIn, 'id' | 'createdAt'>>) => void
   removeMacroCheckIn: (id: string) => void
+  addStockThesis: (entry: Omit<StockThesis, 'id' | 'createdAt' | 'updatedAt'>) => string
+  updateStockThesis: (
+    id: string,
+    entry: Partial<Omit<StockThesis, 'id' | 'createdAt' | 'updatedAt'>>,
+  ) => void
+  removeStockThesis: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -95,6 +102,7 @@ function toAppData(state: AppData): AppData {
     monthlyRecords: state.monthlyRecords,
     investmentPolicy: state.investmentPolicy,
     macroCheckIns: state.macroCheckIns,
+    stockTheses: state.stockTheses,
   }
 }
 
@@ -210,6 +218,25 @@ export const useAppStore = create<AppStore>()(
 
       removeMacroCheckIn: (id) =>
         set((state) => ({ macroCheckIns: state.macroCheckIns.filter((c) => c.id !== id) })),
+
+      addStockThesis: (entry) => {
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+        set((state) => ({
+          stockTheses: [...state.stockTheses, { ...entry, id, createdAt: now, updatedAt: now }],
+        }))
+        return id
+      },
+
+      updateStockThesis: (id, entry) =>
+        set((state) => ({
+          stockTheses: state.stockTheses.map((t) =>
+            t.id === id ? { ...t, ...entry, updatedAt: new Date().toISOString() } : t,
+          ),
+        })),
+
+      removeStockThesis: (id) =>
+        set((state) => ({ stockTheses: state.stockTheses.filter((t) => t.id !== id) })),
 
       mergeMarketPriceHistory: (taiex, tw0050, fetchedOn) =>
         set((state) => ({
