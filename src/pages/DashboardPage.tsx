@@ -7,6 +7,7 @@ import { computeNetCashFlow } from '../lib/calculations/netCashFlow'
 import { isReviewDue } from '../lib/reviewSchedule'
 import { StatCard } from '../components/StatCard'
 import { AdviceSummary } from '../components/AdviceSummary'
+import { StrategyOverview } from '../components/StrategyOverview'
 import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedChart'
 import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 
@@ -110,6 +111,8 @@ export function DashboardPage() {
           />
         </Link>
       </div>
+
+      <StrategyOverview />
 
       <div className="mt-8 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
         <div className="mb-2 flex items-center justify-between">
