@@ -6,6 +6,7 @@ import { isReviewDue } from '../lib/reviewSchedule'
 import { MarketPriceChart } from '../components/charts/MarketPriceChart'
 import { AdviceSummary } from '../components/AdviceSummary'
 import { AiResearchSummary } from '../components/AiResearchSummary'
+import { MacroPanel } from '../components/MacroPanel'
 import {
   MarketCheckInForm,
   MARKET_PHASE_LABELS,
@@ -225,6 +226,8 @@ export function MarketCheckInPage() {
           </div>
         )}
       </div>
+
+      <MacroPanel />
     </div>
   )
 }

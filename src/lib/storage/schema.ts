@@ -146,6 +146,48 @@ export const MarketPriceHistorySchema = z.object({
 })
 export type MarketPriceHistory = z.infer<typeof MarketPriceHistorySchema>
 
+export const TrendSchema = z.enum(['up', 'flat', 'down'])
+export type Trend = z.infer<typeof TrendSchema>
+
+// -1 / 0 / +1 signal. For liquidity, +1 means easing; for sentiment, +1 means
+// overheated and -1 means panic.
+export const SignalSchema = z.number().int().min(-1).max(1)
+export type Signal = z.infer<typeof SignalSchema>
+
+export const MacroCheckInSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  growth: z.object({
+    usPmi: TrendSchema,
+    usEmployment: TrendSchema,
+    twBusinessSignal: TrendSchema,
+    twExportOrders: TrendSchema,
+  }),
+  inflation: z.object({
+    usCpi: TrendSchema,
+    twCpi: TrendSchema,
+  }),
+  liquidity: z.object({
+    policyRate: SignalSchema,
+    yieldCurve: SignalSchema,
+    creditSpread: SignalSchema,
+    centralBankBalanceSheet: SignalSchema,
+    usDollar: SignalSchema,
+  }),
+  sentiment: z.object({
+    valuation: SignalSchema,
+    credit: SignalSchema,
+    ipoHype: SignalSchema,
+    media: SignalSchema,
+    margin: SignalSchema,
+    vix: SignalSchema,
+  }),
+  policyNote: z.string().optional(),
+  note: z.string().optional(),
+  createdAt: z.string(),
+})
+export type MacroCheckIn = z.infer<typeof MacroCheckInSchema>
+
 export const InvestmentPolicySchema = z.object({
   targetYears: z.number(),
   coreTwEquityPercent: z.number(),
@@ -193,6 +235,7 @@ export const AppDataSchema = z.object({
   marketPriceHistory: MarketPriceHistorySchema,
   monthlyRecords: z.array(MonthlyRecordSchema).default([]),
   investmentPolicy: InvestmentPolicySchema.default(createDefaultInvestmentPolicy),
+  macroCheckIns: z.array(MacroCheckInSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -231,5 +274,6 @@ export function createDefaultAppData(): AppData {
     },
     monthlyRecords: [],
     investmentPolicy: createDefaultInvestmentPolicy(),
+    macroCheckIns: [],
   }
 }

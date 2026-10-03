@@ -13,6 +13,7 @@ import {
   type DailyClose,
   type MonthlyRecord,
   type InvestmentPolicy,
+  type MacroCheckIn,
 } from './schema'
 
 export const STORAGE_KEY = 'pfm:appData'
@@ -70,6 +71,9 @@ interface AppStore extends AppData {
     entry: Partial<Omit<MonthlyRecord, 'id' | 'createdAt'>>,
   ) => void
   removeMonthlyRecord: (id: string) => void
+  addMacroCheckIn: (entry: Omit<MacroCheckIn, 'id' | 'createdAt'>) => void
+  updateMacroCheckIn: (id: string, entry: Partial<Omit<MacroCheckIn, 'id' | 'createdAt'>>) => void
+  removeMacroCheckIn: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -90,6 +94,7 @@ function toAppData(state: AppData): AppData {
     marketPriceHistory: state.marketPriceHistory,
     monthlyRecords: state.monthlyRecords,
     investmentPolicy: state.investmentPolicy,
+    macroCheckIns: state.macroCheckIns,
   }
 }
 
@@ -189,6 +194,22 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           monthlyRecords: state.monthlyRecords.filter((r) => r.id !== id),
         })),
+
+      addMacroCheckIn: (entry) =>
+        set((state) => ({
+          macroCheckIns: [
+            ...state.macroCheckIns,
+            { ...entry, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
+          ],
+        })),
+
+      updateMacroCheckIn: (id, entry) =>
+        set((state) => ({
+          macroCheckIns: state.macroCheckIns.map((c) => (c.id === id ? { ...c, ...entry } : c)),
+        })),
+
+      removeMacroCheckIn: (id) =>
+        set((state) => ({ macroCheckIns: state.macroCheckIns.filter((c) => c.id !== id) })),
 
       mergeMarketPriceHistory: (taiex, tw0050, fetchedOn) =>
         set((state) => ({
