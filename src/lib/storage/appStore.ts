@@ -15,6 +15,8 @@ import {
   type InvestmentPolicy,
   type MacroCheckIn,
   type StockThesis,
+  type Holding,
+  type PortfolioMeta,
 } from './schema'
 
 export const STORAGE_KEY = 'pfm:appData'
@@ -81,6 +83,11 @@ interface AppStore extends AppData {
     entry: Partial<Omit<StockThesis, 'id' | 'createdAt' | 'updatedAt'>>,
   ) => void
   removeStockThesis: (id: string) => void
+  addHolding: (entry: Omit<Holding, 'id' | 'createdAt'>) => string
+  updateHolding: (id: string, entry: Partial<Omit<Holding, 'id' | 'createdAt'>>) => void
+  removeHolding: (id: string) => void
+  setPortfolioMeta: (meta: Partial<PortfolioMeta>) => void
+  recordPortfolioValue: (totalValueTwd: number, date: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -103,6 +110,8 @@ function toAppData(state: AppData): AppData {
     investmentPolicy: state.investmentPolicy,
     macroCheckIns: state.macroCheckIns,
     stockTheses: state.stockTheses,
+    holdings: state.holdings,
+    portfolioMeta: state.portfolioMeta,
   }
 }
 
@@ -237,6 +246,38 @@ export const useAppStore = create<AppStore>()(
 
       removeStockThesis: (id) =>
         set((state) => ({ stockTheses: state.stockTheses.filter((t) => t.id !== id) })),
+
+      addHolding: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({
+          holdings: [...state.holdings, { ...entry, id, createdAt: new Date().toISOString() }],
+        }))
+        return id
+      },
+
+      updateHolding: (id, entry) =>
+        set((state) => ({
+          holdings: state.holdings.map((h) => (h.id === id ? { ...h, ...entry } : h)),
+        })),
+
+      removeHolding: (id) =>
+        set((state) => ({ holdings: state.holdings.filter((h) => h.id !== id) })),
+
+      setPortfolioMeta: (meta) =>
+        set((state) => ({ portfolioMeta: { ...state.portfolioMeta, ...meta } })),
+
+      recordPortfolioValue: (totalValueTwd, date) =>
+        set((state) =>
+          totalValueTwd > state.portfolioMeta.peakValueTwd
+            ? {
+                portfolioMeta: {
+                  ...state.portfolioMeta,
+                  peakValueTwd: totalValueTwd,
+                  peakDate: date,
+                },
+              }
+            : {},
+        ),
 
       mergeMarketPriceHistory: (taiex, tw0050, fetchedOn) =>
         set((state) => ({

@@ -254,6 +254,41 @@ export const StockThesisSchema = z.object({
 })
 export type StockThesis = z.infer<typeof StockThesisSchema>
 
+export const SleeveSchema = z.enum([
+  'core_tw',
+  'core_global',
+  'core_bond_cash',
+  'satellite_tw',
+  'satellite_us',
+])
+export type Sleeve = z.infer<typeof SleeveSchema>
+
+export const CurrencySchema = z.enum(['TWD', 'USD'])
+export type HoldingCurrency = z.infer<typeof CurrencySchema>
+
+export const HoldingSchema = z.object({
+  id: z.string(),
+  ticker: z.string(),
+  name: z.string(),
+  sleeve: SleeveSchema,
+  currency: CurrencySchema,
+  shares: z.number(),
+  avgCost: z.number(),
+  currentPrice: z.number(),
+  sector: z.string().optional(),
+  thesisId: z.string().optional(),
+  priceUpdatedAt: z.string().optional(),
+  createdAt: z.string(),
+})
+export type Holding = z.infer<typeof HoldingSchema>
+
+export const PortfolioMetaSchema = z.object({
+  fxUsdTwd: z.number(),
+  peakValueTwd: z.number(),
+  peakDate: z.string().nullable(),
+})
+export type PortfolioMeta = z.infer<typeof PortfolioMetaSchema>
+
 export const InvestmentPolicySchema = z.object({
   targetYears: z.number(),
   coreTwEquityPercent: z.number(),
@@ -303,6 +338,8 @@ export const AppDataSchema = z.object({
   investmentPolicy: InvestmentPolicySchema.default(createDefaultInvestmentPolicy),
   macroCheckIns: z.array(MacroCheckInSchema).default([]),
   stockTheses: z.array(StockThesisSchema).default([]),
+  holdings: z.array(HoldingSchema).default([]),
+  portfolioMeta: PortfolioMetaSchema.default({ fxUsdTwd: 32, peakValueTwd: 0, peakDate: null }),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -343,5 +380,7 @@ export function createDefaultAppData(): AppData {
     investmentPolicy: createDefaultInvestmentPolicy(),
     macroCheckIns: [],
     stockTheses: [],
+    holdings: [],
+    portfolioMeta: { fxUsdTwd: 32, peakValueTwd: 0, peakDate: null },
   }
 }

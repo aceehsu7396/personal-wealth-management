@@ -8,6 +8,7 @@ import { MonthlyRecordsPage } from './pages/MonthlyRecordsPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StrategyPage } from './pages/StrategyPage'
 import { ResearchPage } from './pages/ResearchPage'
+import { PortfolioPage } from './pages/PortfolioPage'
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/strategy" element={<StrategyPage />} />
           <Route path="/market" element={<MarketCheckInPage />} />
           <Route path="/research" element={<ResearchPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/progress" element={<ProgressTrackerPage />} />
           <Route path="/records" element={<MonthlyRecordsPage />} />
           <Route path="/settings" element={<SettingsPage />} />

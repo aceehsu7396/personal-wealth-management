@@ -29,6 +29,9 @@ export function NavBar() {
         <NavLink to="/research" className={linkClass}>
           個股研究
         </NavLink>
+        <NavLink to="/portfolio" className={linkClass}>
+          投資組合
+        </NavLink>
         <NavLink to="/progress" className={linkClass}>
           進度追蹤
         </NavLink>

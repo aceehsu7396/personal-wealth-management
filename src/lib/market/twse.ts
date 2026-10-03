@@ -51,7 +51,23 @@ export async function fetchTaiexMonth(monthDate: Date): Promise<DailyClose[]> {
 }
 
 export async function fetchTw0050Month(monthDate: Date): Promise<DailyClose[]> {
-  return fetchMonth(TW0050_ENDPOINT, monthDate, 6, { stockNo: '0050' })
+  return fetchStockDayMonth('0050', monthDate)
+}
+
+export async function fetchStockDayMonth(stockNo: string, monthDate: Date): Promise<DailyClose[]> {
+  return fetchMonth(TW0050_ENDPOINT, monthDate, 6, { stockNo })
+}
+
+// Latest close for a TWSE-listed security (OTC/TPEx tickers return null).
+// Falls back to last month early in a month before any trading day.
+export async function fetchLatestTwseClose(stockNo: string): Promise<DailyClose | null> {
+  const now = new Date()
+  let closes = await fetchStockDayMonth(stockNo, now)
+  if (closes.length === 0) {
+    closes = await fetchStockDayMonth(stockNo, new Date(now.getFullYear(), now.getMonth() - 1, 1))
+  }
+  const valid = closes.filter((c) => Number.isFinite(c.close))
+  return valid.length > 0 ? valid[valid.length - 1] : null
 }
 
 export function todayIsoDate(): string {
