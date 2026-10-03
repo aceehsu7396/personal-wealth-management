@@ -158,8 +158,8 @@ export function PortfolioPage() {
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
           核心目標依 IPS 比例，並把尚未使用的衛星額度按比例分給核心。衛星合計上限 {policy.satellitePercent}%。
           {report.sectorExposure.length > 0 &&
-            ` 衛星產業分布：${report.sectorExposure
-              .map((e) => `${e.sector} ${e.percentOfSatellite.toFixed(0)}%`)
+            ` 各產業占衛星額度：${report.sectorExposure
+              .map((e) => `${e.sector} ${e.percentOfSatelliteBudget.toFixed(0)}%`)
               .join('、')}。`}
         </p>
       </div>

@@ -41,7 +41,7 @@ export interface PortfolioRiskReport {
   sleeves: SleeveView[]
   satellitePercent: number
   usdExposurePercent: number
-  sectorExposure: { sector: string; percentOfSatellite: number }[]
+  sectorExposure: { sector: string; percentOfSatelliteBudget: number }[]
   drawdownPercent: number
   circuitBreakerActive: boolean
   violations: RiskViolation[]
@@ -145,9 +145,13 @@ export function analyzePortfolio(
     const sector = (v.holding.sector || thesis?.sector || '未分類').trim()
     sectorTotals.set(sector, (sectorTotals.get(sector) ?? 0) + v.valueTwd)
   }
+  // Sector caps are measured against the satellite budget (or the actual
+  // satellite if it is larger), so the first few positions are not flagged
+  // simply for being the only stock in their sector.
+  const satelliteBudget = Math.max(satelliteValue, (totalValueTwd * policy.satellitePercent) / 100)
   const sectorExposure = [...sectorTotals.entries()]
-    .map(([sector, value]) => ({ sector, percentOfSatellite: pct(value, satelliteValue) }))
-    .sort((a, b) => b.percentOfSatellite - a.percentOfSatellite)
+    .map(([sector, value]) => ({ sector, percentOfSatelliteBudget: pct(value, satelliteBudget) }))
+    .sort((a, b) => b.percentOfSatelliteBudget - a.percentOfSatelliteBudget)
 
   const peak = Math.max(meta.peakValueTwd, totalValueTwd)
   const drawdownPercent = peak > 0 ? (totalValueTwd / peak - 1) * 100 : 0
@@ -206,12 +210,12 @@ export function analyzePortfolio(
       message: `美元資產占 ${fmt(usdExposurePercent)}%，超過上限 ${policy.maxUsdExposurePercent}%：新資金改投台幣資產。`,
     })
   }
-  for (const { sector, percentOfSatellite } of sectorExposure) {
-    if (percentOfSatellite <= policy.maxSectorPercentOfSatellite) continue
+  for (const { sector, percentOfSatelliteBudget } of sectorExposure) {
+    if (percentOfSatelliteBudget <= policy.maxSectorPercentOfSatellite) continue
     violations.push({
       severity: 'warning',
       rule: '產業集中度',
-      message: `「${sector}」占衛星 ${fmt(percentOfSatellite)}%，超過上限 ${policy.maxSectorPercentOfSatellite}%：停止加碼該產業。`,
+      message: `「${sector}」占衛星額度 ${fmt(percentOfSatelliteBudget)}%，超過上限 ${policy.maxSectorPercentOfSatellite}%：停止加碼該產業。`,
     })
   }
 

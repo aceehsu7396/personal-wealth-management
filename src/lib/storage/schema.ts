@@ -289,6 +289,60 @@ export const PortfolioMetaSchema = z.object({
 })
 export type PortfolioMeta = z.infer<typeof PortfolioMetaSchema>
 
+export const TradeSideSchema = z.enum(['buy', 'sell'])
+export type TradeSide = z.infer<typeof TradeSideSchema>
+
+export const TradeReasonSchema = z.enum([
+  'core_dca',
+  'rebalance',
+  'tranche_1',
+  'tranche_2',
+  'tranche_3',
+  'exit_thesis_broken',
+  'exit_overvalued',
+  'exit_opportunity_cost',
+  'exit_deep_drawdown_review',
+  'exit_over_limit',
+])
+export type TradeReason = z.infer<typeof TradeReasonSchema>
+
+export const ChecklistItemSchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  passed: z.boolean(),
+})
+export type ChecklistItem = z.infer<typeof ChecklistItemSchema>
+
+export const TradeReviewSchema = z.object({
+  reviewedAt: z.string(),
+  outcomeNote: z.string(),
+  decisionQuality: z.number().int().min(1).max(5),
+  lesson: z.string(),
+})
+export type TradeReview = z.infer<typeof TradeReviewSchema>
+
+export const TradeSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  ticker: z.string(),
+  name: z.string(),
+  holdingId: z.string().optional(),
+  thesisId: z.string().optional(),
+  side: TradeSideSchema,
+  reason: TradeReasonSchema,
+  shares: z.number(),
+  price: z.number(),
+  currency: CurrencySchema,
+  checklist: z.array(ChecklistItemSchema),
+  exceptionReason: z.string().optional(),
+  emotion: z.number().int().min(1).max(5),
+  biasNotes: z.string(),
+  review6m: TradeReviewSchema.optional(),
+  review12m: TradeReviewSchema.optional(),
+  createdAt: z.string(),
+})
+export type Trade = z.infer<typeof TradeSchema>
+
 export const InvestmentPolicySchema = z.object({
   targetYears: z.number(),
   coreTwEquityPercent: z.number(),
@@ -340,6 +394,7 @@ export const AppDataSchema = z.object({
   stockTheses: z.array(StockThesisSchema).default([]),
   holdings: z.array(HoldingSchema).default([]),
   portfolioMeta: PortfolioMetaSchema.default({ fxUsdTwd: 32, peakValueTwd: 0, peakDate: null }),
+  trades: z.array(TradeSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -382,5 +437,6 @@ export function createDefaultAppData(): AppData {
     stockTheses: [],
     holdings: [],
     portfolioMeta: { fxUsdTwd: 32, peakValueTwd: 0, peakDate: null },
+    trades: [],
   }
 }

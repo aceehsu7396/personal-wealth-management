@@ -135,14 +135,25 @@ describe('analyzePortfolio', () => {
   })
 
   it('flags sector concentration within the satellite', () => {
+    // Satellite budget = 30% of 100,000; semiconductors hold 9,000 of it.
     const holdings = [
       holding({ sleeve: 'core_tw', shares: 900 }),
-      holding({ sleeve: 'satellite_tw', shares: 30, thesisId: 'th1' }),
+      holding({ sleeve: 'satellite_tw', shares: 90, thesisId: 'th1' }),
       holding({ sleeve: 'satellite_tw', shares: 10, thesisId: 'th2' }),
     ]
     const report = analyzePortfolio(holdings, theses, policy, guardrails, meta)
-    expect(report.sectorExposure[0]).toEqual({ sector: '半導體', percentOfSatellite: 75 })
+    expect(report.sectorExposure[0].sector).toBe('半導體')
+    expect(report.sectorExposure[0].percentOfSatelliteBudget).toBeCloseTo(30)
     expect(report.violations.some((v) => v.rule === '產業集中度')).toBe(true)
+  })
+
+  it('does not flag the first satellite position for sector concentration', () => {
+    const holdings = [
+      holding({ sleeve: 'core_tw', shares: 970 }),
+      holding({ sleeve: 'satellite_tw', shares: 30, thesisId: 'th1' }),
+    ]
+    const report = analyzePortfolio(holdings, theses, policy, guardrails, meta)
+    expect(report.violations.some((v) => v.rule === '產業集中度')).toBe(false)
   })
 
   it('triggers the circuit breaker on a drawdown past the threshold', () => {

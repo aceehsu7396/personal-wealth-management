@@ -32,6 +32,9 @@ export function NavBar() {
         <NavLink to="/portfolio" className={linkClass}>
           投資組合
         </NavLink>
+        <NavLink to="/trades" className={linkClass}>
+          交易日誌
+        </NavLink>
         <NavLink to="/progress" className={linkClass}>
           進度追蹤
         </NavLink>

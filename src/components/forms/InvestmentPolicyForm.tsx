@@ -77,7 +77,7 @@ const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
   },
   {
     name: 'maxSectorPercentOfSatellite',
-    label: '單一產業上限（占衛星 %）',
+    label: '單一產業上限（占衛星額度 %）',
     step: '1',
   },
   { name: 'maxUsdExposurePercent', label: '美元資產上限（%）', step: '1' },

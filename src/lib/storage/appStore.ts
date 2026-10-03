@@ -17,6 +17,7 @@ import {
   type StockThesis,
   type Holding,
   type PortfolioMeta,
+  type Trade,
 } from './schema'
 
 export const STORAGE_KEY = 'pfm:appData'
@@ -88,6 +89,9 @@ interface AppStore extends AppData {
   removeHolding: (id: string) => void
   setPortfolioMeta: (meta: Partial<PortfolioMeta>) => void
   recordPortfolioValue: (totalValueTwd: number, date: string) => void
+  addTrade: (entry: Omit<Trade, 'id' | 'createdAt'>) => string
+  updateTrade: (id: string, entry: Partial<Omit<Trade, 'id' | 'createdAt'>>) => void
+  removeTrade: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -112,6 +116,7 @@ function toAppData(state: AppData): AppData {
     stockTheses: state.stockTheses,
     holdings: state.holdings,
     portfolioMeta: state.portfolioMeta,
+    trades: state.trades,
   }
 }
 
@@ -278,6 +283,21 @@ export const useAppStore = create<AppStore>()(
               }
             : {},
         ),
+
+      addTrade: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({
+          trades: [...state.trades, { ...entry, id, createdAt: new Date().toISOString() }],
+        }))
+        return id
+      },
+
+      updateTrade: (id, entry) =>
+        set((state) => ({
+          trades: state.trades.map((t) => (t.id === id ? { ...t, ...entry } : t)),
+        })),
+
+      removeTrade: (id) => set((state) => ({ trades: state.trades.filter((t) => t.id !== id) })),
 
       mergeMarketPriceHistory: (taiex, tw0050, fetchedOn) =>
         set((state) => ({
