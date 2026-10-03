@@ -1,0 +1,182 @@
+import { useAppStore } from '../lib/storage/appStore'
+import { computeFireProjection } from '../lib/calculations/fireProjection'
+import {
+  computeRequiredReturn,
+  FEASIBILITY_LABELS,
+} from '../lib/calculations/requiredReturn'
+import { InvestmentPolicyForm } from '../components/forms/InvestmentPolicyForm'
+import { StatCard } from '../components/StatCard'
+import { formatCurrency } from '../lib/format'
+
+const cardClass =
+  'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
+
+const PRINCIPLES = [
+  'IPS 定框架：只在每年 1 月或人生重大事件時修改，市場大漲大跌時不改。',
+  '由上而下決定「多少」：總經只能在 ± 配置微調上限內調整股債比例。',
+  '由下而上決定「買什麼」：衛星個股必須通過產業、財務、估值三關。',
+  '風控優先於看法：部位上限與回撤熔斷不因個別觀點而放寬。',
+  '評估流程而非結果：每筆交易留下理由，事後以歸因區分運氣與能力。',
+]
+
+export function StrategyPage() {
+  const profile = useAppStore((s) => s.profile)
+  const assumptions = useAppStore((s) => s.assumptions)
+  const policy = useAppStore((s) => s.investmentPolicy)
+
+  const projection = computeFireProjection(profile, assumptions)
+  const required = computeRequiredReturn(
+    profile,
+    assumptions,
+    policy.targetYears,
+  )
+  const requiredText =
+    required.requiredNominalReturnPercent === null
+      ? '—'
+      : `${required.requiredNominalReturnPercent.toFixed(2)}%`
+  const meetsAssumption =
+    required.requiredNominalReturnPercent !== null &&
+    assumptions.expectedAnnualReturnPercent >=
+      required.requiredNominalReturnPercent
+
+  const coreTotal =
+    policy.coreTwEquityPercent +
+    policy.coreGlobalEquityPercent +
+    policy.coreBondCashPercent
+  const allocationRows = [
+    {
+      layer: '核心',
+      name: '台股大盤 ETF',
+      percent: policy.coreTwEquityPercent,
+      example: '0050、006208',
+    },
+    {
+      layer: '核心',
+      name: '美股/全球 ETF',
+      percent: policy.coreGlobalEquityPercent,
+      example: 'VT、VOO、VTI',
+    },
+    {
+      layer: '核心',
+      name: '債券/現金',
+      percent: policy.coreBondCashPercent,
+      example: 'BND、短期美債',
+    },
+    {
+      layer: '衛星',
+      name: '台股 + 美股個股',
+      percent: policy.satellitePercent,
+      example: '依個股研究卡',
+    },
+  ]
+
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-10">
+      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+        投資策略
+      </h1>
+      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+        投資政策聲明（IPS）：目標報酬、風險預算與資產配置。完整說明見專案中的
+        docs/strategy 手冊。
+      </p>
+
+      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="FIRE 目標金額"
+          value={formatCurrency(projection.fireNumber, profile.currency)}
+        />
+        <StatCard label="目標年限" value={`${policy.targetYears} 年`} />
+        <StatCard
+          label="所需年化報酬（名目）"
+          value={requiredText}
+          hint={FEASIBILITY_LABELS[required.feasibility]}
+        />
+        <StatCard
+          label="目前假設報酬"
+          value={`${assumptions.expectedAnnualReturnPercent}%`}
+          hint={
+            required.requiredNominalReturnPercent === null
+              ? undefined
+              : meetsAssumption
+                ? '假設報酬已足以在目標年限內達成'
+                : '假設報酬不足，需要提高儲蓄或延長年限'
+          }
+        />
+      </div>
+
+      {(required.feasibility === 'unrealistic' ||
+        required.feasibility === 'unreachable') && (
+        <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+          所需報酬過高。依 IPS 原則，應先調整槓桿最小的變數：提高儲蓄率 →
+          延長年限 → 降低支出，最後才考慮提高風險。
+        </p>
+      )}
+
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          策略資產配置（SAA）
+        </h2>
+        <div className="mt-4 overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <th className="py-2 pr-4">層級</th>
+                <th className="py-2 pr-4">類別</th>
+                <th className="py-2 pr-4">目標</th>
+                <th className="py-2 pr-4">工具範例</th>
+              </tr>
+            </thead>
+            <tbody>
+              {allocationRows.map((row) => (
+                <tr
+                  key={row.name}
+                  className="border-b border-slate-100 last:border-0 dark:border-slate-700"
+                >
+                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">
+                    {row.layer}
+                  </td>
+                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    {row.name}
+                  </td>
+                  <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
+                    {row.percent}%
+                  </td>
+                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">
+                    {row.example}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+          核心合計 {coreTotal}%。衛星比重建議依學習路線由 10%
+          起逐步提高，並以績效歸因決定是否擴大。
+        </p>
+      </div>
+
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          IPS 參數
+        </h2>
+        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          修改後自動儲存。這些參數會套用在個股研究、投資組合風控與交易前檢核。
+        </p>
+        <div className="mt-4">
+          <InvestmentPolicyForm />
+        </div>
+      </div>
+
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          策略原則
+        </h2>
+        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-slate-700 dark:text-slate-300">
+          {PRINCIPLES.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  )
+}

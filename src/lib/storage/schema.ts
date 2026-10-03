@@ -146,6 +146,43 @@ export const MarketPriceHistorySchema = z.object({
 })
 export type MarketPriceHistory = z.infer<typeof MarketPriceHistorySchema>
 
+export const InvestmentPolicySchema = z.object({
+  targetYears: z.number(),
+  coreTwEquityPercent: z.number(),
+  coreGlobalEquityPercent: z.number(),
+  coreBondCashPercent: z.number(),
+  satellitePercent: z.number(),
+  maxSinglePositionPercent: z.number(),
+  maxHighConvictionPositionPercent: z.number(),
+  maxSectorPercentOfSatellite: z.number(),
+  maxUsdExposurePercent: z.number(),
+  marginOfSafetyPercent: z.number(),
+  maxDrawdownTolerancePercent: z.number(),
+  drawdownCircuitBreakerPercent: z.number(),
+  reviewDrawdownFromCostPercent: z.number(),
+  updatedAt: z.string(),
+})
+export type InvestmentPolicy = z.infer<typeof InvestmentPolicySchema>
+
+export function createDefaultInvestmentPolicy(): InvestmentPolicy {
+  return {
+    targetYears: 10,
+    coreTwEquityPercent: 25,
+    coreGlobalEquityPercent: 35,
+    coreBondCashPercent: 10,
+    satellitePercent: 30,
+    maxSinglePositionPercent: 5,
+    maxHighConvictionPositionPercent: 8,
+    maxSectorPercentOfSatellite: 25,
+    maxUsdExposurePercent: 70,
+    marginOfSafetyPercent: 25,
+    maxDrawdownTolerancePercent: 30,
+    drawdownCircuitBreakerPercent: 20,
+    reviewDrawdownFromCostPercent: 25,
+    updatedAt: new Date().toISOString(),
+  }
+}
+
 export const AppDataSchema = z.object({
   schemaVersion: z.number(),
   profile: UserProfileSchema,
@@ -155,6 +192,7 @@ export const AppDataSchema = z.object({
   marketCheckIns: z.array(MarketCheckInSchema),
   marketPriceHistory: MarketPriceHistorySchema,
   monthlyRecords: z.array(MonthlyRecordSchema).default([]),
+  investmentPolicy: InvestmentPolicySchema.default(createDefaultInvestmentPolicy),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -192,5 +230,6 @@ export function createDefaultAppData(): AppData {
       lastFetchedDate: null,
     },
     monthlyRecords: [],
+    investmentPolicy: createDefaultInvestmentPolicy(),
   }
 }

@@ -12,6 +12,7 @@ import {
   type MarketCheckIn,
   type DailyClose,
   type MonthlyRecord,
+  type InvestmentPolicy,
 } from './schema'
 
 export const STORAGE_KEY = 'pfm:appData'
@@ -53,6 +54,7 @@ interface AppStore extends AppData {
   setProfile: (profile: Partial<Omit<UserProfile, 'updatedAt'>>) => void
   setAssumptions: (assumptions: Partial<Omit<FireAssumptions, 'updatedAt'>>) => void
   setGuardrails: (guardrails: Partial<AdviceGuardrails>) => void
+  setInvestmentPolicy: (policy: Partial<Omit<InvestmentPolicy, 'updatedAt'>>) => void
   addCheckIn: (entry: Omit<NetWorthCheckIn, 'id' | 'createdAt'>) => void
   updateCheckIn: (id: string, entry: Partial<Omit<NetWorthCheckIn, 'id' | 'createdAt'>>) => void
   removeCheckIn: (id: string) => void
@@ -87,6 +89,7 @@ function toAppData(state: AppData): AppData {
     marketCheckIns: state.marketCheckIns,
     marketPriceHistory: state.marketPriceHistory,
     monthlyRecords: state.monthlyRecords,
+    investmentPolicy: state.investmentPolicy,
   }
 }
 
@@ -121,6 +124,15 @@ export const useAppStore = create<AppStore>()(
 
       setGuardrails: (guardrails) =>
         set((state) => ({ guardrails: { ...state.guardrails, ...guardrails } })),
+
+      setInvestmentPolicy: (policy) =>
+        set((state) => ({
+          investmentPolicy: {
+            ...state.investmentPolicy,
+            ...policy,
+            updatedAt: new Date().toISOString(),
+          },
+        })),
 
       addCheckIn: (entry) =>
         set((state) => ({

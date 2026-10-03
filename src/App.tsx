@@ -6,6 +6,7 @@ import { ProgressTrackerPage } from './pages/ProgressTrackerPage'
 import { MarketCheckInPage } from './pages/MarketCheckInPage'
 import { MonthlyRecordsPage } from './pages/MonthlyRecordsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { StrategyPage } from './pages/StrategyPage'
 
 function App() {
   return (
@@ -15,6 +16,7 @@ function App() {
         <Routes>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/fire" element={<FireCalculatorPage />} />
+          <Route path="/strategy" element={<StrategyPage />} />
           <Route path="/market" element={<MarketCheckInPage />} />
           <Route path="/progress" element={<ProgressTrackerPage />} />
           <Route path="/records" element={<MonthlyRecordsPage />} />
