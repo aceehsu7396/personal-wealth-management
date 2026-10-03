@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
 import {
@@ -12,7 +13,7 @@ const cardClass =
   'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
 
 const PRINCIPLES = [
-  'IPS 定框架：只在每年 1 月或人生重大事件時修改，市場大漲大跌時不改。',
+  '投資政策定框架：只在每年 1 月或人生重大事件時修改，市場大漲大跌時不改。',
   '由上而下決定「多少」：總經只能在 ± 配置微調上限內調整股債比例。',
   '由下而上決定「買什麼」：衛星個股必須通過產業、財務、估值三關。',
   '風控優先於看法：部位上限與回撤熔斷不因個別觀點而放寬。',
@@ -76,13 +77,16 @@ export function StrategyPage() {
         投資策略
       </h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        投資政策聲明（IPS）：目標報酬、風險預算與資產配置。完整說明見專案中的
-        docs/strategy 手冊。
+        投資政策聲明：目標報酬、風險預算與資產配置。完整說明見{' '}
+        <Link to="/handbook/00" className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+          策略手冊
+        </Link>
+        。
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="FIRE 目標金額"
+          label="財務自由目標金額"
           value={formatCurrency(projection.fireNumber, profile.currency)}
         />
         <StatCard label="目標年限" value={`${policy.targetYears} 年`} />
@@ -107,14 +111,14 @@ export function StrategyPage() {
       {(required.feasibility === 'unrealistic' ||
         required.feasibility === 'unreachable') && (
         <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
-          所需報酬過高。依 IPS 原則，應先調整槓桿最小的變數：提高儲蓄率 →
+          所需報酬過高。依投資政策原則，應先調整槓桿最小的變數：提高儲蓄率 →
           延長年限 → 降低支出，最後才考慮提高風險。
         </p>
       )}
 
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          策略資產配置（SAA）
+          策略資產配置
         </h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -157,7 +161,7 @@ export function StrategyPage() {
 
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
-          IPS 參數
+          投資政策參數
         </h2>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           修改後自動儲存。這些參數會套用在個股研究、投資組合風控與交易前檢核。

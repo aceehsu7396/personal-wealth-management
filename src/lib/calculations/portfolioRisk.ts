@@ -175,8 +175,8 @@ export function analyzePortfolio(
   if (drawdownPercent <= -policy.maxDrawdownTolerancePercent) {
     violations.push({
       severity: 'critical',
-      rule: 'IPS 最大回撤',
-      message: `組合自高點回撤 ${fmt(drawdownPercent)}%，超過 IPS 容忍度 −${policy.maxDrawdownTolerancePercent}%。年度檢討時須下修股票比重。`,
+      rule: '投資政策最大回撤',
+      message: `組合自高點回撤 ${fmt(drawdownPercent)}%，超過投資政策容忍度 −${policy.maxDrawdownTolerancePercent}%。年度檢討時須下修股票比重。`,
     })
   }
   if (circuitBreakerActive) {

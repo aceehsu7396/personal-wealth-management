@@ -33,7 +33,7 @@ export function ProgressTrackerPage() {
         進度追蹤
       </h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-        定期記錄實際淨值，對照 FIRE 試算軌跡，隨時掌握進度。
+        定期記錄實際淨值，對照財務自由試算軌跡，隨時掌握進度。
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">

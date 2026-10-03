@@ -60,7 +60,7 @@ export function DashboardPage() {
         <div className="mt-6 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
           歡迎使用！建議先到{' '}
           <Link to="/fire" className="font-medium underline">
-            FIRE 試算
+            財務自由試算
           </Link>{' '}
           填入現況與假設，開始估算你的財富自由時間點。
         </div>

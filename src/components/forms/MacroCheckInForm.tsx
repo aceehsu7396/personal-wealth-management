@@ -56,15 +56,15 @@ const SENTIMENT_OPTIONS = [
 ]
 
 const GROWTH_FIELDS = [
-  { name: 'growth.usPmi', label: '美國 ISM 製造業 PMI' },
+  { name: 'growth.usPmi', label: '美國製造業採購經理人指數' },
   { name: 'growth.usEmployment', label: '美國就業（非農、失業率趨勢）' },
   { name: 'growth.twBusinessSignal', label: '台灣景氣對策信號' },
   { name: 'growth.twExportOrders', label: '台灣外銷訂單/出口年增率' },
 ] as const
 
 const INFLATION_FIELDS = [
-  { name: 'inflation.usCpi', label: '美國 CPI／核心 PCE' },
-  { name: 'inflation.twCpi', label: '台灣 CPI' },
+  { name: 'inflation.usCpi', label: '美國消費者物價指數／核心個人消費支出物價' },
+  { name: 'inflation.twCpi', label: '台灣消費者物價指數' },
 ] as const
 
 const LIQUIDITY_FIELDS = [
@@ -78,10 +78,10 @@ const LIQUIDITY_FIELDS = [
 const SENTIMENT_FIELDS = [
   { name: 'sentiment.valuation', label: '大盤本益比歷史百分位' },
   { name: 'sentiment.credit', label: '發債與信用條件' },
-  { name: 'sentiment.ipoHype', label: 'IPO／題材炒作熱度' },
+  { name: 'sentiment.ipoHype', label: '新股上市／題材炒作熱度' },
   { name: 'sentiment.media', label: '媒體與周遭討論' },
   { name: 'sentiment.margin', label: '融資餘額變化' },
-  { name: 'sentiment.vix', label: 'VIX（<13 過熱、>30 恐慌）' },
+  { name: 'sentiment.vix', label: '恐慌指數 VIX（低於 13 過熱、高於 30 恐慌）' },
 ] as const
 
 function blankDefaults(): FormInput {
@@ -158,7 +158,7 @@ export function MacroCheckInForm({ initialValues, onSubmit, onCancel }: Props) {
       {section('支柱一：成長', '相較 3–6 個月前的方向', GROWTH_FIELDS, TREND_OPTIONS)}
       {section('支柱一：通膨', '相較 3–6 個月前的方向', INFLATION_FIELDS, TREND_OPTIONS)}
       {section('支柱二：流動性', '+1 寬鬆、−1 緊縮', LIQUIDITY_FIELDS, LIQUIDITY_OPTIONS)}
-      {section('支柱三：情緒溫度（Marks 鐘擺）', '+1 過熱、−1 恐慌', SENTIMENT_FIELDS, SENTIMENT_OPTIONS)}
+      {section('支柱三：情緒溫度（馬克斯鐘擺）', '+1 過熱、−1 恐慌', SENTIMENT_FIELDS, SENTIMENT_OPTIONS)}
 
       <label className="block sm:col-span-2">
         <span className={labelClass}>政策面觀察（選填）：貨幣、財政、產業政策、地緣政治</span>

@@ -119,7 +119,7 @@ export function PortfolioPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">配置 vs 目標</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">配置與目標對比</h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -157,7 +157,7 @@ export function PortfolioPage() {
           </table>
         </div>
         <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
-          核心目標依 IPS 比例，並把尚未使用的衛星額度按比例分給核心。衛星合計上限 {policy.satellitePercent}%。
+          核心目標依投資政策比例，並把尚未使用的衛星額度按比例分給核心。衛星合計上限 {policy.satellitePercent}%。
           {report.sectorExposure.length > 0 &&
             ` 各產業占衛星額度：${report.sectorExposure
               .map((e) => `${e.sector} ${e.percentOfSatelliteBudget.toFixed(0)}%`)
@@ -186,7 +186,7 @@ export function PortfolioPage() {
               <thead>
                 <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
                   <th className="py-2 pr-4">標的</th>
-                  <th className="py-2 pr-4">市值（TWD）</th>
+                  <th className="py-2 pr-4">市值（新台幣）</th>
                   <th className="py-2 pr-4">權重</th>
                   <th className="py-2 pr-4">損益</th>
                   <th className="py-2 pr-4">價位</th>

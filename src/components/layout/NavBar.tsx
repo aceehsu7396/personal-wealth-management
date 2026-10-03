@@ -18,7 +18,10 @@ export function NavBar() {
           儀表板
         </NavLink>
         <NavLink to="/fire" className={linkClass}>
-          FIRE 試算
+          財務自由試算
+        </NavLink>
+        <NavLink to="/handbook" className={linkClass}>
+          策略手冊
         </NavLink>
         <NavLink to="/strategy" className={linkClass}>
           投資策略

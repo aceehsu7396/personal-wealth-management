@@ -51,7 +51,7 @@ const BIAS_QUESTIONS = [
   '錨定：合理價來自基本面，還是最近的股價？',
   '損失規避（賣出）：如果現在沒持有，這個價格我會買嗎？',
   '過度自信：如果錯了，損失在可承受範圍內嗎？',
-  '從眾／FOMO：是因為最近很多人在談才想買嗎？',
+  '從眾／錯失恐懼：是因為最近很多人在談才想買嗎？',
 ]
 
 const EMOTION_LABELS = ['1 極度恐懼', '2 恐懼', '3 平靜', '4 貪婪', '5 極度貪婪']
@@ -225,8 +225,8 @@ export function TradeForm({ ctx, onSubmit }: Props) {
           <label className="block">
             <span className={labelClass}>幣別</span>
             <select className={inputClass} {...register('currency')}>
-              <option value="TWD">TWD</option>
-              <option value="USD">USD</option>
+              <option value="TWD">新台幣</option>
+              <option value="USD">美元</option>
             </select>
           </label>
           <label className="block sm:col-span-2">

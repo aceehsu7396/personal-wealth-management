@@ -210,8 +210,8 @@ export function evaluateThesis(thesis: StockThesis, policy: InvestmentPolicy): T
     { key: 'complete', label: '研究卡完整（論點、驅動因素、失效條件、資訊來源、事前驗屍）', passed: isComplete },
     { key: 'circle', label: '在能力圈內', passed: thesis.inCircleOfCompetence },
     { key: 'fiveForces', label: `五力平均 ≥ 3（目前 ${fiveForcesAverage.toFixed(1)}）`, passed: fiveForcesAverage >= 3 },
-    { key: 'powers', label: `至少 1 項 7 Powers ≥ 3（目前最高 ${topPowerScore}）`, passed: topPowerScore >= 3 },
-    { key: 'fScore', label: `Piotroski F-Score ≥ 6（目前 ${thesis.fScore}）`, passed: thesis.fScore >= 6 },
+    { key: 'powers', label: `至少 1 項競爭力量 ≥ 3（目前最高 ${topPowerScore}）`, passed: topPowerScore >= 3 },
+    { key: 'fScore', label: `F 分數 ≥ 6（目前 ${thesis.fScore}）`, passed: thesis.fScore >= 6 },
   ]
   if (hasRoicInputs) {
     checks.push({ key: 'roic', label: 'ROIC > WACC + 3%', passed: roicBeatsHurdle })
@@ -220,7 +220,7 @@ export function evaluateThesis(thesis: StockThesis, policy: InvestmentPolicy): T
   if (thesis.impliedGrowthPercent !== undefined && thesis.historicalGrowthPercent !== undefined) {
     checks.push({
       key: 'impliedGrowth',
-      label: '反向 DCF 隱含成長 ≤ 歷史成長 × 1.2',
+      label: '反向現金流折現的隱含成長 ≤ 歷史成長 × 1.2',
       passed: thesis.impliedGrowthPercent <= thesis.historicalGrowthPercent * 1.2,
     })
   }

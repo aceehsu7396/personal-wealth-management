@@ -157,7 +157,7 @@ export function TradesPage() {
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">記錄交易</h2>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          檢核依目前的 IPS、總經判斷、研究卡與持股即時計算。交易會同步更新持股的股數與平均成本。
+          檢核依目前的投資政策、總經判斷、研究卡與持股即時計算。交易會同步更新持股的股數與平均成本。
         </p>
         <div className="mt-4">
           <TradeForm ctx={ctx} onSubmit={handleSubmit} />
@@ -192,7 +192,7 @@ export function TradesPage() {
                         {t.ticker} {t.name}
                       </td>
                       <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
-                        {t.side === 'buy' ? '買' : '賣'} {t.shares} @ {t.price} {t.currency}
+                        {t.side === 'buy' ? '買' : '賣'} {t.shares} @ {t.price} {t.currency === 'USD' ? '美元' : '新台幣'}
                       </td>
                       <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{TRADE_REASON_LABELS[t.reason]}</td>
                       <td className="py-2 pr-4">
@@ -209,7 +209,7 @@ export function TradesPage() {
                         </span>
                       </td>
                       <td className="py-2 pr-4 text-xs text-slate-500 dark:text-slate-400">
-                        {t.review6m ? '6M ✓' : '6M —'}・{t.review12m ? '12M ✓' : '12M —'}
+                        {t.review6m ? '6 個月 ✓' : '6 個月 —'}・{t.review12m ? '12 個月 ✓' : '12 個月 —'}
                       </td>
                       <td className="py-2 pr-4 text-right">
                         {pendingDeleteId === t.id ? (

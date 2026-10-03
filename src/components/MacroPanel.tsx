@@ -49,7 +49,7 @@ export function MacroPanel() {
           總經三支柱判斷
         </h2>
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          景氣體制（Dalio 四象限）＋ 流動性（Druckenmiller）＋ 情緒溫度（Marks 鐘擺）。總經只調整股債比例，不決定個股進出。
+          景氣體制（達利歐四象限）＋ 流動性（朱肯米勒）＋ 情緒溫度（馬克斯鐘擺）。總經只調整股債比例，不決定個股進出。
         </p>
         {assessment && latest ? (
           <>

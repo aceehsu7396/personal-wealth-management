@@ -93,19 +93,19 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
         )}
       </div>
       <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-        基準 = 全部放在核心 ETF、依 IPS 核心比例配置。配置效果檢驗總經傾斜，選股效果檢驗衛星個股。
+        基準 = 全部放在核心 ETF、依投資政策的核心比例配置。配置效果檢驗總經傾斜，選股效果檢驗衛星個股。
       </p>
 
       {reviews.length > 0 && (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <StatCard
-            label="累積報酬 vs 基準"
+            label="累積報酬對比基準"
             value={pct(summary.cumulativeReturn)}
             hint={`基準 ${pct(summary.cumulativeBenchmarkReturn)}`}
           />
           <StatCard label="最大回撤（季度）" value={pct(summary.maxDrawdown)} />
           <StatCard
-            label="Sharpe"
+            label="夏普比率"
             value={summary.sharpeRatio === null ? '—' : summary.sharpeRatio.toFixed(2)}
             hint={summary.sharpeRatio === null ? '至少 4 期才計算' : '年化'}
           />
@@ -138,7 +138,7 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
                 <th className="py-2 pr-4">基準</th>
                 <th className="py-2 pr-4">配置效果</th>
                 <th className="py-2 pr-4">選股效果</th>
-                <th className="py-2 pr-4">衛星 vs 基準</th>
+                <th className="py-2 pr-4">衛星對比基準</th>
                 <th className="py-2 pr-4 text-right">操作</th>
               </tr>
             </thead>
@@ -285,7 +285,7 @@ function ReviewForm({
           <input type="number" step="any" className={inputClass} {...register('benchmarkReturns.tw')} />
         </label>
         <label className="block">
-          <span className={labelClass}>VT 含息報酬，台幣計（%）</span>
+          <span className={labelClass}>全球股市 VT 含息報酬，以新台幣計（%）</span>
           <input type="number" step="any" className={inputClass} {...register('benchmarkReturns.global')} />
         </label>
         <label className="block">

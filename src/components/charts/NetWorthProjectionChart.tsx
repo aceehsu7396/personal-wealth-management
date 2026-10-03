@@ -45,7 +45,7 @@ export function NetWorthProjectionChart({ points, fireNumber, currency }: Props)
               stroke="#b45309"
               strokeDasharray="4 4"
               label={{
-                value: 'FIRE 目標',
+                value: '財務自由目標',
                 position: 'insideTopRight',
                 fill: '#b45309',
                 fontSize: 12,

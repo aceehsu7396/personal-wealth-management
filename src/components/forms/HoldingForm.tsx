@@ -95,8 +95,8 @@ export function HoldingForm({ theses, initialValues, onSubmit, onCancel }: Props
       <label className="block">
         <span className={labelClass}>幣別</span>
         <select className={inputClass} {...register('currency')}>
-          <option value="TWD">TWD</option>
-          <option value="USD">USD</option>
+          <option value="TWD">新台幣</option>
+          <option value="USD">美元</option>
         </select>
       </label>
       <label className="block">

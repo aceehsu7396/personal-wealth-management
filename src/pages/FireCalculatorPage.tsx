@@ -19,7 +19,7 @@ export function FireCalculatorPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-        FIRE 試算
+        財務自由試算
       </h1>
       <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
         輸入現況與假設，估算達成財富自由所需的時間。
@@ -27,7 +27,7 @@ export function FireCalculatorPage() {
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard
-          label="FIRE 目標金額"
+          label="財務自由目標金額"
           value={
             Number.isFinite(result.fireNumber)
               ? formatCurrency(result.fireNumber, profile.currency)

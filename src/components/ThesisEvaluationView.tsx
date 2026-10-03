@@ -19,8 +19,8 @@ export function PriceZoneBadge({ zone }: { zone: ThesisEvaluation['priceZone'] }
 
 export function ThesisEvaluationView({ evaluation }: { evaluation: ThesisEvaluation }) {
   const metrics = [
-    { label: '產業分數', value: evaluation.industryScore.toFixed(1), hint: '五力平均與最強 Power' },
-    { label: '品質分數', value: evaluation.qualityScore.toFixed(1), hint: 'F-Score、ROIC、紅旗' },
+    { label: '產業分數', value: evaluation.industryScore.toFixed(1), hint: '五力平均與最強競爭力量' },
+    { label: '品質分數', value: evaluation.qualityScore.toFixed(1), hint: 'F 分數、投入資本報酬率、紅旗' },
     { label: '信心分數', value: evaluation.convictionScore.toFixed(1), hint: '1–5' },
     { label: '買進價', value: formatPrice(evaluation.buyPrice), hint: `安全邊際 ${evaluation.marginOfSafetyPercent}%` },
     { label: '期望價值', value: formatPrice(evaluation.expectedValue), hint: '25/50/25 加權' },

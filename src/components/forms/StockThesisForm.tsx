@@ -219,7 +219,7 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
         {errors.sector && <p className={errorClass}>{errors.sector.message}</p>}
       </label>
       <label className="block">
-        <span className={labelClass}>Lynch 類型</span>
+        <span className={labelClass}>林區六類股</span>
         <select className={inputClass} {...register('lynchCategory')}>
           {Object.entries(LYNCH_LABELS).map(([v, t]) => (
             <option key={v} value={v}>
@@ -251,18 +251,18 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
         </label>
       ))}
 
-      <h3 className={sectionTitle}>產業結構：Porter 五力（5 = 對公司最有利）</h3>
+      <h3 className={sectionTitle}>產業結構：波特五力（5 = 對公司最有利）</h3>
       {Object.entries(FIVE_FORCE_LABELS).map(([k, label]) =>
         scoreSelect(`fiveForces.${k}`, label, 1),
       )}
 
-      <h3 className={sectionTitle}>競爭優勢：7 Powers（0 = 沒有，5 = 非常強）</h3>
+      <h3 className={sectionTitle}>競爭優勢：七大競爭力量（0 = 沒有，5 = 非常強）</h3>
       {Object.entries(POWER_LABELS).map(([k, label]) => scoreSelect(`powers.${k}`, label, 0))}
 
       <h3 className={sectionTitle}>財務品質</h3>
-      {numberInput('fScore', 'Piotroski F-Score（0–9）', errors.fScore?.message, '1')}
-      {numberInput('roicPercent', 'ROIC 5 年平均（%，選填）')}
-      {numberInput('waccPercent', 'WACC（%，選填）')}
+      {numberInput('fScore', '皮奧特洛斯基 F 分數（0–9）', errors.fScore?.message, '1')}
+      {numberInput('roicPercent', '投入資本報酬率 5 年平均（%，選填）')}
+      {numberInput('waccPercent', '加權平均資金成本（%，選填）')}
       <label className="flex items-center gap-2">
         <input type="checkbox" {...register('hasUnexplainedRedFlags')} />
         <span className={labelClass}>有未解釋的財報紅旗</span>
@@ -273,7 +273,7 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
       {numberInput('fairValueBase', '基準合理價', errors.fairValueBase?.message)}
       {numberInput('fairValueBull', '樂觀合理價', errors.fairValueBull?.message)}
       {numberInput('currentPrice', '現價', errors.currentPrice?.message)}
-      {numberInput('impliedGrowthPercent', '反向 DCF 隱含成長率（%，選填）')}
+      {numberInput('impliedGrowthPercent', '反向現金流折現的隱含成長率（%，選填）')}
       {numberInput('historicalGrowthPercent', '過去 5 年實際成長率（%，選填）')}
       {numberInput('marginOfSafetyOverridePercent', '安全邊際覆寫（%，選填；留空依品質自動決定）')}
 
