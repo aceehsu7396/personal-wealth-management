@@ -145,13 +145,17 @@ export function buildPreTradeChecklist(
     list.forEach((m) => items.push({ ...m, passed: manualAnswers[m.key] === true, manual: true }))
 
   if (trade.side === 'buy') {
-    items.push(
-      check(
-        'usdCap',
-        `交易後美元曝險 ${after.usdExposurePercent.toFixed(1)}% ≤ 上限 ${policy.maxUsdExposurePercent}%`,
-        after.usdExposurePercent <= policy.maxUsdExposurePercent,
-      ),
-    )
+    // Only USD purchases can push USD exposure up; a TWD buy reduces it, so
+    // it should not be blocked when the portfolio is already over the cap.
+    if (trade.currency === 'USD') {
+      items.push(
+        check(
+          'usdCap',
+          `交易後美元曝險 ${after.usdExposurePercent.toFixed(1)}% ≤ 上限 ${policy.maxUsdExposurePercent}%`,
+          after.usdExposurePercent <= policy.maxUsdExposurePercent,
+        ),
+      )
+    }
 
     if (isSatellite(trade.sleeve)) {
       items.push(

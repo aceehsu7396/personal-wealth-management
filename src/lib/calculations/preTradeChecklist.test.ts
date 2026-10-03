@@ -140,7 +140,20 @@ describe('buildPreTradeChecklist', () => {
       ctx(),
       {},
     )
-    expect(items.map((i) => i.key)).toEqual(['usdCap'])
+    expect(items).toEqual([])
+  })
+
+  it('checks the USD cap only for USD purchases', () => {
+    const vt: Holding = { ...core, id: 'vt', ticker: 'VT', sleeve: 'core_global', currency: 'USD', shares: 1000, currentPrice: 10 }
+    const overCap = ctx({ holdings: [core, vt] })
+    const twdBuy = buildPreTradeChecklist(buy, overCap, {})
+    expect(twdBuy.find((i) => i.key === 'usdCap')).toBeUndefined()
+    const usdBuy = buildPreTradeChecklist(
+      { ...buy, reason: 'core_dca', sleeve: 'core_global', currency: 'USD', holdingId: 'vt', thesisId: undefined },
+      overCap,
+      {},
+    )
+    expect(usdBuy.find((i) => i.key === 'usdCap')?.passed).toBe(false)
   })
 
   it('verifies the overvaluation exit against the research card', () => {
