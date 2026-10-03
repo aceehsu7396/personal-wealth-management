@@ -343,6 +343,31 @@ export const TradeSchema = z.object({
 })
 export type Trade = z.infer<typeof TradeSchema>
 
+export const SleevePerformanceSchema = z.object({
+  sleeve: SleeveSchema,
+  startValue: z.number(),
+  endValue: z.number(),
+  netFlow: z.number(),
+})
+export type SleevePerformance = z.infer<typeof SleevePerformanceSchema>
+
+// A quarterly snapshot for attribution. Values are TWD; benchmark returns are
+// total returns for the period in percent (0050, VT in TWD, bond/cash).
+export const PerformanceReviewSchema = z.object({
+  id: z.string(),
+  periodStart: z.string(),
+  periodEnd: z.string(),
+  sleeves: z.array(SleevePerformanceSchema),
+  benchmarkReturns: z.object({
+    tw: z.number(),
+    global: z.number(),
+    bondCash: z.number(),
+  }),
+  note: z.string().optional(),
+  createdAt: z.string(),
+})
+export type PerformanceReview = z.infer<typeof PerformanceReviewSchema>
+
 export const InvestmentPolicySchema = z.object({
   targetYears: z.number(),
   coreTwEquityPercent: z.number(),
@@ -395,6 +420,7 @@ export const AppDataSchema = z.object({
   holdings: z.array(HoldingSchema).default([]),
   portfolioMeta: PortfolioMetaSchema.default({ fxUsdTwd: 32, peakValueTwd: 0, peakDate: null }),
   trades: z.array(TradeSchema).default([]),
+  performanceReviews: z.array(PerformanceReviewSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -438,5 +464,6 @@ export function createDefaultAppData(): AppData {
     holdings: [],
     portfolioMeta: { fxUsdTwd: 32, peakValueTwd: 0, peakDate: null },
     trades: [],
+    performanceReviews: [],
   }
 }

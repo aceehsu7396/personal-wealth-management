@@ -4,6 +4,7 @@ import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculation
 import { fetchLatestTwseClose, todayIsoDate } from '../lib/market/twse'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
 import { RiskViolationList } from '../components/RiskViolationList'
+import { PerformanceReviewPanel } from '../components/PerformanceReviewPanel'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
 import { StatCard } from '../components/StatCard'
 import { inputClass, labelClass } from '../components/forms/FormField'
@@ -297,6 +298,8 @@ export function PortfolioPage() {
           />
         </div>
       </div>
+
+      <PerformanceReviewPanel report={report} />
 
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">組合設定</h2>
