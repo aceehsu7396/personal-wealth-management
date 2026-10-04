@@ -16,12 +16,16 @@ export interface HandbookDoc {
 
 // App page that puts each chapter into practice.
 export const CHAPTER_PAGES: Record<string, { to: string; label: string }> = {
-  '00': { to: '/strategy', label: '投資策略' },
-  '01': { to: '/market', label: '市場檢視' },
-  '02': { to: '/research', label: '個股研究' },
-  '03': { to: '/research', label: '個股研究' },
-  '04': { to: '/portfolio', label: '投資組合' },
-  '05': { to: '/trades', label: '交易日誌' },
+  '00': { to: '/journey', label: '行動路線' },
+  '01': { to: '/journey', label: '行動路線' },
+  '02': { to: '/strategy', label: '投資策略' },
+  '03': { to: '/portfolio', label: '投資組合' },
+  '04': { to: '/trades', label: '交易日誌' },
+  '05': { to: '/market', label: '市場檢視' },
+  '06': { to: '/research', label: '個股研究' },
+  '07': { to: '/research', label: '個股研究' },
+  '08': { to: '/portfolio', label: '投資組合' },
+  '09': { to: '/journey', label: '行動路線' },
 }
 
 export function slugOf(fileName: string): string {
@@ -29,7 +33,7 @@ export function slugOf(fileName: string): string {
   return fileName.split('-')[0]
 }
 
-// "# 00a 策略總架構與方法論" → number "00a", title "策略總架構與方法論".
+// "# 03 核心配置與定期定額" → number "03", title "核心配置與定期定額".
 export function parseTitle(content: string, fileName: string): { number: string | null; title: string } {
   const heading = content.split('\n').find((line) => line.startsWith('# '))
   const text = heading ? heading.slice(2).trim() : fileName.replace(/\.md$/, '')
@@ -37,10 +41,9 @@ export function parseTitle(content: string, fileName: string): { number: string 
   return match ? { number: match[1], title: match[2] } : { number: null, title: text }
 }
 
-// Overview first, then 00a, 00, 01, 02, … in reading order.
+// Overview first, then numbered chapters, then appendices (e.g. 附錄A).
 function orderKey(slug: string): number {
-  if (slug === 'index') return -2
-  if (slug === '00a') return -1
+  if (slug === 'index') return -1
   const n = Number.parseInt(slug, 10)
   return Number.isNaN(n) ? 1000 : n
 }

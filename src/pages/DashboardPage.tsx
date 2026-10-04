@@ -38,7 +38,12 @@ export function DashboardPage() {
     ? computeNetCashFlow(currentMonthRecord).netCashFlow
     : null
 
-  const progressStat = result.alreadyFire
+  // With no expenses entered the FIRE number is 0, which would read as
+  // "already free"; show that the goal is not set yet instead.
+  const goalSet = assumptions.monthlyExpenses > 0 || assumptions.targetAnnualExpensesOverride !== undefined
+  const progressStat = !goalSet
+    ? '尚未設定目標'
+    : result.alreadyFire
     ? '已達成財富自由'
     : result.yearsToFire === null
       ? '50 年內無法達成'
@@ -166,7 +171,7 @@ export function DashboardPage() {
         </div>
         <AdviceSummary
           advice={advice}
-          emptyMessage="還沒有任何市場評估，前往市場檢視新增第一筆吧。"
+          emptyMessage="看懂市場是行動路線的第三階段；先完成財務地基與核心配置，再開始市場評估。"
         />
       </div>
     </div>

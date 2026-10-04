@@ -77,7 +77,11 @@ export function StrategyOverview() {
                 ? '—'
                 : `${required.requiredNominalReturnPercent.toFixed(1)}%`
             }
-            hint={FEASIBILITY_LABELS[required.feasibility].split('：')[0]}
+            hint={
+              assumptions.monthlyExpenses > 0
+                ? FEASIBILITY_LABELS[required.feasibility].split('：')[0]
+                : '尚未設定目標'
+            }
           />
         </Link>
         <Link to="/market" className="block">

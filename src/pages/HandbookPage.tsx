@@ -8,6 +8,18 @@ function navLabel(doc: HandbookDoc): string {
   return doc.slug === 'index' ? '總覽與閱讀順序' : doc.title
 }
 
+// Plain text of a Markdown (hast) node, used to spot the「本章行動」box.
+interface TextNode {
+  type?: string
+  value?: string
+  children?: TextNode[]
+}
+function textOf(node: TextNode | undefined): string {
+  if (!node) return ''
+  if (node.type === 'text') return node.value ?? ''
+  return (node.children ?? []).map(textOf).join('')
+}
+
 const markdownComponents: Components = {
   h1: ({ children }) => (
     <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{children}</h1>
@@ -32,11 +44,16 @@ const markdownComponents: Components = {
   strong: ({ children }) => (
     <strong className="font-semibold text-gray-900 dark:text-gray-100">{children}</strong>
   ),
-  blockquote: ({ children }) => (
+  blockquote: ({ node, children }) =>
+    textOf(node).trim().startsWith('本章行動') ? (
+      <blockquote className="mt-4 rounded-md border border-indigo-300 bg-indigo-50 px-5 py-2 text-gray-800 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-gray-200 [&>p]:my-2 [&_ul]:mt-1">
+        {children}
+      </blockquote>
+    ) : (
     <blockquote className="mt-4 rounded-r-md border-l-4 border-orange-400 bg-orange-50 px-4 py-1 text-gray-700 dark:bg-orange-900/20 dark:text-gray-300 [&>p]:my-2">
       {children}
     </blockquote>
-  ),
+    ),
   table: ({ children }) => (
     <div className="mt-4 overflow-x-auto">
       <table className="w-full border-collapse text-left text-sm">{children}</table>
