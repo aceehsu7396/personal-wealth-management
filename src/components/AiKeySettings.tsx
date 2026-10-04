@@ -22,7 +22,7 @@ export function AiKeySettings() {
   return (
     <div>
       <label className="block">
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
           Anthropic API 金鑰
         </span>
         <input
@@ -37,7 +37,7 @@ export function AiKeySettings() {
           }}
         />
       </label>
-      <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
         金鑰僅存在你的瀏覽器本機，<b>不會</b>包含在「資料管理」的 JSON
         匯出/備份中。此金鑰會直接從瀏覽器呼叫 Anthropic
         API，技術上可能被瀏覽器擴充功能或開發者工具讀取，請勿在公用電腦使用。
@@ -46,7 +46,7 @@ export function AiKeySettings() {
         <button
           type="button"
           onClick={handleSave}
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           儲存
         </button>
@@ -54,13 +54,13 @@ export function AiKeySettings() {
           <button
             type="button"
             onClick={handleClear}
-            className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             清除金鑰
           </button>
         )}
         {savedMessage && (
-          <span className="text-xs text-emerald-600 dark:text-emerald-400">{savedMessage}</span>
+          <span className="text-xs text-indigo-600 dark:text-indigo-400">{savedMessage}</span>
         )}
       </div>
     </div>

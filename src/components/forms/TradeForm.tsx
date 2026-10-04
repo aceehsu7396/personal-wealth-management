@@ -268,7 +268,7 @@ export function TradeForm({ ctx, onSubmit }: Props) {
 
       <label className="block sm:col-span-3">
         <span className={labelClass}>偏誤自問（衛星交易必填）</span>
-        <ul className="mt-1 list-disc pl-5 text-xs text-slate-500 dark:text-slate-400">
+        <ul className="mt-1 list-disc pl-5 text-xs text-gray-500 dark:text-gray-400">
           {BIAS_QUESTIONS.map((q) => (
             <li key={q}>{q}</li>
           ))}
@@ -276,16 +276,16 @@ export function TradeForm({ ctx, onSubmit }: Props) {
         <textarea rows={3} className={inputClass} {...register('biasNotes')} />
       </label>
 
-      <div className="rounded-md border border-slate-200 p-4 dark:border-slate-700 sm:col-span-3">
-        <h3 className="text-sm font-semibold text-slate-900 dark:text-slate-100">交易前檢核</h3>
+      <div className="rounded-md border border-gray-200 p-4 dark:border-gray-700 sm:col-span-3">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">交易前檢核</h3>
         {checklist.length === 0 ? (
-          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">填入股數與成交價後顯示檢核結果。</p>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">填入股數與成交價後顯示檢核結果。</p>
         ) : (
           <ul className="mt-2 space-y-1 text-sm">
             {checklist.map((c) =>
               c.manual ? (
                 <li key={c.key}>
-                  <label className="flex items-start gap-2 text-slate-700 dark:text-slate-300">
+                  <label className="flex items-start gap-2 text-gray-700 dark:text-gray-300">
                     <input type="checkbox" className="mt-1" {...register(`manual.${c.key}`)} />
                     <span>{c.label}</span>
                   </label>
@@ -293,7 +293,7 @@ export function TradeForm({ ctx, onSubmit }: Props) {
               ) : (
                 <li
                   key={c.key}
-                  className={c.passed ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}
+                  className={c.passed ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'}
                 >
                   {c.passed ? '✓' : '✗'} {c.label}
                 </li>
@@ -314,7 +314,7 @@ export function TradeForm({ ctx, onSubmit }: Props) {
       <div className="sm:col-span-3">
         <button
           type="submit"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           記錄交易
         </button>

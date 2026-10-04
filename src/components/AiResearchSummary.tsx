@@ -42,9 +42,9 @@ export function AiResearchSummary({ taiex, tw0050, latestCheckIn }: Props) {
 
   if (!hasApiKey) {
     return (
-      <p className="text-sm text-slate-500 dark:text-slate-400">
+      <p className="text-sm text-gray-500 dark:text-gray-400">
         設定{' '}
-        <Link to="/settings" className="font-medium text-emerald-700 underline dark:text-emerald-400">
+        <Link to="/settings" className="font-medium text-indigo-700 underline dark:text-indigo-400">
           Anthropic API 金鑰
         </Link>{' '}
         後，可產生大盤與 0050 的 AI 研究摘要，輔助你判斷估值區間。
@@ -58,7 +58,7 @@ export function AiResearchSummary({ taiex, tw0050, latestCheckIn }: Props) {
         type="button"
         onClick={handleGenerate}
         disabled={status === 'loading'}
-        className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+        className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
       >
         {status === 'loading' ? '產生中…' : '產生研究摘要'}
       </button>
@@ -69,10 +69,10 @@ export function AiResearchSummary({ taiex, tw0050, latestCheckIn }: Props) {
 
       {summary && status !== 'error' && (
         <div className="mt-4 space-y-2">
-          <p className="whitespace-pre-line text-sm text-slate-700 dark:text-slate-300">
+          <p className="whitespace-pre-line text-sm text-gray-700 dark:text-gray-300">
             {summary}
           </p>
-          <p className="rounded-md bg-slate-100 px-3 py-2 text-xs text-slate-500 dark:bg-slate-900/40 dark:text-slate-400">
+          <p className="rounded-md bg-gray-100 px-3 py-2 text-xs text-gray-500 dark:bg-gray-900/40 dark:text-gray-400">
             此摘要由 AI 依歷史收盤價自動產生，僅供研究參考，非投資建議，請自行判斷。
           </p>
         </div>

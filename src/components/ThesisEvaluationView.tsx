@@ -2,10 +2,10 @@ import { PRICE_ZONE_LABELS, type ThesisEvaluation } from '../lib/calculations/th
 import { formatPrice, formatRatio } from '../lib/format'
 
 const ZONE_CLASSES: Record<string, string> = {
-  strong_buy: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300',
-  buy: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
-  hold: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-200',
-  trim: 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300',
+  strong_buy: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
+  buy: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300',
+  hold: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200',
+  trim: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-300',
   exit_overvalued: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 }
 
@@ -37,17 +37,17 @@ export function ThesisEvaluationView({ evaluation }: { evaluation: ThesisEvaluat
       <div className="flex flex-wrap items-center gap-2">
         <PriceZoneBadge zone={evaluation.priceZone} />
         {evaluation.strongestPowers.length > 0 && (
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-gray-500 dark:text-gray-400">
             競爭優勢：{evaluation.strongestPowers.join('、')}
           </span>
         )}
       </div>
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {metrics.map((m) => (
-          <div key={m.label} className="rounded-md bg-slate-50 p-3 dark:bg-slate-900/40">
-            <dt className="text-xs text-slate-500 dark:text-slate-400">{m.label}</dt>
-            <dd className="text-lg font-semibold text-slate-900 dark:text-slate-100">{m.value}</dd>
-            <dd className="text-xs text-slate-500 dark:text-slate-400">{m.hint}</dd>
+          <div key={m.label} className="rounded-md bg-gray-50 p-3 dark:bg-gray-900/40">
+            <dt className="text-xs text-gray-500 dark:text-gray-400">{m.label}</dt>
+            <dd className="text-lg font-semibold text-gray-900 dark:text-gray-100">{m.value}</dd>
+            <dd className="text-xs text-gray-500 dark:text-gray-400">{m.hint}</dd>
           </div>
         ))}
       </dl>
@@ -55,7 +55,7 @@ export function ThesisEvaluationView({ evaluation }: { evaluation: ThesisEvaluat
         {evaluation.checks.map((c) => (
           <li
             key={c.key}
-            className={c.passed ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}
+            className={c.passed ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'}
           >
             {c.passed ? '✓' : '✗'} {c.label}
           </li>

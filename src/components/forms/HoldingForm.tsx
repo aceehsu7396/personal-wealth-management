@@ -133,7 +133,7 @@ export function HoldingForm({ theses, initialValues, onSubmit, onCancel }: Props
       <div className="flex items-end gap-2 sm:col-span-3">
         <button
           type="submit"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           {initialValues ? '儲存修改' : '新增持股'}
         </button>
@@ -141,7 +141,7 @@ export function HoldingForm({ theses, initialValues, onSubmit, onCancel }: Props
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="rounded-md px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             取消
           </button>

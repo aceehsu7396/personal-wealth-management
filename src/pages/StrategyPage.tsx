@@ -10,7 +10,7 @@ import { StatCard } from '../components/StatCard'
 import { formatCurrency } from '../lib/format'
 
 const cardClass =
-  'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
+  'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
 const PRINCIPLES = [
   '投資政策定框架：只在每年 1 月或人生重大事件時修改，市場大漲大跌時不改。',
@@ -73,12 +73,12 @@ export function StrategyPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
         投資策略
       </h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         投資政策聲明：目標報酬、風險預算與資產配置。完整說明見{' '}
-        <Link to="/handbook/00" className="font-medium text-emerald-700 hover:underline dark:text-emerald-400">
+        <Link to="/handbook/00" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
           策略手冊
         </Link>
         。
@@ -110,20 +110,20 @@ export function StrategyPage() {
 
       {(required.feasibility === 'unrealistic' ||
         required.feasibility === 'unreachable') && (
-        <p className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+        <p className="mt-4 rounded-md bg-orange-50 p-3 text-sm text-orange-800 dark:bg-orange-900/30 dark:text-orange-200">
           所需報酬過高。依投資政策原則，應先調整槓桿最小的變數：提高儲蓄率 →
           延長年限 → 降低支出，最後才考慮提高風險。
         </p>
       )}
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           策略資產配置
         </h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                 <th className="py-2 pr-4">層級</th>
                 <th className="py-2 pr-4">類別</th>
                 <th className="py-2 pr-4">目標</th>
@@ -134,18 +134,18 @@ export function StrategyPage() {
               {allocationRows.map((row) => (
                 <tr
                   key={row.name}
-                  className="border-b border-slate-100 last:border-0 dark:border-slate-700"
+                  className="border-b border-gray-100 last:border-0 dark:border-gray-700"
                 >
-                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">
+                  <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">
                     {row.layer}
                   </td>
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                     {row.name}
                   </td>
-                  <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
+                  <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100">
                     {row.percent}%
                   </td>
-                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">
+                  <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">
                     {row.example}
                   </td>
                 </tr>
@@ -153,17 +153,17 @@ export function StrategyPage() {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           核心合計 {coreTotal}%。衛星比重建議依學習路線由 10%
           起逐步提高，並以績效歸因決定是否擴大。
         </p>
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           投資政策參數
         </h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           修改後自動儲存。這些參數會套用在個股研究、投資組合風控與交易前檢核。
         </p>
         <div className="mt-4">
@@ -172,10 +172,10 @@ export function StrategyPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           策略原則
         </h2>
-        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-slate-700 dark:text-slate-300">
+        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-gray-700 dark:text-gray-300">
           {PRINCIPLES.map((p) => (
             <li key={p}>{p}</li>
           ))}

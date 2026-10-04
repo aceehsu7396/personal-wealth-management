@@ -3,7 +3,7 @@ import { useAppStore, exportAppData } from '../lib/storage/appStore'
 import { AppDataSchema } from '../lib/storage/schema'
 
 const buttonClass =
-  'rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700'
+  'rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
 
 export function DataManagement() {
   const importData = useAppStore((s) => s.importData)
@@ -47,8 +47,8 @@ export function DataManagement() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">備份資料</h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">備份資料</h3>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           匯出成 JSON 檔案保存，或匯入之前備份的檔案（會覆蓋目前所有資料）。
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -78,7 +78,7 @@ export function DataManagement() {
           <p
             className={`mt-2 text-xs ${
               importMessage.type === 'success'
-                ? 'text-emerald-600 dark:text-emerald-400'
+                ? 'text-indigo-600 dark:text-indigo-400'
                 : 'text-red-600 dark:text-red-400'
             }`}
           >
@@ -88,8 +88,8 @@ export function DataManagement() {
       </div>
 
       <div>
-        <h3 className="text-sm font-medium text-slate-900 dark:text-slate-100">清除資料</h3>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">清除資料</h3>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           會清除所有試算假設、進度紀錄與市場評估，且無法復原，建議先匯出備份。
         </p>
         <div className="mt-3">

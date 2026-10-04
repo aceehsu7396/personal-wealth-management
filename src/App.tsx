@@ -20,7 +20,7 @@ const HandbookPage = lazy(() =>
 function App() {
   return (
     <HashRouter>
-      <div className="min-h-svh bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
         <NavBar />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
@@ -33,7 +33,7 @@ function App() {
           <Route
             path="/handbook/:slug?"
             element={
-              <Suspense fallback={<p className="px-4 py-10 text-center text-sm text-slate-500">載入手冊中…</p>}>
+              <Suspense fallback={<p className="px-4 py-10 text-center text-sm text-gray-500">載入手冊中…</p>}>
                 <HandbookPage />
               </Suspense>
             }

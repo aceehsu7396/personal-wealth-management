@@ -12,7 +12,7 @@ import { StatCard } from './StatCard'
 import { errorClass, inputClass, labelClass } from './forms/FormField'
 
 const cardClass =
-  'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
+  'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
 const SLEEVES: Sleeve[] = ['core_tw', 'core_global', 'core_bond_cash', 'satellite_tw', 'satellite_us']
 
@@ -79,20 +79,20 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
   return (
     <div className={cardClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           績效歸因（每季）
         </h2>
         {!formOpen && (
           <button
             type="button"
             onClick={() => setFormOpen(true)}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+            className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
           >
             + 新增季度檢討
           </button>
         )}
       </div>
-      <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         基準 = 全部放在核心 ETF、依投資政策的核心比例配置。配置效果檢驗總經傾斜，選股效果檢驗衛星個股。
       </p>
 
@@ -132,7 +132,7 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
         <div className="mt-6 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                 <th className="py-2 pr-4">期間</th>
                 <th className="py-2 pr-4">組合</th>
                 <th className="py-2 pr-4">基準</th>
@@ -146,24 +146,24 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
               {[...summary.periods].reverse().map((p) => (
                 <tr
                   key={p.review.id}
-                  className="border-b border-slate-100 last:border-0 dark:border-slate-700"
+                  className="border-b border-gray-100 last:border-0 dark:border-gray-700"
                 >
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                     {p.review.periodStart} ～ {p.review.periodEnd}
                   </td>
-                  <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
+                  <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100">
                     {pct(p.portfolioReturn)}
                   </td>
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                     {pct(p.benchmarkReturn)}
                   </td>
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                     {pct(p.allocationEffect, 2)}
                   </td>
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                     {pct(p.selectionEffect, 2)}
                   </td>
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                     {p.satelliteReturn === null
                       ? '—'
                       : `${pct(p.satelliteReturn)} / ${pct(p.satelliteBenchmarkReturn)}`}
@@ -184,7 +184,7 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
                         <button
                           type="button"
                           onClick={() => setPendingDeleteId(null)}
-                          className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                          className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                         >
                           取消
                         </button>
@@ -193,7 +193,7 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
                       <button
                         type="button"
                         onClick={() => setPendingDeleteId(p.review.id)}
-                        className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                        className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                       >
                         刪除
                       </button>
@@ -207,7 +207,7 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
       )}
 
       {reviews.length === 0 && !formOpen && (
-        <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+        <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
           每季結束後新增一筆：系統會帶入各層級目前市值與期間內的交易現金流，你只需要補上基準報酬。
         </p>
       )}
@@ -236,7 +236,7 @@ function ReviewForm({
   return (
     <form
       onSubmit={handleSubmit(onSubmit)}
-      className="mt-4 space-y-4 rounded-md border border-slate-200 p-4 dark:border-slate-700"
+      className="mt-4 space-y-4 rounded-md border border-gray-200 p-4 dark:border-gray-700"
     >
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <label className="block">
@@ -253,7 +253,7 @@ function ReviewForm({
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm">
           <thead>
-            <tr className="text-xs text-slate-500 dark:text-slate-400">
+            <tr className="text-xs text-gray-500 dark:text-gray-400">
               <th className="py-1 pr-2">層級</th>
               <th className="py-1 pr-2">期初市值</th>
               <th className="py-1 pr-2">期末市值</th>
@@ -263,7 +263,7 @@ function ReviewForm({
           <tbody>
             {SLEEVES.map((s, i) => (
               <tr key={s}>
-                <td className="py-1 pr-2 text-slate-700 dark:text-slate-300">{SLEEVE_LABELS[s]}</td>
+                <td className="py-1 pr-2 text-gray-700 dark:text-gray-300">{SLEEVE_LABELS[s]}</td>
                 <td className="py-1 pr-2">
                   <input type="number" step="any" className={inputClass} {...register(`sleeves.${i}.startValue`)} />
                 </td>
@@ -302,14 +302,14 @@ function ReviewForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           儲存季度檢討
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700"
+          className="rounded-md px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
         >
           取消
         </button>

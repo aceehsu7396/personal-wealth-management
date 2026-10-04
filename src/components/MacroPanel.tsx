@@ -10,7 +10,7 @@ import { MacroCheckInForm, type MacroCheckInFormValues } from './forms/MacroChec
 import { StatCard } from './StatCard'
 
 const cardClass =
-  'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
+  'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
 const DIRECTION_TEXT = { up: '上升 ↑', flat: '持平 →', down: '下降 ↓' } as const
 
@@ -45,10 +45,10 @@ export function MacroPanel() {
   return (
     <>
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           總經三支柱判斷
         </h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           景氣體制（達利歐四象限）＋ 流動性（朱肯米勒）＋ 情緒溫度（馬克斯鐘擺）。總經只調整股債比例，不決定個股進出。
         </p>
         {assessment && latest ? (
@@ -77,39 +77,39 @@ export function MacroPanel() {
             </div>
             <dl className="mt-4 space-y-2 text-sm">
               <div>
-                <dt className="font-medium text-slate-700 dark:text-slate-300">股票戰術傾斜</dt>
-                <dd className="text-slate-600 dark:text-slate-400">
+                <dt className="font-medium text-gray-700 dark:text-gray-300">股票戰術傾斜</dt>
+                <dd className="text-gray-600 dark:text-gray-400">
                   {formatTiltRange(assessment.tiltMinPoints, assessment.tiltMaxPoints)}
                   ，股票配置不得低於下限 {guardrails.minEquityFloorPercent}%；每季最多調整一次。
                 </dd>
               </div>
               <div>
-                <dt className="font-medium text-slate-700 dark:text-slate-300">行動</dt>
-                <dd className="text-slate-600 dark:text-slate-400">{assessment.actionNote}</dd>
+                <dt className="font-medium text-gray-700 dark:text-gray-300">行動</dt>
+                <dd className="text-gray-600 dark:text-gray-400">{assessment.actionNote}</dd>
               </div>
               <div>
-                <dt className="font-medium text-slate-700 dark:text-slate-300">衛星新建倉</dt>
-                <dd className="text-slate-600 dark:text-slate-400">
+                <dt className="font-medium text-gray-700 dark:text-gray-300">衛星新建倉</dt>
+                <dd className="text-gray-600 dark:text-gray-400">
                   {assessment.satelliteNewPositionsAllowed ? '允許' : '暫停（交易前檢核會標示）'}
                 </dd>
               </div>
               {latest.policyNote && (
                 <div>
-                  <dt className="font-medium text-slate-700 dark:text-slate-300">政策面</dt>
-                  <dd className="text-slate-600 dark:text-slate-400">{latest.policyNote}</dd>
+                  <dt className="font-medium text-gray-700 dark:text-gray-300">政策面</dt>
+                  <dd className="text-gray-600 dark:text-gray-400">{latest.policyNote}</dd>
                 </div>
               )}
             </dl>
           </>
         ) : (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             還沒有總經檢視，建議每月第一週新增一筆。
           </p>
         )}
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {editing ? '編輯總經檢視' : '新增總經檢視'}
         </h2>
         <div className="mt-4">
@@ -124,13 +124,13 @@ export function MacroPanel() {
 
       {sorted.length > 0 && (
         <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             總經檢視歷史
           </h2>
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">日期</th>
                   <th className="py-2 pr-4">體制</th>
                   <th className="py-2 pr-4">流動性</th>
@@ -145,19 +145,19 @@ export function MacroPanel() {
                   return (
                     <tr
                       key={c.id}
-                      className="border-b border-slate-100 last:border-0 dark:border-slate-700"
+                      className="border-b border-gray-100 last:border-0 dark:border-gray-700"
                     >
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{c.date}</td>
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{c.date}</td>
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                         {REGIME_LABELS[a.regime].split('（')[0]}
                       </td>
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                         {signed(a.liquidityScore)}
                       </td>
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                         {signed(a.sentimentScore)}
                       </td>
-                      <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
+                      <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100">
                         {STANCE_LABELS[a.stance]}
                       </td>
                       <td className="py-2 pr-4">
@@ -168,7 +168,7 @@ export function MacroPanel() {
                               setPendingDeleteId(null)
                               setEditingId(c.id)
                             }}
-                            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
                           >
                             編輯
                           </button>
@@ -188,7 +188,7 @@ export function MacroPanel() {
                               <button
                                 type="button"
                                 onClick={() => setPendingDeleteId(null)}
-                                className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                                className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                               >
                                 取消
                               </button>
@@ -197,7 +197,7 @@ export function MacroPanel() {
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(c.id)}
-                              className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                             >
                               刪除
                             </button>

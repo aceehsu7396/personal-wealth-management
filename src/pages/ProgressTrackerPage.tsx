@@ -29,10 +29,10 @@ export function ProgressTrackerPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
         進度追蹤
       </h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         定期記錄實際淨值，對照財務自由試算軌跡，隨時掌握進度。
       </p>
 
@@ -53,7 +53,7 @@ export function ProgressTrackerPage() {
         />
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
         <ActualVsProjectedChart
           projectedPoints={result.points}
           checkIns={checkIns}
@@ -61,8 +61,8 @@ export function ProgressTrackerPage() {
         />
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {editingCheckIn ? '編輯紀錄' : '新增淨值紀錄'}
         </h2>
         <div className="mt-4">
@@ -82,19 +82,19 @@ export function ProgressTrackerPage() {
         </div>
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           歷史紀錄
         </h2>
         {sortedCheckIns.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             還沒有任何紀錄，新增第一筆吧。
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">日期</th>
                   <th className="py-2 pr-4">淨值</th>
                   <th className="py-2 pr-4">備註</th>
@@ -105,13 +105,13 @@ export function ProgressTrackerPage() {
                 {sortedCheckIns.map((c) => (
                   <tr
                     key={c.id}
-                    className="border-b border-slate-100 last:border-0 dark:border-slate-700"
+                    className="border-b border-gray-100 last:border-0 dark:border-gray-700"
                   >
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{c.date}</td>
-                    <td className="py-2 pr-4 font-medium text-slate-900 dark:text-slate-100">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{c.date}</td>
+                    <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100">
                       {formatCurrency(c.netWorthAmount, profile.currency)}
                     </td>
-                    <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">
+                    <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">
                       {c.note || '—'}
                     </td>
                     <td className="py-2 pr-4">
@@ -122,7 +122,7 @@ export function ProgressTrackerPage() {
                             setPendingDeleteId(null)
                             setEditingId(c.id)
                           }}
-                          className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                          className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
                         >
                           編輯
                         </button>
@@ -141,7 +141,7 @@ export function ProgressTrackerPage() {
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(null)}
-                              className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                             >
                               取消
                             </button>
@@ -150,7 +150,7 @@ export function ProgressTrackerPage() {
                           <button
                             type="button"
                             onClick={() => setPendingDeleteId(c.id)}
-                            className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                            className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                           >
                             刪除
                           </button>

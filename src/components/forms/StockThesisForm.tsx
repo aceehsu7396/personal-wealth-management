@@ -139,7 +139,7 @@ const TEXT_FIELDS = [
   { name: 'policyRisk', label: '政策／地緣風險（選填）' },
 ] as const
 
-const sectionTitle = 'text-sm font-semibold text-slate-900 dark:text-slate-100 sm:col-span-2'
+const sectionTitle = 'text-sm font-semibold text-gray-900 dark:text-gray-100 sm:col-span-2'
 
 interface Props {
   policy: InvestmentPolicy
@@ -278,8 +278,8 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
       {numberInput('marginOfSafetyOverridePercent', '安全邊際覆寫（%，選填；留空依品質自動決定）')}
 
       {evaluation && (
-        <div className="rounded-md border border-slate-200 p-4 dark:border-slate-700 sm:col-span-2">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">
+        <div className="rounded-md border border-gray-200 p-4 dark:border-gray-700 sm:col-span-2">
+          <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
             即時評估
           </h3>
           <ThesisEvaluationView evaluation={evaluation} />
@@ -289,7 +289,7 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
       <div className="flex items-end gap-2 sm:col-span-2">
         <button
           type="submit"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           {initialValues ? '儲存修改' : '新增研究卡'}
         </button>
@@ -297,7 +297,7 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="rounded-md px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             取消
           </button>

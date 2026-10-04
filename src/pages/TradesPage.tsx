@@ -11,7 +11,7 @@ import { StatCard } from '../components/StatCard'
 import { formatPercent } from '../lib/format'
 
 const cardClass =
-  'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
+  'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
 const SLOT_LABELS: Record<ReviewSlot, string> = { review6m: '6 個月檢討', review12m: '12 個月檢討' }
 
@@ -89,8 +89,8 @@ export function TradesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">交易日誌</h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">交易日誌</h1>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         每筆交易先過檢核表，事後在 6 與 12 個月時檢討。評估的是流程，不是結果。
       </p>
 
@@ -115,18 +115,18 @@ export function TradesPage() {
 
       {discipline.pendingReviews.length > 0 && (
         <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">待完成的事後檢討</h2>
-          <ul className="mt-4 divide-y divide-slate-100 dark:divide-slate-700">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">待完成的事後檢討</h2>
+          <ul className="mt-4 divide-y divide-gray-100 dark:divide-gray-700">
             {discipline.pendingReviews.map(({ trade, slot, dueDate }) => {
               const key = `${trade.id}:${slot}`
               return (
                 <li key={key} className="py-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                    <span className="text-slate-700 dark:text-slate-300">
+                    <span className="text-gray-700 dark:text-gray-300">
                       {trade.date} {trade.side === 'buy' ? '買進' : '賣出'} {trade.ticker} {trade.name}・
                       {TRADE_REASON_LABELS[trade.reason]}
                     </span>
-                    <span className="text-xs text-amber-700 dark:text-amber-400">
+                    <span className="text-xs text-orange-700 dark:text-orange-400">
                       {SLOT_LABELS[slot]}（{dueDate} 到期）
                     </span>
                   </div>
@@ -142,7 +142,7 @@ export function TradesPage() {
                     <button
                       type="button"
                       onClick={() => setReviewing(key)}
-                      className="mt-1 text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                      className="mt-1 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
                     >
                       開始檢討
                     </button>
@@ -155,8 +155,8 @@ export function TradesPage() {
       )}
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">記錄交易</h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">記錄交易</h2>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           檢核依目前的投資政策、總經判斷、研究卡與持股即時計算。交易會同步更新持股的股數與平均成本。
         </p>
         <div className="mt-4">
@@ -165,14 +165,14 @@ export function TradesPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">交易紀錄</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">交易紀錄</h2>
         {sortedTrades.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">還沒有交易紀錄。</p>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">還沒有交易紀錄。</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">日期</th>
                   <th className="py-2 pr-4">標的</th>
                   <th className="py-2 pr-4">交易</th>
@@ -186,21 +186,21 @@ export function TradesPage() {
                 {sortedTrades.map((t) => {
                   const passed = t.checklist.filter((c) => c.passed).length
                   return (
-                    <tr key={t.id} className="border-b border-slate-100 align-top last:border-0 dark:border-slate-700">
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{t.date}</td>
-                      <td className="py-2 pr-4 text-slate-900 dark:text-slate-100">
+                    <tr key={t.id} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{t.date}</td>
+                      <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">
                         {t.ticker} {t.name}
                       </td>
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                         {t.side === 'buy' ? '買' : '賣'} {t.shares} @ {t.price} {t.currency === 'USD' ? '美元' : '新台幣'}
                       </td>
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{TRADE_REASON_LABELS[t.reason]}</td>
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{TRADE_REASON_LABELS[t.reason]}</td>
                       <td className="py-2 pr-4">
                         <span
                           className={
                             isException(t)
                               ? 'text-red-600 dark:text-red-400'
-                              : 'text-emerald-700 dark:text-emerald-400'
+                              : 'text-indigo-700 dark:text-indigo-400'
                           }
                           title={t.exceptionReason}
                         >
@@ -208,7 +208,7 @@ export function TradesPage() {
                           {isException(t) && '（例外）'}
                         </span>
                       </td>
-                      <td className="py-2 pr-4 text-xs text-slate-500 dark:text-slate-400">
+                      <td className="py-2 pr-4 text-xs text-gray-500 dark:text-gray-400">
                         {t.review6m ? '6 個月 ✓' : '6 個月 —'}・{t.review12m ? '12 個月 ✓' : '12 個月 —'}
                       </td>
                       <td className="py-2 pr-4 text-right">
@@ -227,7 +227,7 @@ export function TradesPage() {
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(null)}
-                              className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                             >
                               取消
                             </button>
@@ -236,7 +236,7 @@ export function TradesPage() {
                           <button
                             type="button"
                             onClick={() => setPendingDeleteId(t.id)}
-                            className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                            className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                           >
                             刪除
                           </button>
@@ -249,7 +249,7 @@ export function TradesPage() {
             </table>
           </div>
         )}
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           刪除交易紀錄不會回復持股；若是輸入錯誤，請到投資組合頁手動修正持股。
         </p>
       </div>

@@ -55,24 +55,24 @@ export function MarketCheckInPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
         市場檢視與建議
       </h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         參考大盤與 0050 收盤價走勢，手動評估市場狀況，取得長期配置建議。
       </p>
 
       {reviewDue && (
-        <div className="mt-6 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+        <div className="mt-6 rounded-md border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
           {latestCheckIn
             ? `距離上次評估已超過 ${guardrails.reviewCadenceMonths} 個月，建議新增一筆市場檢視。`
             : '還沒有任何市場評估，建議新增第一筆。'}
         </div>
       )}
 
-      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mt-6 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
         {fetchState === 'loading' && (
-          <p className="mb-3 text-xs text-slate-400">正在向證交所更新今日收盤價…</p>
+          <p className="mb-3 text-xs text-gray-400">正在向證交所更新今日收盤價…</p>
         )}
         {fetchState === 'error' && (
           <p className="mb-3 text-xs text-red-500">
@@ -83,23 +83,23 @@ export function MarketCheckInPage() {
           <MarketPriceChart
             data={marketPriceHistory.taiex}
             label="大盤（發行量加權股價指數）"
-            color="#059669"
+            color="#4f46e5"
             gradientId="taiexFill"
           />
           <MarketPriceChart
             data={marketPriceHistory.tw0050}
             label="0050"
-            color="#2563eb"
+            color="#f97316"
             gradientId="tw0050Fill"
           />
         </div>
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           AI 研究摘要
         </h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           依大盤與 0050 收盤價自動產生的描述性摘要，輔助你自行判斷估值區間，不是進出場訊號。
         </p>
         <div className="mt-4">
@@ -111,8 +111,8 @@ export function MarketCheckInPage() {
         </div>
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">目前建議</h2>
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">目前建議</h2>
         <div className="mt-4">
           <AdviceSummary
             advice={advice}
@@ -121,8 +121,8 @@ export function MarketCheckInPage() {
         </div>
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {editingCheckIn ? '編輯市場評估' : '新增市場評估'}
         </h2>
         <div className="mt-4">
@@ -142,17 +142,17 @@ export function MarketCheckInPage() {
         </div>
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">歷史評估</h2>
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">歷史評估</h2>
         {sortedCheckIns.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             還沒有任何紀錄，新增第一筆吧。
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">日期</th>
                   <th className="py-2 pr-4">市場階段</th>
                   <th className="py-2 pr-4">估值區間</th>
@@ -164,16 +164,16 @@ export function MarketCheckInPage() {
                 {sortedCheckIns.map((c) => (
                   <tr
                     key={c.id}
-                    className="border-b border-slate-100 last:border-0 dark:border-slate-700"
+                    className="border-b border-gray-100 last:border-0 dark:border-gray-700"
                   >
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{c.date}</td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{c.date}</td>
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {MARKET_PHASE_LABELS[c.marketPhase]}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {VALUATION_ZONE_LABELS[c.valuationZone]}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {INTEREST_RATE_LABELS[c.interestRateLevel]}
                     </td>
                     <td className="py-2 pr-4">
@@ -184,7 +184,7 @@ export function MarketCheckInPage() {
                             setPendingDeleteId(null)
                             setEditingId(c.id)
                           }}
-                          className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                          className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
                         >
                           編輯
                         </button>
@@ -203,7 +203,7 @@ export function MarketCheckInPage() {
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(null)}
-                              className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                             >
                               取消
                             </button>
@@ -212,7 +212,7 @@ export function MarketCheckInPage() {
                           <button
                             type="button"
                             onClick={() => setPendingDeleteId(c.id)}
-                            className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                            className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                           >
                             刪除
                           </button>

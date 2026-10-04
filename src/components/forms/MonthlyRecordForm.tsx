@@ -80,14 +80,14 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
           <button
             type="button"
             onClick={() => income.append({ name: '', amount: 0 })}
-            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
             + 新增收入項目
           </button>
         </div>
         <div className="mt-2 space-y-2">
           {income.fields.length === 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">尚未新增任何收入項目。</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">尚未新增任何收入項目。</p>
           )}
           {income.fields.map((field, index) => (
             <div key={field.id} className="flex items-start gap-2">
@@ -131,14 +131,14 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
           <button
             type="button"
             onClick={() => expenses.append({ name: '', amount: 0 })}
-            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
             + 新增支出項目
           </button>
         </div>
         <div className="mt-2 space-y-2">
           {expenses.fields.length === 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">尚未新增任何支出項目。</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">尚未新增任何支出項目。</p>
           )}
           {expenses.fields.map((field, index) => (
             <div key={field.id} className="flex items-start gap-2">
@@ -182,14 +182,14 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
           <button
             type="button"
             onClick={() => investments.append({ name: '', amount: 0 })}
-            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
             + 新增投資項目
           </button>
         </div>
         <div className="mt-2 space-y-2">
           {investments.fields.length === 0 && (
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
               本月尚未新增任何投資項目。
             </p>
           )}
@@ -237,7 +237,7 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
       <div className="flex items-center gap-2">
         <button
           type="submit"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           {initialValues ? '儲存修改' : '新增紀錄'}
         </button>
@@ -245,7 +245,7 @@ export function MonthlyRecordForm({ initialValues, onSubmit, onCancel }: Props) 
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="rounded-md px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             取消
           </button>

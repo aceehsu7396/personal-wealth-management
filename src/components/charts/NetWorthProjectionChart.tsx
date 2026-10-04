@@ -24,15 +24,15 @@ export function NetWorthProjectionChart({ points, fireNumber, currency }: Props)
         <AreaChart data={points} margin={{ top: 10, right: 16, left: 8, bottom: 0 }}>
           <defs>
             <linearGradient id="netWorthFill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#059669" stopOpacity={0.35} />
-              <stop offset="100%" stopColor="#059669" stopOpacity={0} />
+              <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.35} />
+              <stop offset="100%" stopColor="#4f46e5" stopOpacity={0} />
             </linearGradient>
           </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.3} />
-          <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#64748b' }} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#9ca3af" strokeOpacity={0.3} />
+          <XAxis dataKey="year" tick={{ fontSize: 12, fill: '#6b7280' }} />
           <YAxis
             tickFormatter={(v) => formatCurrency(v, currency)}
-            tick={{ fontSize: 11, fill: '#64748b' }}
+            tick={{ fontSize: 11, fill: '#6b7280' }}
             width={80}
           />
           <Tooltip
@@ -42,12 +42,12 @@ export function NetWorthProjectionChart({ points, fireNumber, currency }: Props)
           {Number.isFinite(fireNumber) && (
             <ReferenceLine
               y={fireNumber}
-              stroke="#b45309"
+              stroke="#ea580c"
               strokeDasharray="4 4"
               label={{
                 value: '財務自由目標',
                 position: 'insideTopRight',
-                fill: '#b45309',
+                fill: '#ea580c',
                 fontSize: 12,
               }}
             />
@@ -55,7 +55,7 @@ export function NetWorthProjectionChart({ points, fireNumber, currency }: Props)
           <Area
             type="monotone"
             dataKey="projectedNetWorth"
-            stroke="#059669"
+            stroke="#4f46e5"
             strokeWidth={2}
             fill="url(#netWorthFill)"
           />

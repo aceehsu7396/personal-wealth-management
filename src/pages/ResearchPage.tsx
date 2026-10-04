@@ -13,7 +13,7 @@ import { StatCard } from '../components/StatCard'
 import type { ThesisStatus } from '../lib/storage/schema'
 
 const cardClass =
-  'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
+  'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
 type Filter = ThesisStatus | 'all'
 
@@ -55,8 +55,8 @@ export function ResearchPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">個股研究</h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">個股研究</h1>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         產業與商業模式 ＋ 財務與價值評估：研究卡通過全部檢核，才進入衛星建倉。
       </p>
 
@@ -69,7 +69,7 @@ export function ResearchPage() {
 
       {editing ? (
         <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {editingThesis ? `編輯研究卡：${editingThesis.ticker}` : '新增研究卡'}
           </h2>
           <div className="mt-4">
@@ -86,7 +86,7 @@ export function ResearchPage() {
         <button
           type="button"
           onClick={() => setEditing('new')}
-          className="mt-8 rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="mt-8 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           + 新增研究卡
         </button>
@@ -94,7 +94,7 @@ export function ResearchPage() {
 
       <div className={cardClass}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">研究卡</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">研究卡</h2>
           <div className="flex gap-1">
             {(['all', 'watch', 'holding', 'exited'] as Filter[]).map((f) => (
               <button
@@ -103,8 +103,8 @@ export function ResearchPage() {
                 onClick={() => setFilter(f)}
                 className={`rounded-md px-2 py-1 text-xs font-medium ${
                   filter === f
-                    ? 'bg-emerald-600 text-white'
-                    : 'text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700'
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700'
                 }`}
               >
                 {f === 'all' ? '全部' : STATUS_LABELS[f]}
@@ -113,14 +113,14 @@ export function ResearchPage() {
           </div>
         </div>
         {evaluated.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             還沒有研究卡。先從能力圈內、最熟悉的公司開始。
           </p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">標的</th>
                   <th className="py-2 pr-4">類型</th>
                   <th className="py-2 pr-4">信心</th>
@@ -133,31 +133,31 @@ export function ResearchPage() {
               </thead>
               <tbody>
                 {evaluated.map(({ thesis: t, evaluation: e }) => (
-                  <tr key={t.id} className="border-b border-slate-100 last:border-0 dark:border-slate-700">
+                  <tr key={t.id} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
                     <td className="py-2 pr-4">
-                      <div className="font-medium text-slate-900 dark:text-slate-100">
+                      <div className="font-medium text-gray-900 dark:text-gray-100">
                         {t.ticker} {t.name}
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
                         {MARKET_LABELS[t.market]}・{t.sector}・{STATUS_LABELS[t.status]}
                       </div>
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {LYNCH_LABELS[t.lynchCategory]}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {e.convictionScore.toFixed(1)}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {t.currentPrice} / {e.buyPrice.toFixed(1)}
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {formatRatio(e.upsideDownsideRatio)}
                     </td>
                     <td className="py-2 pr-4">
                       <PriceZoneBadge zone={e.priceZone} />
                     </td>
-                    <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {e.checks.filter((c) => c.passed).length}/{e.checks.length}
                     </td>
                     <td className="py-2 pr-4">
@@ -168,7 +168,7 @@ export function ResearchPage() {
                             setPendingDeleteId(null)
                             setEditing(t.id)
                           }}
-                          className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                          className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
                         >
                           編輯
                         </button>
@@ -188,7 +188,7 @@ export function ResearchPage() {
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(null)}
-                              className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                             >
                               取消
                             </button>
@@ -197,7 +197,7 @@ export function ResearchPage() {
                           <button
                             type="button"
                             onClick={() => setPendingDeleteId(t.id)}
-                            className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                            className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                           >
                             刪除
                           </button>
@@ -210,7 +210,7 @@ export function ResearchPage() {
             </table>
           </div>
         )}
-        <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
           紀律：每季財報後 2 週內更新研究卡並逐條檢查失效條件；合理價只能因基本面事實調整，不能因股價上漲而上調。
         </p>
       </div>

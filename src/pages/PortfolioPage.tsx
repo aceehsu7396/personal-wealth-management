@@ -11,7 +11,7 @@ import { inputClass, labelClass } from '../components/forms/FormField'
 import { formatCurrency, formatPercent } from '../lib/format'
 
 const cardClass =
-  'mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800'
+  'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 const TWSE_TICKER = /^\d{4,6}[A-Z]?$/
 
 export function PortfolioPage() {
@@ -84,8 +84,8 @@ export function PortfolioPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">投資組合</h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">投資組合</h1>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         組合建構與風險：配置偏離、單檔與產業集中度、匯率曝險、回撤熔斷與出場規則提醒。
       </p>
 
@@ -109,7 +109,7 @@ export function PortfolioPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">風控警示</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">風控警示</h2>
         <div className="mt-4">
           <RiskViolationList
             violations={report.violations}
@@ -119,11 +119,11 @@ export function PortfolioPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">配置與目標對比</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">配置與目標對比</h2>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+              <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                 <th className="py-2 pr-4">層級</th>
                 <th className="py-2 pr-4">市值</th>
                 <th className="py-2 pr-4">實際</th>
@@ -133,20 +133,20 @@ export function PortfolioPage() {
             </thead>
             <tbody>
               {report.sleeves.map((s) => (
-                <tr key={s.sleeve} className="border-b border-slate-100 last:border-0 dark:border-slate-700">
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{SLEEVE_LABELS[s.sleeve]}</td>
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                <tr key={s.sleeve} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{SLEEVE_LABELS[s.sleeve]}</td>
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                     {formatCurrency(s.valueTwd, 'TWD')}
                   </td>
-                  <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">{formatPercent(s.actualPercent)}</td>
-                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">
+                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{formatPercent(s.actualPercent)}</td>
+                  <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">
                     {s.effectiveTargetPercent === null ? '—' : formatPercent(s.effectiveTargetPercent)}
                   </td>
                   <td
                     className={`py-2 pr-4 ${
                       s.driftPoints !== null && Math.abs(s.driftPoints) > guardrails.rebalancingBandPercent
-                        ? 'font-medium text-amber-700 dark:text-amber-400'
-                        : 'text-slate-500 dark:text-slate-400'
+                        ? 'font-medium text-orange-700 dark:text-orange-400'
+                        : 'text-gray-500 dark:text-gray-400'
                     }`}
                   >
                     {s.driftPoints === null ? '—' : `${s.driftPoints > 0 ? '+' : ''}${s.driftPoints.toFixed(1)}`}
@@ -156,7 +156,7 @@ export function PortfolioPage() {
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
           核心目標依投資政策比例，並把尚未使用的衛星額度按比例分給核心。衛星合計上限 {policy.satellitePercent}%。
           {report.sectorExposure.length > 0 &&
             ` 各產業占衛星額度：${report.sectorExposure
@@ -167,24 +167,24 @@ export function PortfolioPage() {
 
       <div className={cardClass}>
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">持股</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">持股</h2>
           <button
             type="button"
             onClick={refreshTwsePrices}
             disabled={priceFetch.state === 'loading'}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             {priceFetch.state === 'loading' ? '更新中…' : '更新上市台股收盤價'}
           </button>
         </div>
-        {priceFetch.text && <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">{priceFetch.text}</p>}
+        {priceFetch.text && <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{priceFetch.text}</p>}
         {report.holdings.length === 0 ? (
-          <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">還沒有持股。</p>
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">還沒有持股。</p>
         ) : (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">標的</th>
                   <th className="py-2 pr-4">市值（新台幣）</th>
                   <th className="py-2 pr-4">權重</th>
@@ -197,29 +197,29 @@ export function PortfolioPage() {
                 {[...report.holdings]
                   .sort((a, b) => b.valueTwd - a.valueTwd)
                   .map((v) => (
-                    <tr key={v.holding.id} className="border-b border-slate-100 last:border-0 dark:border-slate-700">
+                    <tr key={v.holding.id} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
                       <td className="py-2 pr-4">
-                        <div className="font-medium text-slate-900 dark:text-slate-100">
+                        <div className="font-medium text-gray-900 dark:text-gray-100">
                           {v.holding.ticker} {v.holding.name}
                         </div>
-                        <div className="text-xs text-slate-500 dark:text-slate-400">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           {SLEEVE_LABELS[v.holding.sleeve]}
                           {v.holding.priceUpdatedAt && `・價格 ${v.holding.priceUpdatedAt}`}
                         </div>
                       </td>
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                         {formatCurrency(v.valueTwd, 'TWD')}
                       </td>
-                      <td className="py-2 pr-4 text-slate-700 dark:text-slate-300">
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                         {formatPercent(v.weightPercent)}
                         {v.positionCapPercent !== null && (
-                          <span className="text-xs text-slate-400"> / {v.positionCapPercent}%</span>
+                          <span className="text-xs text-gray-400"> / {v.positionCapPercent}%</span>
                         )}
                       </td>
                       <td
                         className={`py-2 pr-4 ${
                           v.gainPercent >= 0
-                            ? 'text-emerald-700 dark:text-emerald-400'
+                            ? 'text-indigo-700 dark:text-indigo-400'
                             : 'text-red-600 dark:text-red-400'
                         }`}
                       >
@@ -237,7 +237,7 @@ export function PortfolioPage() {
                               setPendingDeleteId(null)
                               setEditingId(v.holding.id)
                             }}
-                            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+                            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
                           >
                             編輯
                           </button>
@@ -257,7 +257,7 @@ export function PortfolioPage() {
                               <button
                                 type="button"
                                 onClick={() => setPendingDeleteId(null)}
-                                className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                                className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                               >
                                 取消
                               </button>
@@ -266,7 +266,7 @@ export function PortfolioPage() {
                             <button
                               type="button"
                               onClick={() => setPendingDeleteId(v.holding.id)}
-                              className="text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
+                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
                             >
                               刪除
                             </button>
@@ -282,10 +282,10 @@ export function PortfolioPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           {editing ? `編輯持股：${editing.ticker}` : '新增持股'}
         </h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           現金可新增為「核心：債券/現金」，股數填金額、成本與現價填 1。
         </p>
         <div className="mt-4">
@@ -302,7 +302,7 @@ export function PortfolioPage() {
       <PerformanceReviewPanel report={report} />
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">組合設定</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">組合設定</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="block">
             <span className={labelClass}>美元兌台幣匯率</span>
@@ -319,18 +319,18 @@ export function PortfolioPage() {
           </label>
           <div>
             <span className={labelClass}>組合市值高點（用於回撤熔斷）</span>
-            <p className="mt-2 text-sm text-slate-700 dark:text-slate-300">
+            <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
               {formatCurrency(meta.peakValueTwd, 'TWD')}
-              {meta.peakDate && <span className="text-xs text-slate-500"> （{meta.peakDate}）</span>}
+              {meta.peakDate && <span className="text-xs text-gray-500"> （{meta.peakDate}）</span>}
             </p>
             <button
               type="button"
               onClick={() => setPortfolioMeta({ peakValueTwd: report.totalValueTwd, peakDate: todayIsoDate() })}
-              className="mt-1 text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+              className="mt-1 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
             >
               以目前市值重設高點
             </button>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               高點包含新投入的資金；大筆投入或提領後可重設，以免回撤被低估或高估。
             </p>
           </div>

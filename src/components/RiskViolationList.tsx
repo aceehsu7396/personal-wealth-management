@@ -3,8 +3,8 @@ import type { RiskViolation } from '../lib/calculations/portfolioRisk'
 const SEVERITY_CLASSES: Record<RiskViolation['severity'], string> = {
   critical: 'border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/30 dark:text-red-300',
   warning:
-    'border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
-  info: 'border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900/40 dark:text-slate-300',
+    'border-orange-300 bg-orange-50 text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  info: 'border-gray-200 bg-gray-50 text-gray-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300',
 }
 
 export function RiskViolationList({
@@ -15,7 +15,7 @@ export function RiskViolationList({
   emptyMessage: string
 }) {
   if (violations.length === 0) {
-    return <p className="text-sm text-emerald-700 dark:text-emerald-400">✓ {emptyMessage}</p>
+    return <p className="text-sm text-indigo-700 dark:text-indigo-400">✓ {emptyMessage}</p>
   }
   return (
     <ul className="space-y-2">

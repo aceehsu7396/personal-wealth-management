@@ -53,12 +53,12 @@ export function StrategyOverview() {
   const alerts = risk.violations.filter((v) => v.severity !== 'info')
 
   return (
-    <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+    <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">投資策略紀律</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">投資策略紀律</h2>
         <Link
           to="/strategy"
-          className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+          className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
         >
           前往投資策略
         </Link>
@@ -105,7 +105,7 @@ export function StrategyOverview() {
             <RiskViolationList violations={alerts.slice(0, MAX_ALERTS)} emptyMessage="" />
           )}
           {alerts.length > MAX_ALERTS && (
-            <Link to="/portfolio" className="text-xs text-emerald-700 hover:underline dark:text-emerald-400">
+            <Link to="/portfolio" className="text-xs text-indigo-700 hover:underline dark:text-indigo-400">
               還有 {alerts.length - MAX_ALERTS} 項警示，前往投資組合查看
             </Link>
           )}
@@ -113,7 +113,7 @@ export function StrategyOverview() {
             <ul className="space-y-1 text-sm">
               {todos.map((t) => (
                 <li key={t.text}>
-                  <Link to={t.to} className="text-slate-700 hover:underline dark:text-slate-300">
+                  <Link to={t.to} className="text-gray-700 hover:underline dark:text-gray-300">
                     ☐ {t.text}
                   </Link>
                 </li>

@@ -125,8 +125,8 @@ export function MacroCheckInForm({ initialValues, onSubmit, onCancel }: Props) {
     options: { value: string; text: string }[],
   ) => (
     <fieldset className="sm:col-span-2">
-      <legend className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</legend>
-      <p className="text-xs text-slate-500 dark:text-slate-400">{hint}</p>
+      <legend className="text-sm font-semibold text-gray-900 dark:text-gray-100">{title}</legend>
+      <p className="text-xs text-gray-500 dark:text-gray-400">{hint}</p>
       <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {fields.map((f) => (
           <label key={f.name} className="block">
@@ -173,7 +173,7 @@ export function MacroCheckInForm({ initialValues, onSubmit, onCancel }: Props) {
       <div className="flex items-end gap-2 sm:col-span-2">
         <button
           type="submit"
-          className="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
           {initialValues ? '儲存修改' : '新增總經檢視'}
         </button>
@@ -181,7 +181,7 @@ export function MacroCheckInForm({ initialValues, onSubmit, onCancel }: Props) {
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700"
+            className="rounded-md px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700"
           >
             取消
           </button>

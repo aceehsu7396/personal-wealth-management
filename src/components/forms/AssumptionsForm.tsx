@@ -78,7 +78,7 @@ export function AssumptionsForm() {
       </Field>
 
       <Field label="儲蓄方式" error={errors.savingsMode?.message}>
-        <div className="mt-1 flex gap-4 text-sm text-slate-700 dark:text-slate-300">
+        <div className="mt-1 flex gap-4 text-sm text-gray-700 dark:text-gray-300">
           <label className="flex items-center gap-1.5">
             <input type="radio" value="rate" {...register('savingsMode')} />
             依儲蓄率

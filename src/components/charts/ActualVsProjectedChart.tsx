@@ -44,7 +44,7 @@ export function ActualVsProjectedChart({ projectedPoints, checkIns, currency }: 
 
   if (actualSeries.length === 0) {
     return (
-      <p className="py-12 text-center text-sm text-slate-500 dark:text-slate-400">
+      <p className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
         還沒有任何淨值紀錄，新增第一筆之後這裡會出現實際與試算對比圖。
       </p>
     )
@@ -54,19 +54,19 @@ export function ActualVsProjectedChart({ projectedPoints, checkIns, currency }: 
     <div className="h-72 w-full">
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart margin={{ top: 10, right: 16, left: 8, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.3} />
+          <CartesianGrid strokeDasharray="3 3" stroke="#9ca3af" strokeOpacity={0.3} />
           <XAxis
             dataKey="x"
             type="number"
             domain={['dataMin', 'dataMax']}
             tickFormatter={tickDateFormatter}
-            tick={{ fontSize: 12, fill: '#64748b' }}
+            tick={{ fontSize: 12, fill: '#6b7280' }}
             allowDuplicatedCategory={false}
           />
           <YAxis
             dataKey="y"
             tickFormatter={(v) => formatCurrency(v, currency)}
-            tick={{ fontSize: 11, fill: '#64748b' }}
+            tick={{ fontSize: 11, fill: '#6b7280' }}
             width={80}
           />
           <Tooltip
@@ -75,15 +75,15 @@ export function ActualVsProjectedChart({ projectedPoints, checkIns, currency }: 
           />
           <ReferenceLine
             x={today}
-            stroke="#94a3b8"
+            stroke="#9ca3af"
             strokeDasharray="2 2"
-            label={{ value: '今日', position: 'insideTopLeft', fontSize: 11, fill: '#64748b' }}
+            label={{ value: '今日', position: 'insideTopLeft', fontSize: 11, fill: '#6b7280' }}
           />
           <Line
             data={projectedSeries}
             dataKey="y"
             name="試算軌跡"
-            stroke="#059669"
+            stroke="#4f46e5"
             strokeDasharray="4 4"
             dot={false}
             isAnimationActive={false}
@@ -92,7 +92,7 @@ export function ActualVsProjectedChart({ projectedPoints, checkIns, currency }: 
             data={actualSeries}
             dataKey="y"
             name="實際淨值"
-            stroke="#b45309"
+            stroke="#ea580c"
             strokeWidth={2}
             dot={{ r: 4 }}
             isAnimationActive={false}

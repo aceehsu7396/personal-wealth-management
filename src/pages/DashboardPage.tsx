@@ -51,13 +51,13 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">儀表板</h1>
-      <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">儀表板</h1>
+      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         財富自由計畫的整體現況一覽。
       </p>
 
       {isFirstRun && (
-        <div className="mt-6 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300">
+        <div className="mt-6 rounded-md border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm text-indigo-800 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
           歡迎使用！建議先到{' '}
           <Link to="/fire" className="font-medium underline">
             財務自由試算
@@ -67,7 +67,7 @@ export function DashboardPage() {
       )}
 
       {!isFirstRun && reviewDue && (
-        <div className="mt-6 flex items-center justify-between gap-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+        <div className="mt-6 flex items-center justify-between gap-4 rounded-md border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
           <span>
             {latestMarketCheckIn
               ? `距離上次市場檢視已超過 ${guardrails.reviewCadenceMonths} 個月，該做下一次評估了。`
@@ -114,14 +114,14 @@ export function DashboardPage() {
 
       <StrategyOverview />
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             淨值進度
           </h2>
           <Link
             to="/progress"
-            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
             前往進度追蹤
           </Link>
@@ -133,14 +133,14 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="mt-8 rounded-lg border border-slate-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800">
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             最新市場建議
           </h2>
           <Link
             to="/market"
-            className="text-xs font-medium text-emerald-700 hover:underline dark:text-emerald-400"
+            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
             前往市場檢視
           </Link>
