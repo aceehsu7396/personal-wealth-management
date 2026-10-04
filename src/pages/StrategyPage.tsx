@@ -1,5 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
+import { useJourney } from '../lib/useJourney'
+import { todayIsoDate } from '../lib/market/twse'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
 import {
   computeRequiredReturn,
@@ -24,6 +26,8 @@ export function StrategyPage() {
   const profile = useAppStore((s) => s.profile)
   const assumptions = useAppStore((s) => s.assumptions)
   const policy = useAppStore((s) => s.investmentPolicy)
+  const setInvestmentPolicy = useAppStore((s) => s.setInvestmentPolicy)
+  const { learning } = useJourney()
 
   const projection = computeFireProjection(profile, assumptions)
   const required = computeRequiredReturn(
@@ -67,7 +71,7 @@ export function StrategyPage() {
       layer: '衛星',
       name: '台股 + 美股個股',
       percent: policy.satellitePercent,
-      example: '依個股研究卡',
+      example: `依個股研究卡；目前學習階段上限 ${learning.satelliteCapPercent}%`,
     },
   ]
 
@@ -78,7 +82,7 @@ export function StrategyPage() {
       </h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         投資政策聲明：目標報酬、風險預算與資產配置。完整說明見{' '}
-        <Link to="/handbook/00" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+        <Link to="/handbook/02" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
           策略手冊
         </Link>
         。
@@ -154,8 +158,8 @@ export function StrategyPage() {
           </table>
         </div>
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          核心合計 {coreTotal}%。衛星比重建議依學習路線由 10%
-          起逐步提高，並以績效歸因決定是否擴大。
+          核心合計 {coreTotal}%。衛星上限依學習階段自動調整：目前是階段
+          {learning.title}，上限 {learning.satelliteCapPercent}%；未使用的衛星額度按比例留在核心。
         </p>
       </div>
 
@@ -168,6 +172,27 @@ export function StrategyPage() {
         </p>
         <div className="mt-4">
           <InvestmentPolicyForm />
+        </div>
+      </div>
+
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+          簽署投資政策聲明
+        </h2>
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+          確認目標、風險與配置都是你在冷靜時願意遵守的規則後簽署。簽署後只在每年 1 月或人生重大事件時修改；這是行動路線的步驟 1.4。
+        </p>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setInvestmentPolicy({ signedAt: todayIsoDate() })}
+            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          >
+            {policy.signedAt ? '重新簽署（年度檢討後）' : '我已確認，簽署投資政策聲明'}
+          </button>
+          {policy.signedAt && (
+            <span className="text-sm text-indigo-700 dark:text-indigo-400">✓ 已於 {policy.signedAt} 簽署</span>
+          )}
         </div>
       </div>
 

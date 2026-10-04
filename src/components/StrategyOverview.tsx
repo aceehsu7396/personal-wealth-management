@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
+import { useJourney } from '../lib/useJourney'
 import { computeRequiredReturn, FEASIBILITY_LABELS } from '../lib/calculations/requiredReturn'
 import { assessMacro, STANCE_LABELS } from '../lib/calculations/macroRegime'
 import { analyzePortfolio } from '../lib/calculations/portfolioRisk'
@@ -15,7 +16,7 @@ const THESIS_STALE_MONTHS = 4
 export function StrategyOverview() {
   const profile = useAppStore((s) => s.profile)
   const assumptions = useAppStore((s) => s.assumptions)
-  const policy = useAppStore((s) => s.investmentPolicy)
+  const { policy, journey } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
   const macroCheckIns = useAppStore((s) => s.macroCheckIns)
   const holdings = useAppStore((s) => s.holdings)
@@ -31,7 +32,10 @@ export function StrategyOverview() {
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
 
   const todos: { text: string; to: string }[] = []
-  if (!latestMacro || addMonths(latestMacro.date, 1) <= today) {
+  // Macro reviews belong to stage three; only nag once the core is in place
+  // or the habit has started.
+  const macroStageReached = journey.stages[1].done || latestMacro !== undefined
+  if (macroStageReached && (!latestMacro || addMonths(latestMacro.date, 1) <= today)) {
     todos.push({ text: '本月的總經三支柱檢視尚未完成', to: '/market' })
   }
   const stale = theses.filter(

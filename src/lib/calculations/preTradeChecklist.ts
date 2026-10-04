@@ -41,6 +41,8 @@ export interface ChecklistContext {
   guardrails: AdviceGuardrails
   meta: PortfolioMeta
   macro: MacroAssessment | null
+  // Action-roadmap gate for satellite buys; omitted means no gate.
+  satelliteGate?: { unlocked: boolean; missingSteps: string[] }
 }
 
 export const TRADE_REASON_LABELS: Record<TradeReason, string> = {
@@ -158,6 +160,17 @@ export function buildPreTradeChecklist(
     }
 
     if (isSatellite(trade.sleeve)) {
+      if (ctx.satelliteGate) {
+        items.push(
+          check(
+            'journeyUnlocked',
+            ctx.satelliteGate.unlocked
+              ? '已完成起步前置步驟（財務地基、核心配置、總經檢視）'
+              : `已完成起步前置步驟（尚缺：${ctx.satelliteGate.missingSteps.join('、')}）`,
+            ctx.satelliteGate.unlocked,
+          ),
+        )
+      }
       items.push(
         check(
           'satelliteCap',

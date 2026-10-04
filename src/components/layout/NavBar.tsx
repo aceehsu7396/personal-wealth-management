@@ -18,20 +18,20 @@ export function NavBar() {
         <NavLink to="/" end className={linkClass}>
           儀表板
         </NavLink>
-        <NavLink to="/fire" className={linkClass}>
-          財務自由試算
+        <NavLink to="/journey" className={linkClass}>
+          行動路線
         </NavLink>
         <NavLink to="/handbook" className={linkClass}>
           策略手冊
         </NavLink>
+        <NavLink to="/fire" className={linkClass}>
+          財務自由試算
+        </NavLink>
+        <NavLink to="/records" className={linkClass}>
+          收支記錄
+        </NavLink>
         <NavLink to="/strategy" className={linkClass}>
           投資策略
-        </NavLink>
-        <NavLink to="/market" className={linkClass}>
-          市場檢視
-        </NavLink>
-        <NavLink to="/research" className={linkClass}>
-          個股研究
         </NavLink>
         <NavLink to="/portfolio" className={linkClass}>
           投資組合
@@ -39,11 +39,14 @@ export function NavBar() {
         <NavLink to="/trades" className={linkClass}>
           交易日誌
         </NavLink>
+        <NavLink to="/market" className={linkClass}>
+          市場檢視
+        </NavLink>
+        <NavLink to="/research" className={linkClass}>
+          個股研究
+        </NavLink>
         <NavLink to="/progress" className={linkClass}>
           進度追蹤
-        </NavLink>
-        <NavLink to="/records" className={linkClass}>
-          收支記錄
         </NavLink>
         <NavLink to="/settings" className={linkClass}>
           設定

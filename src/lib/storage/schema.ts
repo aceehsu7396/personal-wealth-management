@@ -382,9 +382,16 @@ export const InvestmentPolicySchema = z.object({
   maxDrawdownTolerancePercent: z.number(),
   drawdownCircuitBreakerPercent: z.number(),
   reviewDrawdownFromCostPercent: z.number(),
+  signedAt: z.string().optional(),
   updatedAt: z.string(),
 })
 export type InvestmentPolicy = z.infer<typeof InvestmentPolicySchema>
+
+export const FoundationSchema = z.object({
+  emergencyFundAmount: z.number(),
+  emergencyFundTargetMonths: z.number(),
+})
+export type Foundation = z.infer<typeof FoundationSchema>
 
 export function createDefaultInvestmentPolicy(): InvestmentPolicy {
   return {
@@ -421,6 +428,7 @@ export const AppDataSchema = z.object({
   portfolioMeta: PortfolioMetaSchema.default({ fxUsdTwd: 32, peakValueTwd: 0, peakDate: null }),
   trades: z.array(TradeSchema).default([]),
   performanceReviews: z.array(PerformanceReviewSchema).default([]),
+  foundation: FoundationSchema.default({ emergencyFundAmount: 0, emergencyFundTargetMonths: 6 }),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -465,5 +473,6 @@ export function createDefaultAppData(): AppData {
     portfolioMeta: { fxUsdTwd: 32, peakValueTwd: 0, peakDate: null },
     trades: [],
     performanceReviews: [],
+    foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6 },
   }
 }

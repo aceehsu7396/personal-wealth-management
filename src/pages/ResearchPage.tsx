@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
+import { useJourney } from '../lib/useJourney'
+import { JourneyNotice } from '../components/JourneyNotice'
 import { evaluateThesis, LYNCH_LABELS } from '../lib/calculations/thesisScoring'
 import {
   MARKET_LABELS,
@@ -20,6 +22,7 @@ type Filter = ThesisStatus | 'all'
 export function ResearchPage() {
   const theses = useAppStore((s) => s.stockTheses)
   const policy = useAppStore((s) => s.investmentPolicy)
+  const { journey } = useJourney()
   const addStockThesis = useAppStore((s) => s.addStockThesis)
   const updateStockThesis = useAppStore((s) => s.updateStockThesis)
   const removeStockThesis = useAppStore((s) => s.removeStockThesis)
@@ -59,6 +62,11 @@ export function ResearchPage() {
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         產業與商業模式 ＋ 財務與價值評估：研究卡通過全部檢核，才進入衛星建倉。
       </p>
+
+      <JourneyNotice
+        missing={journey.missingForSatellite}
+        intro="個股研究是行動路線的第四階段。研究卡可以先寫來觀察，但建議先完成這些步驟再買進個股："
+      />
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="研究中標的" value={`${active.length}`} hint="觀察 + 持有" />

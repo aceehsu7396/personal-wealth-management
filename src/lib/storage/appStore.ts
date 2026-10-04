@@ -19,6 +19,7 @@ import {
   type PortfolioMeta,
   type Trade,
   type PerformanceReview,
+  type Foundation,
 } from './schema'
 
 export const STORAGE_KEY = 'pfm:appData'
@@ -95,6 +96,7 @@ interface AppStore extends AppData {
   removeTrade: (id: string) => void
   addPerformanceReview: (entry: Omit<PerformanceReview, 'id' | 'createdAt'>) => void
   removePerformanceReview: (id: string) => void
+  setFoundation: (foundation: Partial<Foundation>) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -121,6 +123,7 @@ function toAppData(state: AppData): AppData {
     portfolioMeta: state.portfolioMeta,
     trades: state.trades,
     performanceReviews: state.performanceReviews,
+    foundation: state.foundation,
   }
 }
 
@@ -315,6 +318,9 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           performanceReviews: state.performanceReviews.filter((r) => r.id !== id),
         })),
+
+      setFoundation: (foundation) =>
+        set((state) => ({ foundation: { ...state.foundation, ...foundation } })),
 
       mergeMarketPriceHistory: (taiex, tw0050, fetchedOn) =>
         set((state) => ({

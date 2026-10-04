@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
+import { useJourney } from '../lib/useJourney'
+import { JourneyNotice } from '../components/JourneyNotice'
 import { assessMacro } from '../lib/calculations/macroRegime'
 import { computeDiscipline, isException, type ReviewSlot } from '../lib/calculations/disciplineScore'
 import { applyTradeToHoldings, TRADE_REASON_LABELS } from '../lib/calculations/preTradeChecklist'
@@ -23,7 +25,7 @@ export function TradesPage() {
   const trades = useAppStore((s) => s.trades)
   const holdings = useAppStore((s) => s.holdings)
   const theses = useAppStore((s) => s.stockTheses)
-  const policy = useAppStore((s) => s.investmentPolicy)
+  const { policy, journey } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
   const meta = useAppStore((s) => s.portfolioMeta)
   const macroCheckIns = useAppStore((s) => s.macroCheckIns)
@@ -45,6 +47,10 @@ export function TradesPage() {
     guardrails,
     meta,
     macro: latestMacro ? assessMacro(latestMacro, guardrails) : null,
+    satelliteGate: {
+      unlocked: journey.satelliteUnlocked,
+      missingSteps: journey.missingForSatellite.map((s) => `${s.id} ${s.title}`),
+    },
   }
   const today = todayIsoDate()
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
@@ -93,6 +99,11 @@ export function TradesPage() {
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         每筆交易先過檢核表，事後在 6 與 12 個月時檢討。評估的是流程，不是結果。
       </p>
+
+      <JourneyNotice
+        missing={journey.missingForSatellite}
+        intro="核心 ETF 的定期定額可以照常記錄；個股（衛星）買進要先完成這些起步步驟，否則交易前檢核會標示未通過："
+      />
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard

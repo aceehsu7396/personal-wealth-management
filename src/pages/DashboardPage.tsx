@@ -8,6 +8,7 @@ import { isReviewDue } from '../lib/reviewSchedule'
 import { StatCard } from '../components/StatCard'
 import { AdviceSummary } from '../components/AdviceSummary'
 import { StrategyOverview } from '../components/StrategyOverview'
+import { useJourney } from '../lib/useJourney'
 import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedChart'
 import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 
@@ -43,11 +44,8 @@ export function DashboardPage() {
       ? '50 年內無法達成'
       : `約 ${formatYearsToFire(result.yearsToFire)}`
 
-  const isFirstRun =
-    checkIns.length === 0 &&
-    marketCheckIns.length === 0 &&
-    assumptions.currentNetWorth === 0 &&
-    assumptions.monthlyExpenses === 0
+  const { journey } = useJourney()
+  const nextStep = journey.nextStep
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -56,17 +54,38 @@ export function DashboardPage() {
         財富自由計畫的整體現況一覽。
       </p>
 
-      {isFirstRun && (
-        <div className="mt-6 rounded-md border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm text-indigo-800 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-          歡迎使用！建議先到{' '}
-          <Link to="/fire" className="font-medium underline">
-            財務自由試算
-          </Link>{' '}
-          填入現況與假設，開始估算你的財富自由時間點。
+      {nextStep && (
+        <div className="mt-6 rounded-lg border border-indigo-300 bg-indigo-50 p-5 dark:border-indigo-700 dark:bg-indigo-900/30">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold tracking-wide text-indigo-700 dark:text-indigo-300">
+              下一步・行動路線 {journey.completedCount}/{journey.totalCount}
+            </p>
+            <Link to="/journey" className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+              查看完整路線
+            </Link>
+          </div>
+          <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {nextStep.id} {nextStep.title}
+          </p>
+          <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">{nextStep.detail}</p>
+          <div className="mt-3 flex flex-wrap gap-3">
+            <Link
+              to={nextStep.page.to}
+              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              前往{nextStep.page.label}
+            </Link>
+            <Link
+              to={`/handbook/${nextStep.handbookSlug}`}
+              className="rounded-md border border-indigo-300 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100 dark:border-indigo-700 dark:text-indigo-300 dark:hover:bg-indigo-900/40"
+            >
+              先讀手冊這一章
+            </Link>
+          </div>
         </div>
       )}
 
-      {!isFirstRun && reviewDue && (
+      {latestMarketCheckIn && reviewDue && (
         <div className="mt-6 flex items-center justify-between gap-4 rounded-md border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
           <span>
             {latestMarketCheckIn

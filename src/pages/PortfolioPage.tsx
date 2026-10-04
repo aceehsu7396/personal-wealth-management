@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
+import { useJourney } from '../lib/useJourney'
 import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculations/portfolioRisk'
 import { fetchLatestTwseClose, todayIsoDate } from '../lib/market/twse'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
@@ -17,7 +18,8 @@ const TWSE_TICKER = /^\d{4,6}[A-Z]?$/
 export function PortfolioPage() {
   const holdings = useAppStore((s) => s.holdings)
   const theses = useAppStore((s) => s.stockTheses)
-  const policy = useAppStore((s) => s.investmentPolicy)
+  // Satellite cap narrowed to the current learning stage.
+  const { policy, learning } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
   const meta = useAppStore((s) => s.portfolioMeta)
   const addHolding = useAppStore((s) => s.addHolding)
@@ -94,7 +96,7 @@ export function PortfolioPage() {
         <StatCard
           label="衛星比重"
           value={formatPercent(report.satellitePercent)}
-          hint={`上限 ${policy.satellitePercent}%`}
+          hint={`上限 ${policy.satellitePercent}%（學習階段${learning.title.split(' ')[0]}）`}
         />
         <StatCard
           label="美元曝險"
@@ -157,7 +159,7 @@ export function PortfolioPage() {
           </table>
         </div>
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          核心目標依投資政策比例，並把尚未使用的衛星額度按比例分給核心。衛星合計上限 {policy.satellitePercent}%。
+          核心目標依投資政策比例，並把尚未使用的衛星額度按比例分給核心。衛星合計上限 {policy.satellitePercent}%（依學習階段調整）。
           {report.sectorExposure.length > 0 &&
             ` 各產業占衛星額度：${report.sectorExposure
               .map((e) => `${e.sector} ${e.percentOfSatelliteBudget.toFixed(0)}%`)

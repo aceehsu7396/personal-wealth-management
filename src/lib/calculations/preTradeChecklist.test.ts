@@ -124,6 +124,28 @@ describe('buildPreTradeChecklist', () => {
     expect(missing.find((i) => i.key === 'macro')?.passed).toBe(false)
   })
 
+  it('flags satellite buys before the action roadmap is unlocked', () => {
+    const locked = buildPreTradeChecklist(
+      buy,
+      ctx({ satelliteGate: { unlocked: false, missingSteps: ['1.2 準備緊急預備金'] } }),
+      {},
+    )
+    const gate = locked.find((i) => i.key === 'journeyUnlocked')!
+    expect(gate.passed).toBe(false)
+    expect(gate.label).toContain('1.2 準備緊急預備金')
+    const open = buildPreTradeChecklist(buy, ctx({ satelliteGate: { unlocked: true, missingSteps: [] } }), {})
+    expect(open.find((i) => i.key === 'journeyUnlocked')?.passed).toBe(true)
+  })
+
+  it('does not gate core DCA buys', () => {
+    const items = buildPreTradeChecklist(
+      { ...buy, reason: 'core_dca', sleeve: 'core_tw', holdingId: 'core', thesisId: undefined },
+      ctx({ satelliteGate: { unlocked: false, missingSteps: ['x'] } }),
+      {},
+    )
+    expect(items.find((i) => i.key === 'journeyUnlocked')).toBeUndefined()
+  })
+
   it('flags a buy that breaches the single-position cap', () => {
     const items = buildPreTradeChecklist({ ...buy, shares: 20 }, ctx(), {})
     expect(items.find((i) => i.key === 'positionCap')?.passed).toBe(false)

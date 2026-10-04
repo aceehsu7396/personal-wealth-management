@@ -11,6 +11,7 @@ import { StrategyPage } from './pages/StrategyPage'
 import { ResearchPage } from './pages/ResearchPage'
 import { PortfolioPage } from './pages/PortfolioPage'
 import { TradesPage } from './pages/TradesPage'
+import { JourneyPage } from './pages/JourneyPage'
 
 // The handbook bundles the Markdown renderer; load it only when opened.
 const HandbookPage = lazy(() =>
@@ -24,6 +25,7 @@ function App() {
         <NavBar />
         <Routes>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/journey" element={<JourneyPage />} />
           <Route path="/fire" element={<FireCalculatorPage />} />
           <Route path="/strategy" element={<StrategyPage />} />
           <Route path="/market" element={<MarketCheckInPage />} />
