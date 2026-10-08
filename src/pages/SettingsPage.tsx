@@ -32,10 +32,10 @@ export function SettingsPage() {
 
       <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          AI 研究摘要設定
+          AI 網路研究設定
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          用於「市場檢視」頁面產生大盤與 0050 的 AI 研究摘要。
+          用於市場分析（預填總經三支柱）、產業分析、個股分析（預填研究卡事實數據）與大盤摘要。AI 會上網搜尋並附上資料來源；費用直接計入你的 Anthropic 帳戶，每次分析約 US$0.1–0.5，按下按鈕才會執行。
         </p>
         <div className="mt-4">
           <AiKeySettings />

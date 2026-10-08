@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAppStore } from '../storage/appStore'
 import { fetchLatestTwseClose, todayIsoDate } from './twse'
 import { fetchTwseValuations, type TwseValuation } from './twseValuation'
@@ -13,6 +13,8 @@ export function useTwseAutoRefresh() {
   const setMarketSnapshot = useAppStore((s) => s.setMarketSnapshot)
   const updateHolding = useAppStore((s) => s.updateHolding)
   const setThesisPrices = useAppStore((s) => s.setThesisPrices)
+  const holdings = useAppStore((s) => s.holdings)
+  const theses = useAppStore((s) => s.stockTheses)
   const [status, setStatus] = useState<Status>('idle')
   const [message, setMessage] = useState<string | null>(null)
 
@@ -64,10 +66,20 @@ export function useTwseAutoRefresh() {
     }
   }, [setMarketSnapshot, updateHolding, setThesisPrices])
 
+  // Refresh on the first visit of the day, and again when a newly followed
+  // ticker has no data yet (tried once per set of missing tickers).
+  const attemptedMissing = useRef<string | null>(null)
+  const missingKey = followedTwseTickers(holdings, theses)
+    .filter((t) => !snapshot.valuations[t])
+    .sort()
+    .join(',')
   useEffect(() => {
-    if (useAppStore.getState().marketSnapshot.fetchedOn === todayIsoDate()) return
+    const stale = snapshot.fetchedOn !== todayIsoDate()
+    const newTickers = missingKey !== '' && attemptedMissing.current !== missingKey
+    if (!stale && !newTickers) return
+    attemptedMissing.current = missingKey
     void refresh()
-  }, [refresh])
+  }, [refresh, snapshot.fetchedOn, missingKey])
 
   return { snapshot, status, message, refresh }
 }

@@ -100,9 +100,12 @@ interface Props {
   initialValues?: MacroCheckInFormValues
   onSubmit: (values: MacroCheckInFormValues) => void
   onCancel?: () => void
+  // AI draft: the reason behind each pre-filled signal, keyed by field path.
+  reasons?: Record<string, string>
+  submitLabel?: string
 }
 
-export function MacroCheckInForm({ initialValues, onSubmit, onCancel }: Props) {
+export function MacroCheckInForm({ initialValues, onSubmit, onCancel, reasons, submitLabel }: Props) {
   const {
     register,
     handleSubmit,
@@ -141,6 +144,9 @@ export function MacroCheckInForm({ initialValues, onSubmit, onCancel }: Props) {
                 </option>
               ))}
             </select>
+            {reasons?.[f.name] && (
+              <span className="mt-1 block text-xs text-orange-700 dark:text-orange-300">AI：{reasons[f.name]}</span>
+            )}
           </label>
         ))}
       </div>
@@ -175,7 +181,7 @@ export function MacroCheckInForm({ initialValues, onSubmit, onCancel }: Props) {
           type="submit"
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
         >
-          {initialValues ? '儲存修改' : '新增總經檢視'}
+          {submitLabel ?? (initialValues ? '儲存修改' : '新增總經檢視')}
         </button>
         {onCancel && (
           <button

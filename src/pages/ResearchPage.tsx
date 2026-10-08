@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { JourneyNotice } from '../components/JourneyNotice'
+import { IndustryAnalysisPanel } from '../components/research/IndustryAnalysisPanel'
 import { evaluateThesis, LYNCH_LABELS } from '../lib/calculations/thesisScoring'
 import {
   MARKET_LABELS,
@@ -78,6 +79,16 @@ export function ResearchPage() {
         <StatCard label="研究卡未完整" value={`${incomplete}`} hint="未完整不得建倉" />
       </div>
 
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">產業分析</h2>
+        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+          先看懂產業，再挑公司：AI 上網整理產業生命週期、五力、供應鏈、趨勢與代表公司，作為寫研究卡的素材。個股分析在研究卡表單內。
+        </p>
+        <div className="mt-4">
+          <IndustryAnalysisPanel />
+        </div>
+      </div>
+
       {editing ? (
         <div className={cardClass}>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -87,6 +98,8 @@ export function ResearchPage() {
             <StockThesisForm
               key={editing}
               policy={policy}
+              thesisId={editingThesis?.id}
+              valuation={editingThesis ? twse.snapshot.valuations[editingThesis.ticker] : undefined}
               initialValues={editingThesis}
               onSubmit={handleSubmit}
               onCancel={() => setEditing(null)}

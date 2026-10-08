@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import Anthropic from '@anthropic-ai/sdk'
 import { Link } from 'react-router-dom'
-import { generateMarketResearchSummary, MissingApiKeyError } from '../lib/ai/researchSummary'
+import { generateMarketResearchSummary } from '../lib/ai/researchSummary'
+import { describeAiError } from '../lib/ai/client'
 import type { DailyClose, MarketCheckIn } from '../lib/storage/schema'
 import { getApiKey } from '../lib/ai/apiKeyStorage'
 
@@ -11,14 +11,6 @@ interface Props {
   latestCheckIn?: MarketCheckIn
 }
 
-function describeError(error: unknown): string {
-  if (error instanceof MissingApiKeyError) return error.message
-  if (error instanceof Anthropic.AuthenticationError) return 'API 金鑰無效，請至設定頁確認。'
-  if (error instanceof Anthropic.RateLimitError) return '已達 API 速率限制，請稍後再試。'
-  if (error instanceof Anthropic.APIError) return `AI 服務發生錯誤：${error.message}`
-  if (error instanceof Error) return error.message
-  return '發生未知錯誤，請稍後再試。'
-}
 
 export function AiResearchSummary({ taiex, tw0050, latestCheckIn }: Props) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
@@ -35,7 +27,7 @@ export function AiResearchSummary({ taiex, tw0050, latestCheckIn }: Props) {
       setSummary(text)
       setStatus('idle')
     } catch (error) {
-      setErrorMessage(describeError(error))
+      setErrorMessage(describeAiError(error))
       setStatus('error')
     }
   }

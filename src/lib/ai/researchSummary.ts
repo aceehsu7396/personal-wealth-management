@@ -1,13 +1,6 @@
-import Anthropic from '@anthropic-ai/sdk'
-import { getApiKey } from './apiKeyStorage'
+import type Anthropic from '@anthropic-ai/sdk'
+import { createClient, RESEARCH_MODEL } from './client'
 import type { DailyClose, MarketCheckIn } from '../storage/schema'
-
-export class MissingApiKeyError extends Error {
-  constructor() {
-    super('尚未設定 Anthropic API 金鑰')
-    this.name = 'MissingApiKeyError'
-  }
-}
 
 const VALUATION_ZONE_LABELS: Record<string, string> = {
   undervalued: '低估',
@@ -52,10 +45,7 @@ export async function generateMarketResearchSummary(params: {
   tw0050: DailyClose[]
   latestCheckIn?: MarketCheckIn
 }): Promise<string> {
-  const apiKey = getApiKey()
-  if (!apiKey) throw new MissingApiKeyError()
-
-  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true })
+  const client = createClient()
 
   const checkInContext = params.latestCheckIn
     ? `使用者目前手動判斷：市場階段「${MARKET_PHASE_LABELS[params.latestCheckIn.marketPhase]}」、估值區間「${VALUATION_ZONE_LABELS[params.latestCheckIn.valuationZone]}」。`
@@ -77,7 +67,7 @@ ${checkInContext}
 不要使用條列式，用連貫的段落呈現。`
 
   const response = await client.messages.create({
-    model: 'claude-opus-5',
+    model: RESEARCH_MODEL,
     max_tokens: 1024,
     messages: [{ role: 'user', content: prompt }],
   })

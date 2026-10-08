@@ -8,6 +8,11 @@ import {
 } from '../lib/calculations/macroRegime'
 import { MacroCheckInForm, type MacroCheckInFormValues } from './forms/MacroCheckInForm'
 import { StatCard } from './StatCard'
+import { AiActionButton } from './research/AiActionButton'
+import { ResearchReportCard } from './research/ResearchReportCard'
+import { analyzeMarket, macroDraftToForm, MacroDraftSchema } from '../lib/ai/analyses'
+import { useResearchTask } from '../lib/ai/useResearchTask'
+import { todayIsoDate } from '../lib/market/twse'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -25,8 +30,42 @@ export function MacroPanel() {
   const updateMacroCheckIn = useAppStore((s) => s.updateMacroCheckIn)
   const removeMacroCheckIn = useAppStore((s) => s.removeMacroCheckIn)
 
+  const reports = useAppStore((s) => s.researchReports)
+  const addResearchReport = useAppStore((s) => s.addResearchReport)
+  const removeResearchReport = useAppStore((s) => s.removeResearchReport)
+
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  // AI-prefilled form values waiting for the user's confirmation.
+  const [draft, setDraft] = useState<{
+    values: MacroCheckInFormValues
+    reasons: Record<string, string>
+    reportId: string
+  } | null>(null)
+  const task = useResearchTask()
+  const marketReports = reports.filter((r) => r.kind === 'market').reverse()
+
+  function applyReportDraft(reportId: string, facts: unknown) {
+    const parsed = MacroDraftSchema.safeParse(facts)
+    if (!parsed.success) return
+    setEditingId(null)
+    setDraft({ ...macroDraftToForm(parsed.data, todayIsoDate()), reportId })
+  }
+
+  async function runMarketAnalysis() {
+    const result = await task.run(() => analyzeMarket(todayIsoDate()))
+    if (!result) return
+    const reportId = addResearchReport({
+      kind: 'market',
+      subject: '台股＋美股總經三支柱',
+      market: 'TW+US',
+      markdown: result.research.markdown,
+      sources: result.research.sources,
+      facts: result.facts ?? undefined,
+      estimatedCostUsd: result.estimatedCostUsd,
+    })
+    applyReportDraft(reportId, result.facts)
+  }
 
   const sorted = [...macroCheckIns].sort((a, b) => b.date.localeCompare(a.date))
   const latest = sorted[0]
@@ -40,6 +79,7 @@ export function MacroPanel() {
       return
     }
     addMacroCheckIn(values)
+    setDraft(null)
   }
 
   return (
@@ -110,17 +150,63 @@ export function MacroPanel() {
 
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {editing ? '編輯總經檢視' : '新增總經檢視'}
+          {editing ? '編輯總經檢視' : draft ? '新增總經檢視（AI 草稿）' : '新增總經檢視'}
         </h2>
+        {!editing && (
+          <div className="mt-3 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
+            <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
+              讓 AI 上網搜尋台股與美股最新的總經資料，產出研究報告，並預填下方 17 個訊號與判斷理由。你確認或修改後才會儲存。
+            </p>
+            <AiActionButton
+              label="AI 取得總經資訊並預填"
+              running={task.running}
+              error={task.error}
+              hasApiKey={task.hasApiKey}
+              onClick={() => void runMarketAnalysis()}
+            />
+          </div>
+        )}
+        {draft && !editing && (
+          <p className="mt-3 text-sm text-orange-800 dark:text-orange-200">
+            以下是 AI 預填的草稿，橘色文字是每個訊號的判斷理由。請逐項確認，必要時修改，再按「確認並新增總經檢視」。
+            <button type="button" onClick={() => setDraft(null)} className="ml-2 font-medium underline">
+              放棄草稿
+            </button>
+          </p>
+        )}
         <div className="mt-4">
           <MacroCheckInForm
-            key={editingId ?? 'new'}
-            initialValues={editing}
+            key={editingId ?? draft?.reportId ?? 'new'}
+            initialValues={editing ?? draft?.values}
+            reasons={editing ? undefined : draft?.reasons}
+            submitLabel={draft && !editing ? '確認並新增總經檢視' : undefined}
             onSubmit={handleSubmit}
             onCancel={editing ? () => setEditingId(null) : undefined}
           />
         </div>
       </div>
+
+      {marketReports.length > 0 && (
+        <div className={cardClass}>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">AI 市場分析報告</h2>
+          <div className="mt-4 space-y-3">
+            {marketReports.map((r, i) => (
+              <div key={r.id}>
+                <ResearchReportCard report={r} defaultOpen={i === 0 && draft?.reportId === r.id} onDelete={() => removeResearchReport(r.id)} />
+                {r.facts !== undefined && (
+                  <button
+                    type="button"
+                    onClick={() => applyReportDraft(r.id, r.facts)}
+                    className="mt-1 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
+                  >
+                    用這份報告預填總經檢視
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {sorted.length > 0 && (
         <div className={cardClass}>

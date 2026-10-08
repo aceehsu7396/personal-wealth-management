@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,6 +16,10 @@ import {
   POWER_LABELS,
 } from '../../lib/calculations/thesisScoring'
 import { ThesisEvaluationView } from '../ThesisEvaluationView'
+import { StockAiAssist } from '../research/StockAiAssist'
+import { stockFactsToDraft, type StockFacts } from '../../lib/ai/analyses'
+import type { TwseValuation } from '../../lib/market/twseValuation'
+import { describeValuation } from '../../lib/format'
 import { errorClass, inputClass, labelClass } from './FormField'
 
 const optionalNumber = z.preprocess(
@@ -146,20 +151,57 @@ interface Props {
   initialValues?: StockThesisFormValues
   onSubmit: (values: StockThesisFormValues) => void
   onCancel?: () => void
+  thesisId?: string
+  // Latest TWSE valuation for this ticker, shown next to the valuation inputs.
+  valuation?: TwseValuation
 }
 
-export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: Props) {
+export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, thesisId, valuation }: Props) {
   const {
     register,
     handleSubmit,
     watch,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm<FormInput, unknown, StockThesisFormValues>({
     resolver: zodResolver(schema),
     defaultValues: initialValues ? toFormInput(initialValues) : blankDefaults(),
   })
 
-  const live = schema.safeParse(watch())
+  const values = watch()
+  const live = schema.safeParse(values)
+  // Fields last filled from an AI stock analysis, marked until saved.
+  const [prefilled, setPrefilled] = useState<Set<string>>(new Set())
+
+  function applyFacts(facts: StockFacts) {
+    const draft = stockFactsToDraft(facts)
+    const filled = new Set<string>()
+    const opts = { shouldDirty: true, shouldValidate: true }
+    // Name and sector only fill blanks; numbers replace the current value.
+    if (draft.name && !String(getValues('name') ?? '').trim()) {
+      setValue('name', draft.name, opts)
+      filled.add('name')
+    }
+    if (draft.sector && !String(getValues('sector') ?? '').trim()) {
+      setValue('sector', draft.sector, opts)
+      filled.add('sector')
+    }
+    for (const key of ['currentPrice', 'roicPercent', 'historicalGrowthPercent', 'fScore'] as const) {
+      const v = draft[key]
+      if (v === undefined) continue
+      setValue(key, v, opts)
+      filled.add(key)
+    }
+    setPrefilled(filled)
+  }
+
+  const aiBadge = (name: string) =>
+    prefilled.has(name) ? (
+      <span className="ml-1 rounded bg-orange-100 px-1 text-[10px] font-medium text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+        AI 預填
+      </span>
+    ) : null
   const evaluation = live.success
     ? evaluateThesis({ ...live.data, id: '', createdAt: '', updatedAt: '' }, policy)
     : null
@@ -184,7 +226,10 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
     step = 'any',
   ) => (
     <label className="block">
-      <span className={labelClass}>{label}</span>
+      <span className={labelClass}>
+        {label}
+        {aiBadge(name)}
+      </span>
       <input type="number" step={step} className={inputClass} {...register(name)} />
       {error && <p className={errorClass}>{error}</p>}
     </label>
@@ -199,7 +244,7 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
         {errors.ticker && <p className={errorClass}>{errors.ticker.message}</p>}
       </label>
       <label className="block">
-        <span className={labelClass}>名稱</span>
+        <span className={labelClass}>名稱{aiBadge('name')}</span>
         <input type="text" className={inputClass} {...register('name')} />
         {errors.name && <p className={errorClass}>{errors.name.message}</p>}
       </label>
@@ -214,7 +259,7 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
         </select>
       </label>
       <label className="block">
-        <span className={labelClass}>產業</span>
+        <span className={labelClass}>產業{aiBadge('sector')}</span>
         <input type="text" className={inputClass} {...register('sector')} />
         {errors.sector && <p className={errorClass}>{errors.sector.message}</p>}
       </label>
@@ -243,6 +288,14 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
         <span className={labelClass}>在我的能力圈內（能用 3 句話說清楚它怎麼賺錢）</span>
       </label>
 
+      <StockAiAssist
+        ticker={String(values.ticker ?? '')}
+        name={String(values.name ?? '')}
+        market={values.market === 'US' ? 'US' : 'TW'}
+        thesisId={thesisId}
+        onFacts={applyFacts}
+      />
+
       <h3 className={sectionTitle}>投資論點</h3>
       {TEXT_FIELDS.map((f) => (
         <label key={f.name} className="block sm:col-span-2">
@@ -269,6 +322,11 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel }: P
       </label>
 
       <h3 className={sectionTitle}>價值評估</h3>
+      {describeValuation(valuation) && (
+        <p className="text-xs text-gray-500 dark:text-gray-400 sm:col-span-2">
+          證交所數據：{describeValuation(valuation)}
+        </p>
+      )}
       {numberInput('fairValueBear', '悲觀合理價', errors.fairValueBear?.message)}
       {numberInput('fairValueBase', '基準合理價', errors.fairValueBase?.message)}
       {numberInput('fairValueBull', '樂觀合理價', errors.fairValueBull?.message)}
