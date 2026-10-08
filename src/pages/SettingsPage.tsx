@@ -23,7 +23,7 @@ export function SettingsPage() {
           建議規則參數
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          影響「市場檢視」頁面產生的再平衡帶、配置微調上限與檢視提醒週期。
+          影響總經三支柱的股票傾斜上限、股票配置下限，以及投資組合的再平衡帶。
         </p>
         <div className="mt-4">
           <GuardrailsForm />

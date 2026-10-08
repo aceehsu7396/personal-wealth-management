@@ -9,7 +9,9 @@ import {
 } from '../lib/calculations/requiredReturn'
 import { InvestmentPolicyForm } from '../components/forms/InvestmentPolicyForm'
 import { StatCard } from '../components/StatCard'
-import { formatCurrency } from '../lib/format'
+import { AssumptionsForm } from '../components/forms/AssumptionsForm'
+import { NetWorthProjectionChart } from '../components/charts/NetWorthProjectionChart'
+import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -22,7 +24,7 @@ const PRINCIPLES = [
   '評估流程而非結果：每筆交易留下理由，事後以歸因區分運氣與能力。',
 ]
 
-export function StrategyPage() {
+export function GoalsPage() {
   const profile = useAppStore((s) => s.profile)
   const assumptions = useAppStore((s) => s.assumptions)
   const policy = useAppStore((s) => s.investmentPolicy)
@@ -77,13 +79,15 @@ export function StrategyPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-        投資策略
-      </h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">目標與政策</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        投資政策聲明：目標報酬、風險預算與資產配置。完整說明見{' '}
+        先設定財務自由目標、確認所需報酬是否實際，再把目標、風險與配置寫成投資政策並簽署。完整說明見手冊{' '}
+        <Link to="/handbook/01" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+          01 第一步
+        </Link>{' '}
+        與{' '}
         <Link to="/handbook/02" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          策略手冊
+          02 投資政策聲明
         </Link>
         。
       </p>
@@ -91,11 +95,24 @@ export function StrategyPage() {
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="財務自由目標金額"
-          value={formatCurrency(projection.fireNumber, profile.currency)}
+          value={Number.isFinite(projection.fireNumber) ? formatCurrency(projection.fireNumber, profile.currency) : '—'}
+          hint={`年支出 ${formatCurrency(projection.targetAnnualExpenses, profile.currency)} ÷ 安全提領率`}
         />
-        <StatCard label="目標年限" value={`${policy.targetYears} 年`} />
         <StatCard
-          label="所需年化報酬（名目）"
+          label="依假設報酬預估達成"
+          value={
+            assumptions.monthlyExpenses <= 0
+              ? '尚未設定目標'
+              : projection.alreadyFire
+                ? '已達成'
+                : projection.yearsToFire === null
+                  ? '50 年內無法達成'
+                  : `約 ${formatYearsToFire(projection.yearsToFire)}`
+          }
+          hint={projection.targetDate ? formatDate(projection.targetDate) : undefined}
+        />
+        <StatCard
+          label={`${policy.targetYears} 年所需年化報酬`}
           value={requiredText}
           hint={FEASIBILITY_LABELS[required.feasibility]}
         />
@@ -119,6 +136,23 @@ export function StrategyPage() {
           延長年限 → 降低支出，最後才考慮提高風險。
         </p>
       )}
+
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">財務自由試算</h2>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          填寫現況與假設（修改後自動儲存）。每月支出也用來計算緊急預備金目標。
+        </p>
+        <div className="mt-4">
+          <NetWorthProjectionChart
+            points={projection.points}
+            fireNumber={projection.fireNumber}
+            currency={profile.currency}
+          />
+        </div>
+        <div className="mt-6">
+          <AssumptionsForm />
+        </div>
+      </div>
 
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -168,7 +202,7 @@ export function StrategyPage() {
           投資政策參數
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          修改後自動儲存。這些參數會套用在個股研究、投資組合風控與交易前檢核。
+          修改後自動儲存。這些參數會套用在個股研究卡、投資組合風控與交易前檢核。
         </p>
         <div className="mt-4">
           <InvestmentPolicyForm />

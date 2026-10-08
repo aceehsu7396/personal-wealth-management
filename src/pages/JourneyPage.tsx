@@ -12,7 +12,6 @@ const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text
 
 export function JourneyPage() {
   const setFoundation = useAppStore((s) => s.setFoundation)
-  const monthlyRecordCount = useAppStore((s) => s.monthlyRecords.length)
   const { state, journey, learning } = useJourney()
 
   const target = emergencyFundTarget(state)
@@ -100,7 +99,7 @@ export function JourneyPage() {
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">緊急預備金</h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 放在活存或貨幣市場等隨時可動用的地方，不計入投資組合。每月支出
-                {monthlyRecordCount > 0 ? '取最近 3 個月收支記錄的平均' : '取財務自由試算的數字'}：
+                取「目標與政策」財務自由試算的數字：
                 {formatCurrency(baseline, state.profile.currency)}。
               </p>
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">

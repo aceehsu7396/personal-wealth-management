@@ -186,7 +186,7 @@ export function buildPreTradeChecklist(
           'macro',
           ctx.macro
             ? `總經判斷允許衛星新建倉（目前：${ctx.macro.satelliteNewPositionsAllowed ? '允許' : '暫停'}）`
-            : '總經判斷允許衛星新建倉（尚無總經檢視，請先到市場檢視新增）',
+            : '總經判斷允許衛星新建倉（尚無總經檢視，請先到「研究分析 → 市場」新增）',
           ctx.macro?.satelliteNewPositionsAllowed ?? false,
         ),
         check('thesisLinked', '已連結研究卡', thesis !== undefined),

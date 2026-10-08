@@ -13,7 +13,6 @@ import { todayIsoDate } from './market/twse'
 export function useJourney() {
   const profile = useAppStore((s) => s.profile)
   const assumptions = useAppStore((s) => s.assumptions)
-  const monthlyRecords = useAppStore((s) => s.monthlyRecords)
   const foundation = useAppStore((s) => s.foundation)
   const investmentPolicy = useAppStore((s) => s.investmentPolicy)
   const holdings = useAppStore((s) => s.holdings)
@@ -25,7 +24,6 @@ export function useJourney() {
   const state: JourneyState = {
     profile,
     assumptions,
-    monthlyRecords,
     foundation,
     investmentPolicy,
     holdings,

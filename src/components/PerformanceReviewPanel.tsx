@@ -80,7 +80,7 @@ export function PerformanceReviewPanel({ report }: { report: PortfolioRiskReport
     <div className={cardClass}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          績效歸因（每季）
+          季度檢討
         </h2>
         {!formOpen && (
           <button

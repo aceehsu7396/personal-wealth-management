@@ -18,13 +18,13 @@ export interface HandbookDoc {
 export const CHAPTER_PAGES: Record<string, { to: string; label: string }> = {
   '00': { to: '/journey', label: '行動路線' },
   '01': { to: '/journey', label: '行動路線' },
-  '02': { to: '/strategy', label: '投資策略' },
-  '03': { to: '/portfolio', label: '投資組合' },
-  '04': { to: '/trades', label: '交易日誌' },
-  '05': { to: '/market', label: '市場檢視' },
-  '06': { to: '/research', label: '個股研究' },
-  '07': { to: '/research', label: '個股研究' },
-  '08': { to: '/portfolio', label: '投資組合' },
+  '02': { to: '/goals', label: '目標與政策' },
+  '03': { to: '/portfolio', label: '持股與風控' },
+  '04': { to: '/portfolio/trades', label: '交易日誌' },
+  '05': { to: '/research/market', label: '研究分析・市場' },
+  '06': { to: '/research/industry', label: '研究分析・產業' },
+  '07': { to: '/research/stocks', label: '研究分析・個股' },
+  '08': { to: '/portfolio/review', label: '績效歸因' },
   '09': { to: '/journey', label: '行動路線' },
 }
 

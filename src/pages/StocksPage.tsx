@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { JourneyNotice } from '../components/JourneyNotice'
-import { IndustryAnalysisPanel } from '../components/research/IndustryAnalysisPanel'
 import { evaluateThesis, LYNCH_LABELS } from '../lib/calculations/thesisScoring'
 import {
   MARKET_LABELS,
@@ -21,7 +20,7 @@ const cardClass =
 
 type Filter = ThesisStatus | 'all'
 
-export function ResearchPage() {
+export function StocksPage() {
   const theses = useAppStore((s) => s.stockTheses)
   const policy = useAppStore((s) => s.investmentPolicy)
   const { journey } = useJourney()
@@ -62,7 +61,7 @@ export function ResearchPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">個股研究</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">個股</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         產業與商業模式 ＋ 財務與價值評估：研究卡通過全部檢核，才進入衛星建倉。
       </p>
@@ -79,15 +78,6 @@ export function ResearchPage() {
         <StatCard label="研究卡未完整" value={`${incomplete}`} hint="未完整不得建倉" />
       </div>
 
-      <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">產業分析</h2>
-        <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          先看懂產業，再挑公司：AI 上網整理產業生命週期、五力、供應鏈、趨勢與代表公司，作為寫研究卡的素材。個股分析在研究卡表單內。
-        </p>
-        <div className="mt-4">
-          <IndustryAnalysisPanel />
-        </div>
-      </div>
 
       {editing ? (
         <div className={cardClass}>

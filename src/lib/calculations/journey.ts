@@ -1,5 +1,4 @@
 import type { AppData, InvestmentPolicy } from '../storage/schema'
-import { computeNetCashFlow } from './netCashFlow'
 import { computeRequiredReturn } from './requiredReturn'
 import { computeDiscipline } from './disciplineScore'
 import { summarizeAttribution } from './attribution'
@@ -10,7 +9,6 @@ export type JourneyState = Pick<
   AppData,
   | 'profile'
   | 'assumptions'
-  | 'monthlyRecords'
   | 'foundation'
   | 'investmentPolicy'
   | 'holdings'
@@ -67,35 +65,27 @@ export const SATELLITE_PREREQUISITES = ['1.1', '1.2', '1.4', '2.1', '2.3', '3.1'
 
 export const LEARNING_STAGE_TITLES = ['一 打地基', '二 練研究', '三 建系統', '四 穩定複利'] as const
 const STAGE_CAPS = [10, 20, 30, Infinity]
-const RECENT_EXPENSE_MONTHS = 3
 
 const PAGES = {
-  fire: { to: '/fire', label: '財務自由試算' },
+  goals: { to: '/goals', label: '目標與政策' },
   journey: { to: '/journey', label: '行動路線' },
-  strategy: { to: '/strategy', label: '投資策略' },
-  portfolio: { to: '/portfolio', label: '投資組合' },
-  trades: { to: '/trades', label: '交易日誌' },
-  market: { to: '/market', label: '市場檢視' },
-  research: { to: '/research', label: '個股研究' },
+  portfolio: { to: '/portfolio', label: '持股與風控' },
+  trades: { to: '/portfolio/trades', label: '交易日誌' },
+  review: { to: '/portfolio/review', label: '績效歸因' },
+  market: { to: '/research/market', label: '研究分析・市場' },
+  stocks: { to: '/research/stocks', label: '研究分析・個股' },
 }
 
 function distinctMonths(dates: string[]): number {
   return new Set(dates.map((d) => d.slice(0, 7))).size
 }
 
-// Average spending over the most recent recorded months; falls back to the
-// FIRE calculator's monthly expenses when nothing has been recorded.
-export function monthlyExpenseBaseline(state: Pick<JourneyState, 'monthlyRecords' | 'assumptions'>): number {
-  const recent = [...state.monthlyRecords]
-    .sort((a, b) => b.month.localeCompare(a.month))
-    .slice(0, RECENT_EXPENSE_MONTHS)
-    .map((r) => computeNetCashFlow(r).expenseTotal)
-    .filter((v) => v > 0)
-  if (recent.length > 0) return recent.reduce((a, v) => a + v, 0) / recent.length
+// Monthly spending comes from the FIRE inputs on 目標與政策.
+export function monthlyExpenseBaseline(state: Pick<JourneyState, 'assumptions'>): number {
   return state.assumptions.monthlyExpenses
 }
 
-export function emergencyFundTarget(state: Pick<JourneyState, 'monthlyRecords' | 'assumptions' | 'foundation'>): number {
+export function emergencyFundTarget(state: Pick<JourneyState, 'assumptions' | 'foundation'>): number {
   return monthlyExpenseBaseline(state) * state.foundation.emergencyFundTargetMonths
 }
 
@@ -127,8 +117,8 @@ export function computeJourney(state: JourneyState): JourneyReport {
           id: '1.1',
           title: '設定財務自由目標',
           done: goalSet,
-          detail: goalSet ? '已填寫每月收入與支出' : '在財務自由試算填寫每月收入與支出',
-          page: PAGES.fire,
+          detail: goalSet ? '已填寫每月收入與支出' : '在「目標與政策」的財務自由試算填寫每月收入與支出',
+          page: PAGES.goals,
           handbookSlug: '01',
         },
         {
@@ -153,15 +143,15 @@ export function computeJourney(state: JourneyState): JourneyReport {
                 ? '已達成目標'
                 : '目前條件下無法在目標年限內達成，先調整儲蓄、年限或支出'
               : `${policy.targetYears} 年所需年化報酬 ${required.requiredNominalReturnPercent.toFixed(1)}%`,
-          page: PAGES.strategy,
+          page: PAGES.goals,
           handbookSlug: '01',
         },
         {
           id: '1.4',
           title: '簽署投資政策聲明',
           done: policy.signedAt !== undefined,
-          detail: policy.signedAt ? `已於 ${policy.signedAt} 簽署` : '確認參數後在投資策略頁簽署',
-          page: PAGES.strategy,
+          detail: policy.signedAt ? `已於 ${policy.signedAt} 簽署` : '確認參數後在「目標與政策」頁簽署',
+          page: PAGES.goals,
           handbookSlug: '02',
         },
       ],
@@ -206,7 +196,7 @@ export function computeJourney(state: JourneyState): JourneyReport {
           id: '3.1',
           title: '完成第一次總經檢視',
           done: macroMonths >= 1,
-          detail: '在市場檢視填寫總經三支柱',
+          detail: '在「研究分析 → 市場」填寫總經三支柱',
           page: PAGES.market,
           handbookSlug: '05',
         },
@@ -230,7 +220,7 @@ export function computeJourney(state: JourneyState): JourneyReport {
           title: '寫第一張觀察用研究卡',
           done: state.stockTheses.length > 0,
           detail: '研究卡隨時可以寫，先觀察不買進',
-          page: PAGES.research,
+          page: PAGES.stocks,
           handbookSlug: '06',
         },
         {
@@ -252,8 +242,8 @@ export function computeJourney(state: JourneyState): JourneyReport {
           id: '5.1',
           title: '完成第一次季度績效歸因',
           done: state.performanceReviews.length > 0,
-          detail: '在投資組合頁新增季度檢討',
-          page: PAGES.portfolio,
+          detail: '在「投資組合 → 績效歸因」新增季度檢討',
+          page: PAGES.review,
           handbookSlug: '08',
         },
         {

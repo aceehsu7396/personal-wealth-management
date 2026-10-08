@@ -9,7 +9,6 @@ const formSchema = z.object({
   rebalancingBandPercent: z.coerce.number().min(0).max(50),
   maxTiltPercent: z.coerce.number().min(0).max(50),
   minEquityFloorPercent: z.coerce.number().min(0).max(100),
-  reviewCadenceMonths: z.coerce.number().min(1).max(24),
 })
 
 type FormInput = z.input<typeof formSchema>
@@ -30,7 +29,6 @@ export function GuardrailsForm() {
       rebalancingBandPercent: guardrails.rebalancingBandPercent,
       maxTiltPercent: guardrails.maxTiltPercent,
       minEquityFloorPercent: guardrails.minEquityFloorPercent,
-      reviewCadenceMonths: guardrails.reviewCadenceMonths,
     },
   })
 
@@ -75,15 +73,6 @@ export function GuardrailsForm() {
           step="1"
           className={inputClass}
           {...register('minEquityFloorPercent')}
-        />
-      </Field>
-
-      <Field label="市場檢視週期（月）" error={errors.reviewCadenceMonths?.message}>
-        <input
-          type="number"
-          step="1"
-          className={inputClass}
-          {...register('reviewCadenceMonths')}
         />
       </Field>
     </form>

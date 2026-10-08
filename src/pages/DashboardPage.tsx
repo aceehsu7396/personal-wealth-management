@@ -2,11 +2,8 @@ import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
 import { computeProgressPercent } from '../lib/calculations/progress'
-import { computeAdvice } from '../lib/calculations/adviceRules'
-import { computeNetCashFlow } from '../lib/calculations/netCashFlow'
-import { isReviewDue } from '../lib/reviewSchedule'
+import { emergencyFundTarget } from '../lib/calculations/journey'
 import { StatCard } from '../components/StatCard'
-import { AdviceSummary } from '../components/AdviceSummary'
 import { StrategyOverview } from '../components/StrategyOverview'
 import { useJourney } from '../lib/useJourney'
 import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedChart'
@@ -16,9 +13,6 @@ export function DashboardPage() {
   const profile = useAppStore((s) => s.profile)
   const assumptions = useAppStore((s) => s.assumptions)
   const checkIns = useAppStore((s) => s.checkIns)
-  const marketCheckIns = useAppStore((s) => s.marketCheckIns)
-  const monthlyRecords = useAppStore((s) => s.monthlyRecords)
-  const guardrails = useAppStore((s) => s.guardrails)
 
   const result = computeFireProjection(profile, assumptions)
 
@@ -26,17 +20,6 @@ export function DashboardPage() {
   const latestCheckIn = sortedCheckIns[0]
   const latestNetWorth = latestCheckIn ? latestCheckIn.netWorthAmount : assumptions.currentNetWorth
   const progressPercent = computeProgressPercent(latestNetWorth, result.fireNumber)
-
-  const sortedMarketCheckIns = [...marketCheckIns].sort((a, b) => b.date.localeCompare(a.date))
-  const latestMarketCheckIn = sortedMarketCheckIns[0]
-  const advice = latestMarketCheckIn ? computeAdvice(latestMarketCheckIn, guardrails) : null
-  const reviewDue = isReviewDue(latestMarketCheckIn?.date, guardrails.reviewCadenceMonths)
-
-  const currentMonth = new Date().toISOString().slice(0, 7)
-  const currentMonthRecord = monthlyRecords.find((r) => r.month === currentMonth)
-  const currentMonthNetCashFlow = currentMonthRecord
-    ? computeNetCashFlow(currentMonthRecord).netCashFlow
-    : null
 
   // With no expenses entered the FIRE number is 0, which would read as
   // "already free"; show that the goal is not set yet instead.
@@ -49,14 +32,16 @@ export function DashboardPage() {
       ? '50 年內無法達成'
       : `約 ${formatYearsToFire(result.yearsToFire)}`
 
-  const { journey } = useJourney()
+  const { journey, state } = useJourney()
   const nextStep = journey.nextStep
+  const fundTarget = emergencyFundTarget(state)
+  const fundPercent = fundTarget > 0 ? (state.foundation.emergencyFundAmount / fundTarget) * 100 : null
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">儀表板</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">概況</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        財富自由計畫的整體現況一覽。
+        財富自由計畫的整體現況：下一步、進度與策略紀律。
       </p>
 
       {nextStep && (
@@ -90,19 +75,6 @@ export function DashboardPage() {
         </div>
       )}
 
-      {latestMarketCheckIn && reviewDue && (
-        <div className="mt-6 flex items-center justify-between gap-4 rounded-md border border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-800 dark:border-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
-          <span>
-            {latestMarketCheckIn
-              ? `距離上次市場檢視已超過 ${guardrails.reviewCadenceMonths} 個月，該做下一次評估了。`
-              : '還沒有任何市場評估，建議新增第一筆。'}
-          </span>
-          <Link to="/market" className="whitespace-nowrap font-medium underline">
-            前往市場檢視
-          </Link>
-        </div>
-      )}
-
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label="最新淨值"
@@ -123,15 +95,15 @@ export function DashboardPage() {
           value={progressStat}
           hint={result.targetDate ? formatDate(result.targetDate) : undefined}
         />
-        <Link to="/records" className="block">
+        <Link to="/journey" className="block">
           <StatCard
-            label="本月淨收支"
-            value={
-              currentMonthNetCashFlow !== null
-                ? formatCurrency(currentMonthNetCashFlow, profile.currency)
-                : '—'
+            label="緊急預備金"
+            value={fundPercent === null ? '—' : `${Math.min(fundPercent, 100).toFixed(0)}%`}
+            hint={
+              fundPercent === null
+                ? '先設定每月支出'
+                : `${formatCurrency(state.foundation.emergencyFundAmount, profile.currency)} / ${formatCurrency(fundTarget, profile.currency)}`
             }
-            hint={currentMonthRecord ? undefined : '尚無本月紀錄'}
           />
         </Link>
       </div>
@@ -144,10 +116,10 @@ export function DashboardPage() {
             淨值進度
           </h2>
           <Link
-            to="/progress"
+            to="/networth"
             className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
-            前往進度追蹤
+            記錄淨值
           </Link>
         </div>
         <ActualVsProjectedChart
@@ -157,23 +129,6 @@ export function DashboardPage() {
         />
       </div>
 
-      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            最新市場建議
-          </h2>
-          <Link
-            to="/market"
-            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
-          >
-            前往市場檢視
-          </Link>
-        </div>
-        <AdviceSummary
-          advice={advice}
-          emptyMessage="看懂市場是行動路線的第三階段；先完成財務地基與核心配置，再開始市場評估。"
-        />
-      </div>
     </div>
   )
 }

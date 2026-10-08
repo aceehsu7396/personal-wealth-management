@@ -29,7 +29,6 @@ function base(): JourneyState {
       savingsRatePercent: 50,
       monthlyExpenses: 50_000,
     },
-    monthlyRecords: [],
     foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6 },
     investmentPolicy: d.investmentPolicy,
     holdings: [],
@@ -93,21 +92,8 @@ describe('monthlyExpenseBaseline', () => {
     expect(monthlyExpenseBaseline(base())).toBe(50_000)
   })
 
-  it('averages the three most recent recorded months', () => {
-    const rec = (month: string, amount: number) => ({
-      id: month,
-      month,
-      income: [],
-      expenses: [{ name: 'x', amount }],
-      investments: [],
-      createdAt: '',
-    })
-    const state = {
-      ...base(),
-      monthlyRecords: [rec('2026-06', 10_000), rec('2026-07', 40_000), rec('2026-08', 50_000), rec('2026-09', 60_000)],
-    }
-    expect(monthlyExpenseBaseline(state)).toBe(50_000)
-    expect(emergencyFundTarget(state)).toBe(300_000)
+  it('sets the emergency fund target from monthly expenses × target months', () => {
+    expect(emergencyFundTarget(base())).toBe(300_000)
   })
 })
 

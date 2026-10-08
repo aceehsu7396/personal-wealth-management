@@ -6,7 +6,6 @@ import { todayIsoDate } from '../lib/market/twse'
 import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
 import { RiskViolationList } from '../components/RiskViolationList'
-import { PerformanceReviewPanel } from '../components/PerformanceReviewPanel'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
 import { StatCard } from '../components/StatCard'
 import { inputClass, labelClass } from '../components/forms/FormField'
@@ -63,7 +62,7 @@ export function PortfolioPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">投資組合</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">持股與風控</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         組合建構與風險：配置偏離、單檔與產業集中度、匯率曝險、回撤熔斷與出場規則提醒。
       </p>
@@ -282,8 +281,6 @@ export function PortfolioPage() {
           />
         </div>
       </div>
-
-      <PerformanceReviewPanel report={report} />
 
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">組合設定</h2>

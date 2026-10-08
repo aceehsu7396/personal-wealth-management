@@ -1,17 +1,18 @@
 import { lazy, Suspense } from 'react'
-import { HashRouter, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/layout/NavBar'
+import { LEGACY_REDIRECTS } from './components/layout/navigation'
 import { DashboardPage } from './pages/DashboardPage'
-import { FireCalculatorPage } from './pages/FireCalculatorPage'
-import { ProgressTrackerPage } from './pages/ProgressTrackerPage'
-import { MarketCheckInPage } from './pages/MarketCheckInPage'
-import { MonthlyRecordsPage } from './pages/MonthlyRecordsPage'
-import { SettingsPage } from './pages/SettingsPage'
-import { StrategyPage } from './pages/StrategyPage'
-import { ResearchPage } from './pages/ResearchPage'
+import { GoalsPage } from './pages/GoalsPage'
+import { NetWorthPage } from './pages/NetWorthPage'
+import { JourneyPage } from './pages/JourneyPage'
+import { MarketPage } from './pages/MarketPage'
+import { IndustryPage } from './pages/IndustryPage'
+import { StocksPage } from './pages/StocksPage'
 import { PortfolioPage } from './pages/PortfolioPage'
 import { TradesPage } from './pages/TradesPage'
-import { JourneyPage } from './pages/JourneyPage'
+import { PortfolioReviewPage } from './pages/PortfolioReviewPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 // The handbook bundles the Markdown renderer; load it only when opened.
 const HandbookPage = lazy(() =>
@@ -24,14 +25,12 @@ function App() {
       <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
         <NavBar />
         <Routes>
+          {/* 總覽 */}
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/goals" element={<GoalsPage />} />
+          <Route path="/networth" element={<NetWorthPage />} />
+          {/* 學習路線 */}
           <Route path="/journey" element={<JourneyPage />} />
-          <Route path="/fire" element={<FireCalculatorPage />} />
-          <Route path="/strategy" element={<StrategyPage />} />
-          <Route path="/market" element={<MarketCheckInPage />} />
-          <Route path="/research" element={<ResearchPage />} />
-          <Route path="/portfolio" element={<PortfolioPage />} />
-          <Route path="/trades" element={<TradesPage />} />
           <Route
             path="/handbook/:slug?"
             element={
@@ -40,9 +39,19 @@ function App() {
               </Suspense>
             }
           />
-          <Route path="/progress" element={<ProgressTrackerPage />} />
-          <Route path="/records" element={<MonthlyRecordsPage />} />
+          {/* 研究分析 */}
+          <Route path="/research/market" element={<MarketPage />} />
+          <Route path="/research/industry" element={<IndustryPage />} />
+          <Route path="/research/stocks" element={<StocksPage />} />
+          {/* 投資組合 */}
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/portfolio/trades" element={<TradesPage />} />
+          <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
           <Route path="/settings" element={<SettingsPage />} />
+          {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
+            <Route key={from} path={from} element={<Navigate to={to} replace />} />
+          ))}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
     </HashRouter>

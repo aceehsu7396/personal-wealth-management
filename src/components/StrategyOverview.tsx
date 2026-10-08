@@ -36,7 +36,7 @@ export function StrategyOverview() {
   // or the habit has started.
   const macroStageReached = journey.stages[1].done || latestMacro !== undefined
   if (macroStageReached && (!latestMacro || addMonths(latestMacro.date, 1) <= today)) {
-    todos.push({ text: '本月的總經三支柱檢視尚未完成', to: '/market' })
+    todos.push({ text: '本月的總經三支柱檢視尚未完成', to: '/research/market' })
   }
   const stale = theses.filter(
     (t) => t.status !== 'exited' && addMonths(t.updatedAt.slice(0, 10), THESIS_STALE_MONTHS) <= today,
@@ -47,11 +47,11 @@ export function StrategyOverview() {
         .slice(0, 3)
         .map((t) => t.ticker)
         .join('、')}${stale.length > 3 ? '…' : ''}）`,
-      to: '/research',
+      to: '/research/stocks',
     })
   }
   if (discipline.pendingReviews.length > 0) {
-    todos.push({ text: `${discipline.pendingReviews.length} 筆交易待完成事後檢討`, to: '/trades' })
+    todos.push({ text: `${discipline.pendingReviews.length} 筆交易待完成事後檢討`, to: '/portfolio/trades' })
   }
 
   const alerts = risk.violations.filter((v) => v.severity !== 'info')
@@ -61,15 +61,15 @@ export function StrategyOverview() {
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">投資策略紀律</h2>
         <Link
-          to="/strategy"
+          to="/goals"
           className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
         >
-          前往投資策略
+          前往目標與政策
         </Link>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link to="/strategy" className="block">
+        <Link to="/goals" className="block">
           <StatCard
             label={`${policy.targetYears} 年所需報酬`}
             value={
@@ -84,7 +84,7 @@ export function StrategyOverview() {
             }
           />
         </Link>
-        <Link to="/market" className="block">
+        <Link to="/research/market" className="block">
           <StatCard
             label="總經判斷"
             value={macro ? STANCE_LABELS[macro.stance] : '—'}
@@ -98,7 +98,7 @@ export function StrategyOverview() {
             hint={risk.circuitBreakerActive ? '回撤熔斷中' : holdings.length === 0 ? '尚無持股' : undefined}
           />
         </Link>
-        <Link to="/trades" className="block">
+        <Link to="/portfolio/trades" className="block">
           <StatCard
             label="紀律分數"
             value={discipline.score === null ? '—' : `${discipline.score}`}

@@ -7,7 +7,7 @@ import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedCh
 import { StatCard } from '../components/StatCard'
 import { formatCurrency } from '../lib/format'
 
-export function ProgressTrackerPage() {
+export function NetWorthPage() {
   const profile = useAppStore((s) => s.profile)
   const assumptions = useAppStore((s) => s.assumptions)
   const checkIns = useAppStore((s) => s.checkIns)
@@ -30,10 +30,10 @@ export function ProgressTrackerPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
-        進度追蹤
+        淨值紀錄
       </h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        定期記錄實際淨值，對照財務自由試算軌跡，隨時掌握進度。
+        每月或每季記錄一次實際淨值，對照「目標與政策」的試算軌跡，確認是否走在財務自由的路上。
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
