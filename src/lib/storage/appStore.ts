@@ -20,7 +20,12 @@ import {
   type Trade,
   type PerformanceReview,
   type Foundation,
+  type MarketSnapshot,
+  type ResearchReport,
 } from './schema'
+
+// Keep localStorage bounded: only the most recent reports are stored.
+export const MAX_RESEARCH_REPORTS = 30
 
 export const STORAGE_KEY = 'pfm:appData'
 const BACKUP_SUFFIX = ':corrupted-backup'
@@ -97,6 +102,12 @@ interface AppStore extends AppData {
   addPerformanceReview: (entry: Omit<PerformanceReview, 'id' | 'createdAt'>) => void
   removePerformanceReview: (id: string) => void
   setFoundation: (foundation: Partial<Foundation>) => void
+  setMarketSnapshot: (snapshot: MarketSnapshot) => void
+  // Market price refresh: leaves updatedAt alone so a daily price update does
+  // not count as the user reviewing the research card.
+  setThesisPrices: (prices: Record<string, number>) => void
+  addResearchReport: (entry: Omit<ResearchReport, 'id' | 'createdAt'>) => string
+  removeResearchReport: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -124,6 +135,8 @@ function toAppData(state: AppData): AppData {
     trades: state.trades,
     performanceReviews: state.performanceReviews,
     foundation: state.foundation,
+    marketSnapshot: state.marketSnapshot,
+    researchReports: state.researchReports,
   }
 }
 
@@ -321,6 +334,29 @@ export const useAppStore = create<AppStore>()(
 
       setFoundation: (foundation) =>
         set((state) => ({ foundation: { ...state.foundation, ...foundation } })),
+
+      setMarketSnapshot: (snapshot) => set({ marketSnapshot: snapshot }),
+
+      setThesisPrices: (prices) =>
+        set((state) => ({
+          stockTheses: state.stockTheses.map((t) =>
+            prices[t.id] !== undefined ? { ...t, currentPrice: prices[t.id] } : t,
+          ),
+        })),
+
+      addResearchReport: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({
+          researchReports: [
+            ...state.researchReports,
+            { ...entry, id, createdAt: new Date().toISOString() },
+          ].slice(-MAX_RESEARCH_REPORTS),
+        }))
+        return id
+      },
+
+      removeResearchReport: (id) =>
+        set((state) => ({ researchReports: state.researchReports.filter((r) => r.id !== id) })),
 
       mergeMarketPriceHistory: (taiex, tw0050, fetchedOn) =>
         set((state) => ({

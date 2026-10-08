@@ -10,7 +10,8 @@ import {
   type StockThesisFormValues,
 } from '../components/forms/StockThesisForm'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
-import { formatRatio } from '../lib/format'
+import { describeValuation, formatRatio } from '../lib/format'
+import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
 import { StatCard } from '../components/StatCard'
 import type { ThesisStatus } from '../lib/storage/schema'
 
@@ -23,6 +24,8 @@ export function ResearchPage() {
   const theses = useAppStore((s) => s.stockTheses)
   const policy = useAppStore((s) => s.investmentPolicy)
   const { journey } = useJourney()
+  // Daily TWSE price/valuation refresh for Taiwan research cards.
+  const twse = useTwseAutoRefresh()
   const addStockThesis = useAppStore((s) => s.addStockThesis)
   const updateStockThesis = useAppStore((s) => s.updateStockThesis)
   const removeStockThesis = useAppStore((s) => s.removeStockThesis)
@@ -149,6 +152,11 @@ export function ResearchPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {MARKET_LABELS[t.market]}・{t.sector}・{STATUS_LABELS[t.status]}
                       </div>
+                      {t.market === 'TW' && describeValuation(twse.snapshot.valuations[t.ticker]) && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {describeValuation(twse.snapshot.valuations[t.ticker])}
+                        </div>
+                      )}
                     </td>
                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {LYNCH_LABELS[t.lynchCategory]}

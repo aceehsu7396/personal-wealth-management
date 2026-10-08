@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculations/portfolioRisk'
-import { fetchLatestTwseClose, todayIsoDate } from '../lib/market/twse'
+import { todayIsoDate } from '../lib/market/twse'
+import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
 import { RiskViolationList } from '../components/RiskViolationList'
 import { PerformanceReviewPanel } from '../components/PerformanceReviewPanel'
@@ -13,7 +14,6 @@ import { formatCurrency, formatPercent } from '../lib/format'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
-const TWSE_TICKER = /^\d{4,6}[A-Z]?$/
 
 export function PortfolioPage() {
   const holdings = useAppStore((s) => s.holdings)
@@ -31,9 +31,8 @@ export function PortfolioPage() {
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const [priceFetch, setPriceFetch] = useState<{ state: 'idle' | 'loading' | 'done'; text?: string }>({
-    state: 'idle',
-  })
+  // TWSE prices refresh automatically once a day; the button forces a refresh.
+  const twse = useTwseAutoRefresh()
 
   const report = analyzePortfolio(holdings, theses, policy, guardrails, meta)
   const editing = editingId ? holdings.find((h) => h.id === editingId) : undefined
@@ -60,28 +59,6 @@ export function PortfolioPage() {
       addHolding(withDate)
     }
     syncThesis(values)
-  }
-
-  async function refreshTwsePrices() {
-    const targets = holdings.filter((h) => h.currency === 'TWD' && TWSE_TICKER.test(h.ticker))
-    if (targets.length === 0) {
-      setPriceFetch({ state: 'done', text: '沒有可更新的上市台股代號。' })
-      return
-    }
-    setPriceFetch({ state: 'loading' })
-    const results = await Promise.allSettled(targets.map((h) => fetchLatestTwseClose(h.ticker)))
-    let updated = 0
-    results.forEach((r, i) => {
-      if (r.status !== 'fulfilled' || !r.value) return
-      const h = targets[i]
-      updateHolding(h.id, { currentPrice: r.value.close, priceUpdatedAt: r.value.date })
-      syncThesis({ ...h, currentPrice: r.value.close })
-      updated += 1
-    })
-    setPriceFetch({
-      state: 'done',
-      text: `已更新 ${updated}/${targets.length} 檔（上櫃股票與美股請手動輸入）。`,
-    })
   }
 
   return (
@@ -172,14 +149,19 @@ export function PortfolioPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">持股</h2>
           <button
             type="button"
-            onClick={refreshTwsePrices}
-            disabled={priceFetch.state === 'loading'}
+            onClick={() => void twse.refresh()}
+            disabled={twse.status === 'loading'}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
-            {priceFetch.state === 'loading' ? '更新中…' : '更新上市台股收盤價'}
+            {twse.status === 'loading' ? '更新中…' : '重新取得上市台股收盤價'}
           </button>
         </div>
-        {priceFetch.text && <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{priceFetch.text}</p>}
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {twse.message ??
+            (twse.snapshot.fetchedOn
+              ? `上市台股價格已於 ${twse.snapshot.fetchedOn} 自動更新（每天第一次開啟時更新）。`
+              : '上市台股價格每天第一次開啟時自動從證交所更新。')}
+        </p>
         {report.holdings.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">還沒有持股。</p>
         ) : (

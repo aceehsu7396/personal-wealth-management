@@ -393,6 +393,46 @@ export const FoundationSchema = z.object({
 })
 export type Foundation = z.infer<typeof FoundationSchema>
 
+export const TwseValuationSchema = z.object({
+  ticker: z.string(),
+  name: z.string(),
+  close: z.number().nullable(),
+  dividendYield: z.number().nullable(),
+  pe: z.number().nullable(),
+  pb: z.number().nullable(),
+  period: z.string(),
+  date: z.string(),
+})
+
+// Latest TWSE valuation data for the tickers the user follows.
+export const MarketSnapshotSchema = z.object({
+  fetchedOn: z.string().nullable(),
+  valuations: z.record(z.string(), TwseValuationSchema),
+})
+export type MarketSnapshot = z.infer<typeof MarketSnapshotSchema>
+
+export const ResearchKindSchema = z.enum(['market', 'industry', 'stock'])
+export type ResearchKind = z.infer<typeof ResearchKindSchema>
+
+export const ResearchSourceSchema = z.object({ title: z.string(), url: z.string() })
+export type ResearchSource = z.infer<typeof ResearchSourceSchema>
+
+// An AI web-research report. `facts` holds the structured extraction (macro
+// signal draft or stock facts) and is validated again where it is used.
+export const ResearchReportSchema = z.object({
+  id: z.string(),
+  kind: ResearchKindSchema,
+  subject: z.string(),
+  market: z.string(),
+  thesisId: z.string().optional(),
+  createdAt: z.string(),
+  markdown: z.string(),
+  sources: z.array(ResearchSourceSchema),
+  facts: z.unknown().optional(),
+  estimatedCostUsd: z.number(),
+})
+export type ResearchReport = z.infer<typeof ResearchReportSchema>
+
 export function createDefaultInvestmentPolicy(): InvestmentPolicy {
   return {
     targetYears: 10,
@@ -429,6 +469,8 @@ export const AppDataSchema = z.object({
   trades: z.array(TradeSchema).default([]),
   performanceReviews: z.array(PerformanceReviewSchema).default([]),
   foundation: FoundationSchema.default({ emergencyFundAmount: 0, emergencyFundTargetMonths: 6 }),
+  marketSnapshot: MarketSnapshotSchema.default({ fetchedOn: null, valuations: {} }),
+  researchReports: z.array(ResearchReportSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -474,5 +516,7 @@ export function createDefaultAppData(): AppData {
     trades: [],
     performanceReviews: [],
     foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6 },
+    marketSnapshot: { fetchedOn: null, valuations: {} },
+    researchReports: [],
   }
 }

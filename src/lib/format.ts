@@ -1,3 +1,5 @@
+import type { TwseValuation } from './market/twseValuation'
+
 export function formatCurrency(amount: number, currency: string): string {
   if (!Number.isFinite(amount)) return '—'
   return new Intl.NumberFormat('zh-TW', {
@@ -35,4 +37,16 @@ export function formatRatio(value: number): string {
 export function formatPercent(value: number, digits = 1): string {
   if (!Number.isFinite(value)) return '—'
   return `${value.toFixed(digits)}%`
+}
+
+// One-line TWSE valuation summary, e.g. 本益比 29.96・淨值比 10.42・殖利率 0.85%（2026-10-07）
+export function describeValuation(v: TwseValuation | undefined): string | null {
+  if (!v) return null
+  const parts = [
+    v.pe !== null ? `本益比 ${v.pe}` : null,
+    v.pb !== null ? `淨值比 ${v.pb}` : null,
+    v.dividendYield !== null ? `殖利率 ${v.dividendYield}%` : null,
+  ].filter(Boolean)
+  if (parts.length === 0) return null
+  return `${parts.join('・')}（${v.date}）`
 }

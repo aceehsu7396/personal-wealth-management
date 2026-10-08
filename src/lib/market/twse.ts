@@ -14,11 +14,11 @@ function rocDateToIso(rocDate: string): string {
   return `${year}-${month}-${day}`
 }
 
-function parseNumber(value: string): number {
+export function parseNumber(value: string): number {
   return Number(value.replace(/,/g, ''))
 }
 
-function yyyymmdd(date: Date): string {
+export function yyyymmdd(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
