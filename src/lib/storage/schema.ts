@@ -260,14 +260,29 @@ export const SleeveSchema = z.enum([
   'core_bond_cash',
   'satellite_tw',
   'satellite_us',
+  'satellite_fund',
 ])
 export type Sleeve = z.infer<typeof SleeveSchema>
 
 export const CurrencySchema = z.enum(['TWD', 'USD'])
 export type HoldingCurrency = z.infer<typeof CurrencySchema>
 
+export const HoldingKindSchema = z.enum(['security', 'fund'])
+export type HoldingKind = z.infer<typeof HoldingKindSchema>
+
+export const FundTypeSchema = z.enum(['index_equity', 'active_equity', 'balanced', 'bond', 'money_market'])
+export type FundType = z.infer<typeof FundTypeSchema>
+
+// Stocks/ETFs and mutual funds share one shape: for a fund, ticker is the
+// fund code, shares are units, avgCost/currentPrice are NAVs and
+// priceUpdatedAt is the NAV date.
 export const HoldingSchema = z.object({
   id: z.string(),
+  // Absent on data saved before funds existed; treated as 'security'.
+  kind: HoldingKindSchema.optional(),
+  fundType: FundTypeSchema.optional(),
+  expenseRatioPercent: z.number().optional(),
+  provider: z.string().optional(),
   ticker: z.string(),
   name: z.string(),
   sleeve: SleeveSchema,
@@ -411,7 +426,7 @@ export const MarketSnapshotSchema = z.object({
 })
 export type MarketSnapshot = z.infer<typeof MarketSnapshotSchema>
 
-export const ResearchKindSchema = z.enum(['market', 'industry', 'stock'])
+export const ResearchKindSchema = z.enum(['market', 'industry', 'stock', 'fund'])
 export type ResearchKind = z.infer<typeof ResearchKindSchema>
 
 export const ResearchSourceSchema = z.object({ title: z.string(), url: z.string() })

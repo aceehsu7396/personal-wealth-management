@@ -165,7 +165,7 @@ export function computeJourney(state: JourneyState): JourneyReport {
           id: '2.1',
           title: '建立核心 ETF 持股',
           done: heldSleeves.has('core_tw') && heldSleeves.has('core_global'),
-          detail: '台股大盤與美股/全球 ETF 各至少一檔',
+          detail: '台股大盤與美股/全球各至少一檔 ETF 或指數型基金',
           page: PAGES.portfolio,
           handbookSlug: '03',
         },

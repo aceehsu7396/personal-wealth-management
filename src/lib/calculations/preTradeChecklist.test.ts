@@ -146,6 +146,19 @@ describe('buildPreTradeChecklist', () => {
     expect(items.find((i) => i.key === 'journeyUnlocked')).toBeUndefined()
   })
 
+  it('skips stock checks when buying more of an active fund', () => {
+    const fund: Holding = { ...core, id: 'fund', ticker: 'F1', kind: 'fund', sleeve: 'satellite_fund', shares: 10, currentPrice: 10 }
+    const items = buildPreTradeChecklist(
+      { ...buy, holdingId: 'fund', sleeve: 'satellite_fund', thesisId: undefined, shares: 50, price: 10 },
+      ctx({ holdings: [core, fund], satelliteGate: { unlocked: true, missingSteps: [] } }),
+      {},
+    )
+    const keys = items.map((i) => i.key)
+    expect(keys).toEqual(expect.arrayContaining(['journeyUnlocked', 'satelliteCap', 'macro', 'bias']))
+    expect(keys.some((k) => k === 'thesisLinked' || k.startsWith('thesis.') || k === 'positionCap' || k === 'sectorCap')).toBe(false)
+    expect(items.filter((i) => !i.passed)).toEqual([])
+  })
+
   it('flags a buy that breaches the single-position cap', () => {
     const items = buildPreTradeChecklist({ ...buy, shares: 20 }, ctx(), {})
     expect(items.find((i) => i.key === 'positionCap')?.passed).toBe(false)

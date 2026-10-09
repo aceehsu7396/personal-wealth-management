@@ -4,6 +4,8 @@ import { useJourney } from '../lib/useJourney'
 import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculations/portfolioRisk'
 import { todayIsoDate } from '../lib/market/twse'
 import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
+import { FUND_TYPE_LABELS, isFund, isNavStale } from '../lib/calculations/fundRules'
+import { FundNavUpdater } from '../components/research/FundNavUpdater'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
 import { RiskViolationList } from '../components/RiskViolationList'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
@@ -50,7 +52,8 @@ export function PortfolioPage() {
   }
 
   function handleSubmit(values: HoldingFormValues) {
-    const withDate = { ...values, priceUpdatedAt: todayIsoDate() }
+    // Funds carry their NAV date; stock prices entered by hand are dated today.
+    const withDate = { ...values, priceUpdatedAt: values.priceUpdatedAt ?? todayIsoDate() }
     if (editingId) {
       updateHolding(editingId, withDate)
       setEditingId(null)
@@ -161,6 +164,7 @@ export function PortfolioPage() {
               ? `上市台股價格已於 ${twse.snapshot.fetchedOn} 自動更新（每天第一次開啟時更新）。`
               : '上市台股價格每天第一次開啟時自動從證交所更新。')}
         </p>
+        <FundNavUpdater />
         {report.holdings.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">還沒有持股。</p>
         ) : (
@@ -183,11 +187,29 @@ export function PortfolioPage() {
                     <tr key={v.holding.id} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
                       <td className="py-2 pr-4">
                         <div className="font-medium text-gray-900 dark:text-gray-100">
+                          {isFund(v.holding) && (
+                            <span className="mr-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                              基金
+                            </span>
+                          )}
                           {v.holding.ticker} {v.holding.name}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           {SLEEVE_LABELS[v.holding.sleeve]}
-                          {v.holding.priceUpdatedAt && `・價格 ${v.holding.priceUpdatedAt}`}
+                          {isFund(v.holding) ? (
+                            <>
+                              {v.holding.fundType && `・${FUND_TYPE_LABELS[v.holding.fundType]}`}
+                              {v.holding.provider && `・${v.holding.provider}`}
+                              {v.holding.expenseRatioPercent !== undefined && `・費用 ${v.holding.expenseRatioPercent}%`}
+                              {`・淨值 ${v.holding.currentPrice}`}
+                              {v.holding.priceUpdatedAt && `（${v.holding.priceUpdatedAt}）`}
+                              {isNavStale(v.holding.priceUpdatedAt, todayIsoDate()) && (
+                                <span className="ml-1 text-orange-700 dark:text-orange-400">淨值超過 7 天未更新</span>
+                              )}
+                            </>
+                          ) : (
+                            v.holding.priceUpdatedAt && `・價格 ${v.holding.priceUpdatedAt}`
+                          )}
                         </div>
                       </td>
                       <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
@@ -269,7 +291,7 @@ export function PortfolioPage() {
           {editing ? `編輯持股：${editing.ticker}` : '新增持股'}
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          現金可新增為「核心：債券/現金」，股數填金額、成本與現價填 1。
+          共同基金請切換到「基金」，以單位數與淨值記錄。現金可新增為「核心：債券/現金」，股數填金額、成本與現價填 1。
         </p>
         <div className="mt-4">
           <HoldingForm

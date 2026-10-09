@@ -11,6 +11,7 @@ import type {
 import type { MacroAssessment } from './macroRegime'
 import { analyzePortfolio, isSatellite } from './portfolioRisk'
 import { evaluateThesis } from './thesisScoring'
+import { isFund } from './fundRules'
 
 export interface ChecklistEntry {
   key: string
@@ -189,9 +190,12 @@ export function buildPreTradeChecklist(
             : '總經判斷允許衛星新建倉（尚無總經檢視，請先到「研究分析 → 市場」新增）',
           ctx.macro?.satelliteNewPositionsAllowed ?? false,
         ),
-        check('thesisLinked', '已連結研究卡', thesis !== undefined),
       )
-      if (evaluation) {
+      // Active funds skip the individual-stock checks (research card,
+      // valuation, single-position and sector caps).
+      const fund = holding !== undefined && isFund(holding)
+      if (!fund) items.push(check('thesisLinked', '已連結研究卡', thesis !== undefined))
+      if (evaluation && !fund) {
         for (const c of evaluation.checks) items.push(check(`thesis.${c.key}`, c.label, c.passed))
       }
       if (target && target.positionCapPercent !== null) {
@@ -204,7 +208,7 @@ export function buildPreTradeChecklist(
         )
       }
       const worstSector = after.sectorExposure[0]
-      if (worstSector) {
+      if (worstSector && !fund) {
         items.push(
           check(
             'sectorCap',

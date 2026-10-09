@@ -195,7 +195,7 @@ export function TradeForm({ ctx, onSubmit }: Props) {
           {side === 'sell' && <option value="">請選擇</option>}
           {holdingOptions.map((h) => (
             <option key={h.id} value={h.id}>
-              {h.ticker} {h.name}（{SLEEVE_LABELS[h.sleeve]}，{h.shares} 股）
+              {h.ticker} {h.name}（{SLEEVE_LABELS[h.sleeve]}，{h.shares} {h.kind === 'fund' ? '單位' : '股'}）
             </option>
           ))}
         </select>

@@ -72,7 +72,11 @@ export function collectSources(messages: BetaMessage[]): ResearchSource[] {
 }
 
 export async function runWebResearch(
-  { system = RESEARCH_SYSTEM_PROMPT, prompt }: { system?: string; prompt: string },
+  {
+    system = RESEARCH_SYSTEM_PROMPT,
+    prompt,
+    maxSearches = 8,
+  }: { system?: string; prompt: string; maxSearches?: number },
   client: ResearchClient = createClient(),
 ): Promise<ResearchResult> {
   const messages: BetaMessageParam[] = [{ role: 'user', content: prompt }]
@@ -88,7 +92,7 @@ export async function runWebResearch(
       system,
       output_config: { effort: 'medium' },
       tools: [
-        { type: 'web_search_20260209', name: 'web_search', max_uses: 8 },
+        { type: 'web_search_20260209', name: 'web_search', max_uses: maxSearches },
         { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 5 },
       ],
       messages,

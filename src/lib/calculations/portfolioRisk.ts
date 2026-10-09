@@ -7,6 +7,7 @@ import type {
   StockThesis,
 } from '../storage/schema'
 import { evaluateThesis, positionCapFor, type ThesisEvaluation } from './thesisScoring'
+import { expenseLimitFor, isFund } from './fundRules'
 
 export type ViolationSeverity = 'critical' | 'warning' | 'info'
 
@@ -48,15 +49,16 @@ export interface PortfolioRiskReport {
 }
 
 export const SLEEVE_LABELS: Record<Sleeve, string> = {
-  core_tw: '核心：台股大盤 ETF',
-  core_global: '核心：美股/全球 ETF',
+  core_tw: '核心：台股大盤',
+  core_global: '核心：美股/全球',
   core_bond_cash: '核心：債券/現金',
   satellite_tw: '衛星：台股個股',
   satellite_us: '衛星：美股個股',
+  satellite_fund: '衛星：主動基金',
 }
 
 const CORE_SLEEVES: Sleeve[] = ['core_tw', 'core_global', 'core_bond_cash']
-const SATELLITE_SLEEVES: Sleeve[] = ['satellite_tw', 'satellite_us']
+const SATELLITE_SLEEVES: Sleeve[] = ['satellite_tw', 'satellite_us', 'satellite_fund']
 
 export function isSatellite(sleeve: Sleeve): boolean {
   return SATELLITE_SLEEVES.includes(sleeve)
@@ -97,7 +99,8 @@ export function analyzePortfolio(
     const valueTwd = holdingValueTwd(h, meta.fxUsdTwd)
     const thesis = h.thesisId ? thesisById.get(h.thesisId) : undefined
     const thesisEvaluation = thesis ? evaluateThesis(thesis, policy) : null
-    const positionCapPercent = isSatellite(h.sleeve)
+    // Funds are diversified, so the single-stock cap does not apply.
+    const positionCapPercent = isSatellite(h.sleeve) && !isFund(h)
       ? thesis && thesisEvaluation
         ? positionCapFor(thesis.lynchCategory, thesisEvaluation.convictionScore, policy)
         : policy.maxSinglePositionPercent
@@ -140,7 +143,7 @@ export function analyzePortfolio(
 
   const sectorTotals = new Map<string, number>()
   for (const v of holdingViews) {
-    if (!isSatellite(v.holding.sleeve)) continue
+    if (!isSatellite(v.holding.sleeve) || isFund(v.holding)) continue
     const thesis = v.holding.thesisId ? thesisById.get(v.holding.thesisId) : undefined
     const sector = (v.holding.sector || thesis?.sector || '未分類').trim()
     sectorTotals.set(sector, (sectorTotals.get(sector) ?? 0) + v.valueTwd)
@@ -219,9 +222,23 @@ export function analyzePortfolio(
     })
   }
 
-  // Per-holding rules (exit rules ②, ④, ⑤ and research hygiene).
+  // Fund fees: a reminder, not a rule breach.
   for (const v of holdingViews) {
-    if (!isSatellite(v.holding.sleeve)) continue
+    const fee = v.holding.expenseRatioPercent
+    if (!isFund(v.holding) || fee === undefined) continue
+    const limit = expenseLimitFor(v.holding.sleeve)
+    if (fee <= limit) continue
+    violations.push({
+      severity: 'info',
+      rule: '基金費用',
+      message: `${`${v.holding.ticker} ${v.holding.name}`.trim()} 內扣費用率 ${fee}%，高於 ${limit}%：費用每年都會侵蝕報酬，確認它值得這個成本（核心可改用低成本指數工具）。`,
+    })
+  }
+
+  // Per-holding rules for individual stocks (exit rules ②, ④, ⑤ and
+  // research hygiene). Funds are exempt: no research card or stock caps.
+  for (const v of holdingViews) {
+    if (!isSatellite(v.holding.sleeve) || isFund(v.holding)) continue
     const label = `${v.holding.ticker} ${v.holding.name}`.trim()
     if (v.positionCapPercent !== null && v.weightPercent > v.positionCapPercent) {
       violations.push({

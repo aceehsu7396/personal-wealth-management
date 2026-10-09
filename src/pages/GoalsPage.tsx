@@ -53,15 +53,15 @@ export function GoalsPage() {
   const allocationRows = [
     {
       layer: '核心',
-      name: '台股大盤 ETF',
+      name: '台股大盤',
       percent: policy.coreTwEquityPercent,
-      example: '0050、006208',
+      example: '0050、006208 或台股指數型基金',
     },
     {
       layer: '核心',
-      name: '美股/全球 ETF',
+      name: '美股/全球',
       percent: policy.coreGlobalEquityPercent,
-      example: 'VT、VOO、VTI',
+      example: 'VT、VOO、VTI 或全球指數型基金',
     },
     {
       layer: '核心',

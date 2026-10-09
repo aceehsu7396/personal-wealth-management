@@ -8,6 +8,7 @@ const KIND_LABELS: Record<ResearchReport['kind'], string> = {
   market: '市場分析',
   industry: '產業分析',
   stock: '個股分析',
+  fund: '基金淨值',
 }
 
 function formatDateTime(iso: string): string {

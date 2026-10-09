@@ -15,6 +15,8 @@ export const SLEEVE_ASSET_CLASS: Record<Sleeve, AssetClass> = {
   satellite_tw: 'tw',
   core_global: 'global',
   satellite_us: 'global',
+  // Active funds are benchmarked against global equities.
+  satellite_fund: 'global',
   core_bond_cash: 'bondCash',
 }
 
@@ -205,6 +207,7 @@ export function netFlowsBySleeve(
     core_bond_cash: 0,
     satellite_tw: 0,
     satellite_us: 0,
+    satellite_fund: 0,
   }
   const sleeveOf = new Map(holdings.map((h) => [h.id, h.sleeve]))
   for (const t of trades) {

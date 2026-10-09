@@ -14,7 +14,7 @@ import { errorClass, inputClass, labelClass } from './forms/FormField'
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
-const SLEEVES: Sleeve[] = ['core_tw', 'core_global', 'core_bond_cash', 'satellite_tw', 'satellite_us']
+const SLEEVES: Sleeve[] = ['core_tw', 'core_global', 'core_bond_cash', 'satellite_tw', 'satellite_us', 'satellite_fund']
 
 const num = z.coerce.number()
 const schema = z

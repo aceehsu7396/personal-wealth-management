@@ -6,7 +6,10 @@ export const TWSE_TICKER = /^\d{4,6}[A-Z]?$/
 
 export function followedTwseTickers(holdings: Holding[], theses: StockThesis[]): string[] {
   const tickers = new Set<string>()
-  for (const h of holdings) if (h.currency === 'TWD' && TWSE_TICKER.test(h.ticker)) tickers.add(h.ticker)
+  for (const h of holdings) {
+    // Fund NAVs are not on TWSE; fund codes can look like listed codes.
+    if (h.kind !== 'fund' && h.currency === 'TWD' && TWSE_TICKER.test(h.ticker)) tickers.add(h.ticker)
+  }
   for (const t of theses) if (t.market === 'TW' && TWSE_TICKER.test(t.ticker)) tickers.add(t.ticker)
   return [...tickers]
 }
@@ -26,7 +29,7 @@ export function planPriceUpdates(
   const plan: PriceUpdatePlan = { holdings: [], thesisPrices: {} }
   for (const h of holdings) {
     const v = valuations[h.ticker]
-    if (h.currency !== 'TWD' || !v || v.close === null || v.close === h.currentPrice) continue
+    if (h.kind === 'fund' || h.currency !== 'TWD' || !v || v.close === null || v.close === h.currentPrice) continue
     plan.holdings.push({ id: h.id, price: v.close, date: v.date })
   }
   for (const t of theses) {

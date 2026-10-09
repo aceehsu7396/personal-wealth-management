@@ -51,6 +51,12 @@ describe('planPriceUpdates', () => {
     expect(plan.thesisPrices).toEqual({ t: 950 })
   })
 
+  it('never applies TWSE prices to funds', () => {
+    const fund = holding({ id: 'f', ticker: '0050', kind: 'fund' })
+    expect(followedTwseTickers([fund], [])).toEqual([])
+    expect(planPriceUpdates([fund], [], { '0050': val('0050', 180) }).holdings).toEqual([])
+  })
+
   it('skips tickers without a close', () => {
     const plan = planPriceUpdates([holding({})], [], { '0050': val('0050', null) })
     expect(plan.holdings).toEqual([])

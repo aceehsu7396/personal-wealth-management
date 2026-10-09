@@ -57,10 +57,10 @@ type FormOutput = z.output<typeof formSchema>
 
 const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
   { name: 'targetYears', label: '財務自由目標年限（年）', step: '1' },
-  { name: 'coreTwEquityPercent', label: '核心：台股大盤 ETF（%）', step: '1' },
+  { name: 'coreTwEquityPercent', label: '核心：台股大盤（%）', step: '1' },
   {
     name: 'coreGlobalEquityPercent',
-    label: '核心：美股/全球 ETF（%）',
+    label: '核心：美股/全球（%）',
     step: '1',
   },
   { name: 'coreBondCashPercent', label: '核心：債券/現金（%）', step: '1' },

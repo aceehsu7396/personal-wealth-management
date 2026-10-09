@@ -174,6 +174,35 @@ describe('analyzePortfolio', () => {
     expect(report.violations.some((v) => v.rule === '匯率曝險')).toBe(true)
   })
 
+  it('counts active funds toward the satellite without stock rules', () => {
+    const holdings = [
+      holding({ sleeve: 'core_tw', shares: 800 }),
+      holding({ kind: 'fund', sleeve: 'satellite_fund', shares: 200, avgCost: 150, currentPrice: 100 }),
+    ]
+    const report = analyzePortfolio(holdings, theses, policy, guardrails, meta)
+    expect(report.satellitePercent).toBeCloseTo(20)
+    const fund = report.holdings.find((v) => v.holding.kind === 'fund')!
+    expect(fund.positionCapPercent).toBeNull()
+    const rules = report.violations.map((v) => v.rule)
+    expect(rules).not.toContain('研究紀律')
+    expect(rules.some((r) => r.includes('④') || r.includes('⑤'))).toBe(false)
+    expect(report.sectorExposure).toEqual([])
+  })
+
+  it('reminds about high fund fees by sleeve', () => {
+    const holdings = [
+      holding({ kind: 'fund', sleeve: 'core_global', shares: 500, expenseRatioPercent: 1.2 }),
+      holding({ kind: 'fund', sleeve: 'satellite_fund', shares: 100, expenseRatioPercent: 1.8 }),
+      holding({ sleeve: 'core_tw', shares: 400 }),
+    ]
+    const fees = analyzePortfolio(holdings, theses, policy, guardrails, meta).violations.filter(
+      (v) => v.rule === '基金費用',
+    )
+    expect(fees).toHaveLength(1)
+    expect(fees[0].severity).toBe('info')
+    expect(fees[0].message).toContain('1.2%')
+  })
+
   it('returns an empty report for an empty portfolio', () => {
     const report = analyzePortfolio([], theses, policy, guardrails, meta)
     expect(report.totalValueTwd).toBe(0)
