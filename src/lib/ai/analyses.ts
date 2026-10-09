@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { MacroCheckIn, Market } from '../storage/schema'
+import type { MacroCheckIn, Market, ResearchSource } from '../storage/schema'
 import { runWebResearch, type ResearchClient, type ResearchResult } from './webResearch'
 import { extractStructured, type ExtractionClient } from './extractStructured'
 
@@ -141,9 +141,46 @@ export const StockFactsSchema = z.object({
 })
 export type StockFacts = z.infer<typeof StockFactsSchema>
 
-export function buildStockPrompt(ticker: string, name: string, market: Market, today: string): string {
+// Price and valuation already known from TWSE, so the model does not spend
+// searches on them.
+export interface KnownQuote {
+  price: number | null
+  pe: number | null
+  pb: number | null
+  dividendYield: number | null
+  date: string
+}
+
+function knownQuoteLine(known: KnownQuote | undefined): string {
+  if (!known) return ''
+  const parts = [
+    known.price !== null ? `收盤價 ${known.price}` : null,
+    known.pe !== null ? `本益比 ${known.pe}` : null,
+    known.pb !== null ? `股價淨值比 ${known.pb}` : null,
+    known.dividendYield !== null ? `殖利率 ${known.dividendYield}%` : null,
+  ].filter(Boolean)
+  if (parts.length === 0) return ''
+  return `\n以下數據已由台灣證券交易所取得（${known.date}），直接使用、不需要再搜尋：${parts.join('、')}。\n`
+}
+
+// Search budget is limited, so numbers come first: one page with several
+// years of financials beats one search per figure.
+const NUMBERS_FIRST = `## 搜尋順序（搜尋次數有限，請照順序）
+1. **先取得財務數字**：近 5 年營收、EPS、投入資本報酬率，以及 F 分數需要的資料（資產報酬率、營業現金流、長期負債、流動比率、流通股數、毛利率、資產週轉率）。優先讀取一個頁面就能看到多年數據的來源（公司年報或法說會簡報、公開資訊觀測站、財報彙整網站），不要每個數字分別搜尋。
+2. 數字取得後，再查商業模式、競爭優勢、近期新聞與風險。
+3. 搜尋次數用完時，用已取得的資料完成報告，缺少的數字寫「未取得」。`
+
+export function buildStockPrompt(
+  ticker: string,
+  name: string,
+  market: Market,
+  today: string,
+  known?: KnownQuote,
+): string {
   const label = `${MARKET_NAMES[market]}股票 ${ticker}${name ? ` ${name}` : ''}`
   return `今天是 ${today}。請上網搜尋最新資料，撰寫「${label}」的個股研究報告，作為長期投資人填寫研究卡的素材。
+${knownQuoteLine(known)}
+${NUMBERS_FIRST}
 
 ## 報告結構
 1. 摘要（3–5 點）
@@ -155,6 +192,70 @@ export function buildStockPrompt(ticker: string, name: string, market: Market, t
 7. 主要風險與財報紅旗
 8. 反方觀點：最強的看空理由是什麼？
 9. 值得追蹤的失效訊號（可作為研究卡「失效條件」的參考）`
+}
+
+// Key figures the research card pre-fills; a run missing too many of them
+// gets one focused follow-up search.
+export const STOCK_KEY_FIELDS = {
+  currentPrice: '現價',
+  roicPercent: '投入資本報酬率（近 5 年平均）',
+  historicalGrowthPercent: '過去 5 年營收或 EPS 年複合成長率',
+  fScore: 'Piotroski F 分數（9 項逐項）',
+} as const
+export type StockKeyField = keyof typeof STOCK_KEY_FIELDS
+
+export const FOLLOW_UP_MIN_MISSING = 2
+export const FOLLOW_UP_MAX_SEARCHES = 6
+
+export function missingStockFields(facts: StockFacts): StockKeyField[] {
+  return (Object.keys(STOCK_KEY_FIELDS) as StockKeyField[]).filter((k) => facts[k] === null)
+}
+
+// Fills gaps in `primary` from `extra`, keeping each value with its context
+// (price with its date, growth with its basis, F score with its items).
+export function mergeStockFacts(primary: StockFacts, extra: StockFacts): StockFacts {
+  const merged = { ...primary }
+  if (merged.currentPrice === null && extra.currentPrice !== null) {
+    merged.currentPrice = extra.currentPrice
+    merged.priceDate = extra.priceDate
+    merged.currency = extra.currency
+  }
+  if (merged.roicPercent === null) merged.roicPercent = extra.roicPercent
+  if (merged.historicalGrowthPercent === null && extra.historicalGrowthPercent !== null) {
+    merged.historicalGrowthPercent = extra.historicalGrowthPercent
+    merged.growthBasis = extra.growthBasis
+  }
+  if (merged.fScore === null && extra.fScore !== null) {
+    merged.fScore = extra.fScore
+    merged.fScoreItems = extra.fScoreItems
+  }
+  if (!merged.name) merged.name = extra.name
+  if (!merged.sector) merged.sector = extra.sector
+  return merged
+}
+
+// TWSE already has today's close; use it when the report did not find one.
+export function applyKnownQuote(facts: StockFacts, known: KnownQuote | undefined): StockFacts {
+  if (!known || known.price === null || facts.currentPrice !== null) return facts
+  return { ...facts, currentPrice: known.price, priceDate: known.date, currency: 'TWD' }
+}
+
+export function buildStockFollowUpPrompt(
+  ticker: string,
+  name: string,
+  market: Market,
+  today: string,
+  missing: StockKeyField[],
+): string {
+  const label = `${MARKET_NAMES[market]}股票 ${ticker}${name ? ` ${name}` : ''}`
+  const items = missing.map((k) => `- ${STOCK_KEY_FIELDS[k]}`).join('\n')
+  return `今天是 ${today}。上一輪研究「${label}」時，下列財務數據沒有查到。請**只查這些數字**，不需要撰寫商業模式或新聞：
+
+${items}
+
+優先讀取一個頁面就能看到多年財務數據的來源（公司年報、公開資訊觀測站、財報彙整網站）。每個數字註明期間、資料日期與來源；F 分數請逐項列出 9 項的判斷依據。真的找不到的寫「未取得」，不要估算。
+
+用「## 補查：財務數據」作為標題，以條列或表格呈現。`
 }
 
 export const STOCK_EXTRACTION_INSTRUCTIONS =
@@ -182,6 +283,10 @@ export interface AnalysisOutcome<Facts> {
   research: ResearchResult
   facts: Facts | null
   estimatedCostUsd: number
+  // Stock analysis only: whether a follow-up search ran, and what is still
+  // missing after it.
+  followUp?: boolean
+  stillMissing?: StockKeyField[]
 }
 
 export async function analyzeMarket(
@@ -212,15 +317,22 @@ export async function analyzeIndustry(
   return { research, facts: null, estimatedCostUsd: research.estimatedCostUsd }
 }
 
+function mergeSources(a: ResearchSource[], b: ResearchSource[]): ResearchSource[] {
+  const seen = new Map(a.map((s) => [s.url, s]))
+  for (const s of b) if (!seen.has(s.url)) seen.set(s.url, s)
+  return [...seen.values()]
+}
+
 export async function analyzeStock(
   ticker: string,
   name: string,
   market: Market,
   today: string,
   clients?: { research?: ResearchClient; extraction?: ExtractionClient },
+  known?: KnownQuote,
 ): Promise<AnalysisOutcome<StockFacts>> {
   const research = await runWebResearch(
-    { prompt: buildStockPrompt(ticker, name, market, today) },
+    { prompt: buildStockPrompt(ticker, name, market, today, known) },
     clients?.research,
   )
   const extraction = await extractStructured(
@@ -229,9 +341,47 @@ export async function analyzeStock(
     research.markdown,
     clients?.extraction,
   )
+  let facts = applyKnownQuote(extraction.data, known)
+  let cost = research.estimatedCostUsd + extraction.estimatedCostUsd
+  let markdown = research.markdown
+  let sources = research.sources
+  let searchCount = research.searchCount
+
+  // One focused follow-up when too many key figures are missing.
+  const missing = missingStockFields(facts)
+  const followUp = missing.length >= FOLLOW_UP_MIN_MISSING
+  if (followUp) {
+    const extra = await runWebResearch(
+      {
+        prompt: buildStockFollowUpPrompt(ticker, name, market, today, missing),
+        maxSearches: FOLLOW_UP_MAX_SEARCHES,
+      },
+      clients?.research,
+    )
+    const extraFacts = await extractStructured(
+      StockFactsSchema,
+      STOCK_EXTRACTION_INSTRUCTIONS,
+      extra.markdown,
+      clients?.extraction,
+    )
+    facts = mergeStockFacts(facts, extraFacts.data)
+    markdown = `${markdown}\n\n${extra.markdown}`
+    sources = mergeSources(sources, extra.sources)
+    searchCount += extra.searchCount
+    cost += extra.estimatedCostUsd + extraFacts.estimatedCostUsd
+  }
+
+  const stillMissing = missingStockFields(facts)
+  if (stillMissing.length > 0) {
+    const list = stillMissing.map((k) => STOCK_KEY_FIELDS[k]).join('、')
+    markdown = `> **以下數據${followUp ? '補查後仍' : '本次'}未取得**：${list}。可依公司年報自行補在研究卡上，或稍後再分析一次。\n\n${markdown}`
+  }
+
   return {
-    research,
-    facts: extraction.data,
-    estimatedCostUsd: research.estimatedCostUsd + extraction.estimatedCostUsd,
+    research: { ...research, markdown, sources, searchCount, estimatedCostUsd: cost },
+    facts,
+    estimatedCostUsd: cost,
+    followUp,
+    stillMissing,
   }
 }

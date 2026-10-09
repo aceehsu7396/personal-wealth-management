@@ -1,5 +1,13 @@
+import { useState } from 'react'
 import { useAppStore } from '../../lib/storage/appStore'
-import { analyzeStock, StockFactsSchema, type StockFacts } from '../../lib/ai/analyses'
+import {
+  analyzeStock,
+  STOCK_KEY_FIELDS,
+  StockFactsSchema,
+  type KnownQuote,
+  type StockFacts,
+  type StockKeyField,
+} from '../../lib/ai/analyses'
 import { useResearchTask } from '../../lib/ai/useResearchTask'
 import { todayIsoDate } from '../../lib/market/twse'
 import type { Market } from '../../lib/storage/schema'
@@ -24,7 +32,11 @@ export function StockAiAssist({
   const reports = useAppStore((s) => s.researchReports)
   const addResearchReport = useAppStore((s) => s.addResearchReport)
   const removeResearchReport = useAppStore((s) => s.removeResearchReport)
+  const valuations = useAppStore((s) => s.marketSnapshot.valuations)
   const task = useResearchTask()
+  // Outcome of the last run: whether a follow-up search ran and what is
+  // still missing afterwards.
+  const [lastRun, setLastRun] = useState<{ followUp: boolean; stillMissing: StockKeyField[] } | null>(null)
 
   const trimmed = ticker.trim()
   const subject = `${trimmed} ${name.trim()}`.trim()
@@ -35,8 +47,17 @@ export function StockAiAssist({
   const latestFacts = latest ? StockFactsSchema.safeParse(latest.facts) : null
 
   async function run() {
-    const result = await task.run(() => analyzeStock(trimmed, name.trim(), market, todayIsoDate()))
+    // Taiwan stocks: hand over the TWSE quote so no searches are spent on it.
+    const v = market === 'TW' ? valuations[trimmed] : undefined
+    const known: KnownQuote | undefined = v
+      ? { price: v.close, pe: v.pe, pb: v.pb, dividendYield: v.dividendYield, date: v.date }
+      : undefined
+    setLastRun(null)
+    const result = await task.run(() =>
+      analyzeStock(trimmed, name.trim(), market, todayIsoDate(), undefined, known),
+    )
     if (!result || !result.facts) return
+    setLastRun({ followUp: result.followUp ?? false, stillMissing: result.stillMissing ?? [] })
     addResearchReport({
       kind: 'stock',
       subject,
@@ -64,6 +85,18 @@ export function StockAiAssist({
         onClick={() => void run()}
       />
       {!trimmed && <p className="mt-2 text-xs text-gray-500">先填寫代號。</p>}
+      {lastRun && (
+        <p
+          className={`mt-2 text-xs ${
+            lastRun.stillMissing.length > 0 ? 'text-orange-700 dark:text-orange-400' : 'text-indigo-700 dark:text-indigo-400'
+          }`}
+        >
+          {lastRun.followUp ? '第一輪有關鍵數字沒查到，已自動補查一次。' : ''}
+          {lastRun.stillMissing.length > 0
+            ? `仍未取得：${lastRun.stillMissing.map((k) => STOCK_KEY_FIELDS[k]).join('、')}，可依年報自行補上。`
+            : '關鍵財務數字都已取得。'}
+        </p>
+      )}
 
       {latest && (
         <div className="mt-4 space-y-3">
