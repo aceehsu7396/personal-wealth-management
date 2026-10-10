@@ -10,7 +10,7 @@ import { MacroCheckInForm, type MacroCheckInFormValues } from './forms/MacroChec
 import { StatCard } from './StatCard'
 import { AiActionButton } from './research/AiActionButton'
 import { ResearchReportCard } from './research/ResearchReportCard'
-import { analyzeMarket, macroDraftToForm, MacroDraftSchema } from '../lib/ai/analyses'
+import { analyzeMarket, MACRO_PRIMARY_SOURCE, macroDraftToForm, MacroDraftSchema } from '../lib/ai/analyses'
 import { useResearchTask } from '../lib/ai/useResearchTask'
 import { todayIsoDate } from '../lib/market/twse'
 
@@ -155,7 +155,11 @@ export function MacroPanel() {
         {!editing && (
           <div className="mt-3 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
             <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
-              讓 AI 上網搜尋台股與美股最新的總經資料，產出研究報告，並預填下方 17 個訊號與判斷理由。你確認或修改後才會儲存。
+              AI 會先讀取{' '}
+              <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className="font-medium text-indigo-700 underline dark:text-indigo-400">
+                富邦金控研究報告
+              </a>{' '}
+              最新一期「市場展望」，報告沒有的最新數據再上網補充，產出研究報告並預填下方 17 個訊號與判斷理由。你確認或修改後才會儲存。
             </p>
             <AiActionButton
               label="AI 取得總經資訊並預填"

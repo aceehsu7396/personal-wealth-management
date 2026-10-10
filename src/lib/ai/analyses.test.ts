@@ -5,6 +5,8 @@ import {
   mergeStockFacts,
   missingStockFields,
   buildIndustryPrompt,
+  buildMarketPrompt,
+  MACRO_PRIMARY_SOURCE,
   buildStockPrompt,
   macroDraftToForm,
   MacroDraftSchema,
@@ -72,6 +74,15 @@ describe('stockFactsToDraft', () => {
 
   it('drops an out-of-range F score', () => {
     expect(stockFactsToDraft({ ...facts, fScore: 12 }).fScore).toBeUndefined()
+  })
+})
+
+describe('market prompt', () => {
+  it('reads the Fubon outlook first and searches only to fill gaps', () => {
+    const prompt = buildMarketPrompt('2026-10-11')
+    expect(prompt).toContain(MACRO_PRIMARY_SOURCE)
+    expect(prompt).toContain('富邦總經觀點-○月市場展望')
+    expect(prompt.indexOf(MACRO_PRIMARY_SOURCE)).toBeLessThan(prompt.indexOf('上網搜尋補充'))
   })
 })
 

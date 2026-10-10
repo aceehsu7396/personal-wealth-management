@@ -41,20 +41,31 @@ export const MacroDraftSchema = z.object({
 })
 export type MacroDraft = z.infer<typeof MacroDraftSchema>
 
+// Primary macro source: Fubon Financial's research report list. The model
+// fetches the list, then the latest monthly outlook PDF linked from it.
+export const MACRO_PRIMARY_SOURCE = 'https://invest.fubonlife.com.tw/w/wa/waFubonlifeMSG.djhtm'
+
 export function buildMarketPrompt(today: string): string {
-  return `今天是 ${today}。請上網搜尋最新資料，撰寫台股與美股的「總經三支柱」研究報告，供長期投資人每月檢視使用。
+  return `今天是 ${today}。請撰寫台股與美股的「總經三支柱」研究報告，供長期投資人每月檢視使用。
+
+## 資料來源（請照順序）
+1. **主要來源**：先用網頁讀取工具開啟富邦金控研究報告列表 ${MACRO_PRIMARY_SOURCE} ，找出日期最新的一期「富邦總經觀點-○月市場展望」，再開啟它連結的 PDF 全文。若最近 1 個月內另有「富邦總經分析」與台灣、美國或金融市場風險相關，也一併讀取。
+2. 以這份報告為主要依據撰寫各支柱，並在報告開頭註明所依據的報告名稱與日期。
+3. **只在報告沒有涵蓋，或報告日期之後有更新的數據時**，才上網搜尋補充（例如最新的 PMI、CPI、VIX、信用利差），並註明哪些數據來自富邦報告、哪些來自其他來源。
+4. 若列表或 PDF 無法開啟，改以上網搜尋取得資料，並在報告開頭說明。
 
 ## 報告結構
-1. 摘要（3–5 點）
-2. 支柱一：景氣體制——成長與通膨的方向（相較 3–6 個月前）
+1. 依據來源：富邦報告名稱與日期，以及補充來源
+2. 摘要（3–5 點），包含富邦報告的主要觀點
+3. 支柱一：景氣體制——成長與通膨的方向（相較 3–6 個月前）
    - 美國：ISM 製造業 PMI、非農就業與失業率趨勢、CPI／核心 PCE
    - 台灣：國發會景氣對策信號、外銷訂單年增率、CPI
-3. 支柱二：流動性——Fed 與台灣央行利率方向、美國 10 年減 2 年公債利差、高收益債信用利差、Fed 資產負債表、美元指數
-4. 支柱三：情緒溫度——台股與 S&P 500 本益比相對歷史的位置、信用條件、新股上市與題材熱度、媒體氛圍、台股融資餘額變化、VIX
-5. 政策與地緣政治重點
-6. 估值概況：台股與美股大盤目前的評價水準
+4. 支柱二：流動性——Fed 與台灣央行利率方向、美國 10 年減 2 年公債利差、高收益債信用利差、Fed 資產負債表、美元指數
+5. 支柱三：情緒溫度——台股與 S&P 500 本益比相對歷史的位置、信用條件、新股上市與題材熱度、媒體氛圍、台股融資餘額變化、VIX
+6. 政策與地緣政治重點
+7. 估值概況：台股與美股大盤目前的評價水準
 
-每個指標寫出最新數值、資料日期、與 3–6 個月前相比的方向。`
+每個指標寫出最新數值、資料日期、與 3–6 個月前相比的方向。富邦報告中的投資建議或配置看法可以摘要呈現，但要標明是富邦的觀點。`
 }
 
 export const MACRO_EXTRACTION_INSTRUCTIONS =
