@@ -6,19 +6,19 @@ import { emergencyFundTarget } from '../lib/calculations/journey'
 import { StatCard } from '../components/StatCard'
 import { StrategyOverview } from '../components/StrategyOverview'
 import { useJourney } from '../lib/useJourney'
+import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
+import { snapshotsAsCheckIns } from '../lib/calculations/netWorth'
 import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedChart'
 import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 
 export function DashboardPage() {
   const profile = useAppStore((s) => s.profile)
-  const assumptions = useAppStore((s) => s.assumptions)
-  const checkIns = useAppStore((s) => s.checkIns)
+  const snapshots = useAppStore((s) => s.portfolioSnapshots)
+  // Net worth comes from the portfolio once holdings exist.
+  const { assumptions, fromPortfolio } = usePlanningAssumptions()
 
   const result = computeFireProjection(profile, assumptions)
-
-  const sortedCheckIns = [...checkIns].sort((a, b) => b.date.localeCompare(a.date))
-  const latestCheckIn = sortedCheckIns[0]
-  const latestNetWorth = latestCheckIn ? latestCheckIn.netWorthAmount : assumptions.currentNetWorth
+  const latestNetWorth = assumptions.currentNetWorth
   const progressPercent = computeProgressPercent(latestNetWorth, result.fireNumber)
 
   // With no expenses entered the FIRE number is 0, which would read as
@@ -77,9 +77,9 @@ export function DashboardPage() {
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="最新淨值"
+          label="淨資產（投資組合市值）"
           value={formatCurrency(latestNetWorth, profile.currency)}
-          hint={latestCheckIn ? `紀錄於 ${latestCheckIn.date}` : '尚無進度紀錄'}
+          hint={fromPortfolio ? '依持股即時計算，每月自動記錄' : '尚未建立持股，暫用目標與政策的輸入'}
         />
         <StatCard
           label="達成進度"
@@ -116,15 +116,15 @@ export function DashboardPage() {
             淨值進度
           </h2>
           <Link
-            to="/networth"
+            to="/portfolio"
             className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
-            記錄淨值
+            前往投資組合
           </Link>
         </div>
         <ActualVsProjectedChart
           projectedPoints={result.points}
-          checkIns={checkIns}
+          checkIns={snapshotsAsCheckIns(snapshots)}
           currency={profile.currency}
         />
       </div>

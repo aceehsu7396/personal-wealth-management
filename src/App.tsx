@@ -1,10 +1,10 @@
 import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/layout/NavBar'
+import { PortfolioSnapshotRecorder } from './components/PortfolioSnapshotRecorder'
 import { LEGACY_REDIRECTS } from './components/layout/navigation'
 import { DashboardPage } from './pages/DashboardPage'
 import { GoalsPage } from './pages/GoalsPage'
-import { NetWorthPage } from './pages/NetWorthPage'
 import { JourneyPage } from './pages/JourneyPage'
 import { MarketPage } from './pages/MarketPage'
 import { IndustryPage } from './pages/IndustryPage'
@@ -24,11 +24,11 @@ function App() {
     <HashRouter>
       <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
         <NavBar />
+        <PortfolioSnapshotRecorder />
         <Routes>
           {/* 總覽 */}
           <Route path="/" element={<DashboardPage />} />
           <Route path="/goals" element={<GoalsPage />} />
-          <Route path="/networth" element={<NetWorthPage />} />
           {/* 學習路線 */}
           <Route path="/journey" element={<JourneyPage />} />
           <Route

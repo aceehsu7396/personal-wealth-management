@@ -45,7 +45,7 @@ export function ActualVsProjectedChart({ projectedPoints, checkIns, currency }: 
   if (actualSeries.length === 0) {
     return (
       <p className="py-12 text-center text-sm text-gray-500 dark:text-gray-400">
-        還沒有任何淨值紀錄，新增第一筆之後這裡會出現實際與試算對比圖。
+        建立持股後，系統每月自動記錄投資組合市值，這裡會出現實際與試算的對比。
       </p>
     )
   }

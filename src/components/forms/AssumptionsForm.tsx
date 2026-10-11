@@ -3,7 +3,9 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAppStore } from '../../lib/storage/appStore'
+import { Link } from 'react-router-dom'
 import { Field, inputClass } from './FormField'
+import { formatCurrency } from '../../lib/format'
 
 const formSchema = z
   .object({
@@ -28,9 +30,12 @@ const formSchema = z
 type FormInput = z.input<typeof formSchema>
 type FormOutput = z.output<typeof formSchema>
 
-export function AssumptionsForm() {
+// When holdings exist, current net worth is the portfolio's market value and
+// is shown read-only here; manual input is only for before the first holding.
+export function AssumptionsForm({ netWorthFromPortfolio = null }: { netWorthFromPortfolio?: number | null }) {
   const assumptions = useAppStore((s) => s.assumptions)
   const setAssumptions = useAppStore((s) => s.setAssumptions)
+  const currency = useAppStore((s) => s.profile.currency)
 
   const {
     register,
@@ -65,9 +70,25 @@ export function AssumptionsForm() {
 
   return (
     <form className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-      <Field label="目前淨資產" error={errors.currentNetWorth?.message}>
-        <input type="number" className={inputClass} {...register('currentNetWorth')} />
-      </Field>
+      {netWorthFromPortfolio === null ? (
+        <Field label="目前淨資產（尚未建立持股時手動輸入）" error={errors.currentNetWorth?.message}>
+          <input type="number" className={inputClass} {...register('currentNetWorth')} />
+        </Field>
+      ) : (
+        <div>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">目前淨資產</span>
+          <p className="mt-1 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-100">
+            {formatCurrency(netWorthFromPortfolio, currency)}
+          </p>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            自動取自
+            <Link to="/portfolio" className="mx-1 font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              投資組合
+            </Link>
+            總市值（不含緊急預備金與自住房地產）
+          </p>
+        </div>
+      )}
 
       <Field label="月收入" error={errors.monthlyIncome?.message}>
         <input type="number" className={inputClass} {...register('monthlyIncome')} />

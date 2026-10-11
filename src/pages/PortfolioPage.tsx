@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculations/portfolioRisk'
@@ -27,7 +27,6 @@ export function PortfolioPage() {
   const updateHolding = useAppStore((s) => s.updateHolding)
   const removeHolding = useAppStore((s) => s.removeHolding)
   const setPortfolioMeta = useAppStore((s) => s.setPortfolioMeta)
-  const recordPortfolioValue = useAppStore((s) => s.recordPortfolioValue)
   const updateStockThesis = useAppStore((s) => s.updateStockThesis)
 
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -37,10 +36,6 @@ export function PortfolioPage() {
 
   const report = analyzePortfolio(holdings, theses, policy, guardrails, meta)
   const editing = editingId ? holdings.find((h) => h.id === editingId) : undefined
-
-  useEffect(() => {
-    if (report.totalValueTwd > 0) recordPortfolioValue(report.totalValueTwd, todayIsoDate())
-  }, [report.totalValueTwd, recordPortfolioValue])
 
   // Keep the linked research card's price and status in step with the holding.
   function syncThesis(values: HoldingFormValues) {

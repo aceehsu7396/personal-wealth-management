@@ -23,7 +23,6 @@ export const NAV_GROUPS: NavGroup[] = [
     tabs: [
       { label: '概況', to: '/', exact: true },
       { label: '目標與政策', to: '/goals' },
-      { label: '淨值紀錄', to: '/networth' },
     ],
   },
   {
@@ -71,7 +70,8 @@ export function groupOf(pathname: string): NavGroup | undefined {
 export const LEGACY_REDIRECTS: Record<string, string> = {
   '/fire': '/goals',
   '/strategy': '/goals',
-  '/progress': '/networth',
+  '/progress': '/',
+  '/networth': '/',
   '/records': '/',
   '/market': '/research/market',
   '/research': '/research/stocks',

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
+import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { computeRequiredReturn, FEASIBILITY_LABELS } from '../lib/calculations/requiredReturn'
 import { assessMacro, STANCE_LABELS } from '../lib/calculations/macroRegime'
 import { analyzePortfolio } from '../lib/calculations/portfolioRisk'
@@ -15,7 +16,7 @@ const THESIS_STALE_MONTHS = 4
 
 export function StrategyOverview() {
   const profile = useAppStore((s) => s.profile)
-  const assumptions = useAppStore((s) => s.assumptions)
+  const { assumptions } = usePlanningAssumptions()
   const { policy, journey } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
   const macroCheckIns = useAppStore((s) => s.macroCheckIns)

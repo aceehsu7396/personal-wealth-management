@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
+import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { todayIsoDate } from '../lib/market/twse'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
 import {
@@ -26,7 +27,7 @@ const PRINCIPLES = [
 
 export function GoalsPage() {
   const profile = useAppStore((s) => s.profile)
-  const assumptions = useAppStore((s) => s.assumptions)
+  const { assumptions, fromPortfolio } = usePlanningAssumptions()
   const policy = useAppStore((s) => s.investmentPolicy)
   const setInvestmentPolicy = useAppStore((s) => s.setInvestmentPolicy)
   const { learning } = useJourney()
@@ -150,7 +151,7 @@ export function GoalsPage() {
           />
         </div>
         <div className="mt-6">
-          <AssumptionsForm />
+          <AssumptionsForm netWorthFromPortfolio={fromPortfolio ? assumptions.currentNetWorth : null} />
         </div>
       </div>
 

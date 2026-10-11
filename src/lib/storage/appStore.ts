@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
+import { upsertSnapshot } from '../calculations/netWorth'
 import {
   AppDataSchema,
   SCHEMA_VERSION,
@@ -137,6 +138,7 @@ function toAppData(state: AppData): AppData {
     foundation: state.foundation,
     marketSnapshot: state.marketSnapshot,
     researchReports: state.researchReports,
+    portfolioSnapshots: state.portfolioSnapshots,
   }
 }
 
@@ -291,18 +293,23 @@ export const useAppStore = create<AppStore>()(
       setPortfolioMeta: (meta) =>
         set((state) => ({ portfolioMeta: { ...state.portfolioMeta, ...meta } })),
 
+      // Tracks the peak (for the drawdown circuit breaker) and the monthly
+      // net-worth history from the same portfolio value.
       recordPortfolioValue: (totalValueTwd, date) =>
-        set((state) =>
-          totalValueTwd > state.portfolioMeta.peakValueTwd
-            ? {
-                portfolioMeta: {
-                  ...state.portfolioMeta,
-                  peakValueTwd: totalValueTwd,
-                  peakDate: date,
-                },
-              }
-            : {},
-        ),
+        set((state) => {
+          const latest = state.portfolioSnapshots.find((s) => s.month === date.slice(0, 7))
+          const snapshotChanged = !latest || latest.valueTwd !== totalValueTwd || latest.date !== date
+          const newPeak = totalValueTwd > state.portfolioMeta.peakValueTwd
+          if (!snapshotChanged && !newPeak) return {}
+          return {
+            ...(snapshotChanged
+              ? { portfolioSnapshots: upsertSnapshot(state.portfolioSnapshots, totalValueTwd, date) }
+              : {}),
+            ...(newPeak
+              ? { portfolioMeta: { ...state.portfolioMeta, peakValueTwd: totalValueTwd, peakDate: date } }
+              : {}),
+          }
+        }),
 
       addTrade: (entry) => {
         const id = crypto.randomUUID()

@@ -297,6 +297,15 @@ export const HoldingSchema = z.object({
 })
 export type Holding = z.infer<typeof HoldingSchema>
 
+// Month-end style record of total portfolio value (TWD), kept automatically:
+// one entry per month, overwritten by the latest value seen that month.
+export const PortfolioSnapshotSchema = z.object({
+  month: z.string(),
+  date: z.string(),
+  valueTwd: z.number(),
+})
+export type PortfolioSnapshot = z.infer<typeof PortfolioSnapshotSchema>
+
 export const PortfolioMetaSchema = z.object({
   fxUsdTwd: z.number(),
   peakValueTwd: z.number(),
@@ -486,6 +495,7 @@ export const AppDataSchema = z.object({
   foundation: FoundationSchema.default({ emergencyFundAmount: 0, emergencyFundTargetMonths: 6 }),
   marketSnapshot: MarketSnapshotSchema.default({ fetchedOn: null, valuations: {} }),
   researchReports: z.array(ResearchReportSchema).default([]),
+  portfolioSnapshots: z.array(PortfolioSnapshotSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -533,5 +543,6 @@ export function createDefaultAppData(): AppData {
     foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6 },
     marketSnapshot: { fetchedOn: null, valuations: {} },
     researchReports: [],
+    portfolioSnapshots: [],
   }
 }

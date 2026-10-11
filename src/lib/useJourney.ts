@@ -6,13 +6,14 @@ import {
   type JourneyState,
 } from './calculations/journey'
 import { todayIsoDate } from './market/twse'
+import { usePlanningAssumptions } from './usePlanningAssumptions'
 
 // Action roadmap, learning stage and the stage-capped investment policy,
 // derived from the stored data. Pages use `policy` (not the raw investment
 // policy) wherever the satellite cap matters.
 export function useJourney() {
   const profile = useAppStore((s) => s.profile)
-  const assumptions = useAppStore((s) => s.assumptions)
+  const { assumptions } = usePlanningAssumptions()
   const foundation = useAppStore((s) => s.foundation)
   const investmentPolicy = useAppStore((s) => s.investmentPolicy)
   const holdings = useAppStore((s) => s.holdings)
