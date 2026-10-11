@@ -87,6 +87,8 @@ interface AppStore extends AppData {
   addMacroCheckIn: (entry: Omit<MacroCheckIn, 'id' | 'createdAt'>) => void
   updateMacroCheckIn: (id: string, entry: Partial<Omit<MacroCheckIn, 'id' | 'createdAt'>>) => void
   removeMacroCheckIn: (id: string) => void
+  // One check-in per month: an automatic refresh replaces that month's entry.
+  upsertMonthlyMacroCheckIn: (entry: Omit<MacroCheckIn, 'id' | 'createdAt'>) => void
   addStockThesis: (entry: Omit<StockThesis, 'id' | 'createdAt' | 'updatedAt'>) => string
   updateStockThesis: (
     id: string,
@@ -159,7 +161,7 @@ function mergeByDate(existing: DailyClose[], incoming: DailyClose[]): DailyClose
 
 export const useAppStore = create<AppStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       ...createDefaultAppData(),
 
       setProfile: (profile) =>
@@ -255,6 +257,14 @@ export const useAppStore = create<AppStore>()(
       updateMacroCheckIn: (id, entry) =>
         set((state) => ({
           macroCheckIns: state.macroCheckIns.map((c) => (c.id === id ? { ...c, ...entry } : c)),
+        })),
+
+      upsertMonthlyMacroCheckIn: (entry) =>
+        set((state) => ({
+          macroCheckIns: [
+            ...state.macroCheckIns.filter((c) => c.date.slice(0, 7) !== entry.date.slice(0, 7)),
+            { ...entry, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
+          ],
         })),
 
       removeMacroCheckIn: (id) =>
@@ -368,9 +378,10 @@ export const useAppStore = create<AppStore>()(
       },
 
       upsertFubonOutlook: (entry) => {
-        const id = crypto.randomUUID()
         const sameReport = (o: FubonOutlook) =>
           o.reportTitle === entry.reportTitle && o.reportDate === entry.reportDate
+        // Keep the id of a re-digested report so analyses still point to it.
+        const id = get().fubonOutlooks.find(sameReport)?.id ?? crypto.randomUUID()
         set((state) => ({
           fubonOutlooks: [
             ...state.fubonOutlooks.filter((o) => !sameReport(o)),

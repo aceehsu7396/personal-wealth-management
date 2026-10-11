@@ -1,8 +1,6 @@
 import { lazy, Suspense } from 'react'
 import { useAppStore } from '../../lib/storage/appStore'
 import { fubonUsage, MACRO_PRIMARY_SOURCE } from '../../lib/ai/analyses'
-import { digestFubonOutlook } from '../../lib/ai/fubonOutlook'
-import { useResearchTask } from '../../lib/ai/useResearchTask'
 import {
   gapSignals,
   isOutlookFresh,
@@ -13,7 +11,6 @@ import {
 } from '../../lib/calculations/fubonTracking'
 import { todayIsoDate } from '../../lib/market/twse'
 import type { AllocationView, FubonOutlook, ResearchReport } from '../../lib/storage/schema'
-import { AiActionButton } from './AiActionButton'
 import { FubonTrackingTable } from './FubonTrackingTable'
 
 const MarkdownView = lazy(() => import('../MarkdownView').then((m) => ({ default: m.MarkdownView })))
@@ -108,17 +105,10 @@ function CoverageList({ outlook }: { outlook: FubonOutlook }) {
 export function FubonOutlookCard() {
   const outlooks = useAppStore((s) => s.fubonOutlooks)
   const taiex = useAppStore((s) => s.marketPriceHistory.taiex)
-  const upsertFubonOutlook = useAppStore((s) => s.upsertFubonOutlook)
-  const task = useResearchTask()
 
   const latest = latestOutlook(outlooks)
   const tracking = trackForecasts(outlooks, taiex)
   const today = todayIsoDate()
-
-  async function run() {
-    const digest = await task.run(() => digestFubonOutlook(todayIsoDate()))
-    if (digest) upsertFubonOutlook(digest)
-  }
 
   return (
     <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
@@ -129,22 +119,12 @@ export function FubonOutlookCard() {
         )}
       </div>
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        每月整理一次富邦金控「富邦總經觀點－市場展望」：摘要、條列重點、配置觀點、對總經三支柱的涵蓋度，以及預測區間的命中追蹤。之後的總經分析會直接使用這份整理。
+        富邦金控「富邦總經觀點－市場展望」的整理：摘要、條列重點、配置觀點、對總經三支柱的涵蓋度，以及預測區間的命中追蹤，全部由上方按鈕自動取得。
       </p>
-      <div className="mt-3">
-        <AiActionButton
-          label="整理富邦最新報告"
-          running={task.running}
-          error={task.error}
-          hasApiKey={task.hasApiKey}
-          costNote="每月一次，約 US$0.1，使用你的 Anthropic API 金鑰"
-          onClick={() => void run()}
-        />
-      </div>
 
       {!latest ? (
         <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
-          還沒有整理過富邦報告。按上方按鈕整理最新一期，或直接到{' '}
+          還沒有整理過富邦報告。按上方「取得最新總經資訊」自動整理最新一期，或直接到{' '}
           <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className={linkClass}>
             富邦金控研究報告列表
           </a>{' '}
@@ -168,7 +148,7 @@ export function FubonOutlookCard() {
           </div>
           {!isOutlookFresh(latest, today) && (
             <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
-              這份整理已超過 45 天，總經分析會改為自行讀取最新 PDF；建議先整理最新一期。
+              這份整理已超過 45 天，下次按「取得最新總經資訊」會重新整理最新一期。
             </p>
           )}
 

@@ -9,6 +9,7 @@ export function AiActionButton({
   onClick,
   disabled = false,
   costNote = '每次約 US$0.1–0.5，使用你的 Anthropic API 金鑰',
+  runningLabel = '搜尋與整理中…（約 1–3 分鐘）',
 }: {
   label: string
   running: boolean
@@ -17,6 +18,7 @@ export function AiActionButton({
   onClick: () => void
   disabled?: boolean
   costNote?: string
+  runningLabel?: string
 }) {
   if (!hasApiKey) {
     return (
@@ -38,7 +40,7 @@ export function AiActionButton({
           disabled={running || disabled}
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          {running ? '搜尋與整理中…（約 1–3 分鐘）' : label}
+          {running ? runningLabel : label}
         </button>
         <span className="text-xs text-gray-500 dark:text-gray-400">{costNote}</span>
       </div>

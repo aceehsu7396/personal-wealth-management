@@ -196,7 +196,7 @@ export function computeJourney(state: JourneyState): JourneyReport {
           id: '3.1',
           title: '完成第一次總經檢視',
           done: macroMonths >= 1,
-          detail: '在「研究分析 → 市場」填寫總經三支柱',
+          detail: '在「研究分析 → 市場」按「取得最新總經資訊」',
           page: PAGES.market,
           handbookSlug: '05',
         },

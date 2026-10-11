@@ -176,7 +176,7 @@ export function macroDraftToForm(
       liquidity: signals('liquidity', draft.liquidity),
       sentiment: signals('sentiment', draft.sentiment),
       policyNote: draft.policyNote,
-      note: 'AI 預填草稿，已人工確認',
+      note: 'AI 依富邦報告與網路補查自動判斷',
     },
     reasons,
   }

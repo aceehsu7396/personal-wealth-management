@@ -184,6 +184,10 @@ export const MacroCheckInSchema = z.object({
   }),
   policyNote: z.string().optional(),
   note: z.string().optional(),
+  // Filled automatically from the monthly Fubon report + gap search: the
+  // reason behind each signal (keyed by field path) and the source report.
+  reasons: z.record(z.string(), z.string()).optional(),
+  reportId: z.string().optional(),
   createdAt: z.string(),
 })
 export type MacroCheckIn = z.infer<typeof MacroCheckInSchema>

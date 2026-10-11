@@ -10,27 +10,71 @@ import { MacroCheckInForm, type MacroCheckInFormValues } from './forms/MacroChec
 import { StatCard } from './StatCard'
 import { AiActionButton } from './research/AiActionButton'
 import { ResearchReportCard } from './research/ResearchReportCard'
-import { analyzeMarket, MACRO_PRIMARY_SOURCE, macroDraftToForm, StoredMacroDraftSchema } from '../lib/ai/analyses'
+import { MACRO_PRIMARY_SOURCE } from '../lib/ai/analyses'
+import { refreshMacro } from '../lib/ai/macroRefresh'
 import { FubonOutlookCard, FubonUsageNote } from './research/FubonOutlookCard'
 import { useResearchTask } from '../lib/ai/useResearchTask'
-import { isOutlookFresh, latestOutlook } from '../lib/calculations/fubonTracking'
+import { latestOutlook, MACRO_SIGNAL_LABELS, PILLAR_LABELS } from '../lib/calculations/fubonTracking'
 import { todayIsoDate } from '../lib/market/twse'
+import type { MacroCheckIn, MacroSignalKey } from '../lib/storage/schema'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
 const DIRECTION_TEXT = { up: '上升 ↑', flat: '持平 →', down: '下降 ↓' } as const
+const SIGNAL_TEXT: Record<string, Record<number, string>> = {
+  liquidity: { 1: '寬鬆 +1', 0: '中性 0', [-1]: '緊縮 −1' },
+  sentiment: { 1: '過熱 +1', 0: '正常 0', [-1]: '恐慌 −1' },
+}
 
 function signed(value: number): string {
   return `${value > 0 ? '+' : ''}${value}`
 }
 
+function signalValue(checkIn: MacroCheckIn, key: MacroSignalKey): string {
+  const [pillar, field] = key.split('.') as ['growth' | 'inflation' | 'liquidity' | 'sentiment', string]
+  const value = (checkIn[pillar] as Record<string, string | number>)[field]
+  return typeof value === 'string' ? DIRECTION_TEXT[value as keyof typeof DIRECTION_TEXT] : SIGNAL_TEXT[pillar][value]
+}
+
+// The 17 signals of a check-in with the reason behind each, by pillar.
+function SignalReasons({ checkIn }: { checkIn: MacroCheckIn }) {
+  const keys = Object.keys(MACRO_SIGNAL_LABELS) as MacroSignalKey[]
+  return (
+    <details className="mt-4 text-sm">
+      <summary className="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
+        17 個訊號與判斷依據
+      </summary>
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Object.entries(PILLAR_LABELS).map(([pillar, label]) => (
+          <div key={pillar}>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{label}</p>
+            <ul className="mt-1 space-y-1 text-xs">
+              {keys
+                .filter((k) => k.startsWith(`${pillar}.`))
+                .map((k) => (
+                  <li key={k} className="text-gray-600 dark:text-gray-400">
+                    <span className="font-medium text-gray-800 dark:text-gray-200">
+                      {MACRO_SIGNAL_LABELS[k]}：{signalValue(checkIn, k)}
+                    </span>
+                    {checkIn.reasons?.[k] && <span className="block">{checkIn.reasons[k]}</span>}
+                  </li>
+                ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </details>
+  )
+}
+
 export function MacroPanel() {
   const macroCheckIns = useAppStore((s) => s.macroCheckIns)
   const guardrails = useAppStore((s) => s.guardrails)
-  const addMacroCheckIn = useAppStore((s) => s.addMacroCheckIn)
   const updateMacroCheckIn = useAppStore((s) => s.updateMacroCheckIn)
   const removeMacroCheckIn = useAppStore((s) => s.removeMacroCheckIn)
+  const upsertMonthlyMacroCheckIn = useAppStore((s) => s.upsertMonthlyMacroCheckIn)
+  const upsertFubonOutlook = useAppStore((s) => s.upsertFubonOutlook)
 
   const reports = useAppStore((s) => s.researchReports)
   const addResearchReport = useAppStore((s) => s.addResearchReport)
@@ -38,30 +82,23 @@ export function MacroPanel() {
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  // AI-prefilled form values waiting for the user's confirmation.
-  const [draft, setDraft] = useState<{
-    values: MacroCheckInFormValues
-    reasons: Record<string, string>
-    reportId: string
-  } | null>(null)
+  const [step, setStep] = useState<'digest' | 'analysis' | null>(null)
+  const [digestWarning, setDigestWarning] = useState<string | null>(null)
   const task = useResearchTask()
   const marketReports = reports.filter((r) => r.kind === 'market').reverse()
 
-  function applyReportDraft(reportId: string, facts: unknown) {
-    const parsed = StoredMacroDraftSchema.safeParse(facts)
-    if (!parsed.success) return
-    setEditingId(null)
-    setDraft({ ...macroDraftToForm(parsed.data, todayIsoDate()), reportId })
-  }
-
-  async function runMarketAnalysis() {
-    // Use a fresh Fubon digest when there is one: the analysis then only
-    // searches for the signals Fubon does not cover.
+  // One button for the whole monthly review: digest the latest Fubon
+  // outlook (when a new month's issue may be out), search only the signals
+  // it does not cover, and save the month's check-in automatically.
+  async function refresh() {
     const today = todayIsoDate()
-    const latest = latestOutlook(useAppStore.getState().fubonOutlooks)
-    const outlook = latest && isOutlookFresh(latest, today) ? latest : undefined
-    const result = await task.run(() => analyzeMarket(today, undefined, outlook))
+    setDigestWarning(null)
+    const result = await task.run(() => refreshMacro(today, useAppStore.getState().fubonOutlooks, undefined, setStep))
+    setStep(null)
     if (!result) return
+    if (result.newOutlook) upsertFubonOutlook(result.newOutlook)
+    if (result.digestError) setDigestWarning(result.digestError)
+    const outlook = result.usedOutlook ? latestOutlook(useAppStore.getState().fubonOutlooks) : undefined
     const reportId = addResearchReport({
       kind: 'market',
       fubonOutlookId: outlook?.id,
@@ -69,10 +106,11 @@ export function MacroPanel() {
       market: 'TW+US',
       markdown: result.research.markdown,
       sources: result.research.sources,
-      facts: result.facts ?? undefined,
+      facts: undefined,
       estimatedCostUsd: result.estimatedCostUsd,
     })
-    applyReportDraft(reportId, result.facts)
+    upsertMonthlyMacroCheckIn({ ...result.checkIn, reportId })
+    setEditingId(null)
   }
 
   const sorted = [...macroCheckIns].sort((a, b) => b.date.localeCompare(a.date))
@@ -80,26 +118,42 @@ export function MacroPanel() {
   const assessment = latest ? assessMacro(latest, guardrails) : null
   const editing = editingId ? macroCheckIns.find((c) => c.id === editingId) : undefined
 
-  function handleSubmit(values: MacroCheckInFormValues) {
-    if (editingId) {
-      updateMacroCheckIn(editingId, values)
-      setEditingId(null)
-      return
-    }
-    addMacroCheckIn(values)
-    setDraft(null)
+  function handleEdit(values: MacroCheckInFormValues) {
+    if (!editingId) return
+    updateMacroCheckIn(editingId, { ...values, note: values.note || '已手動修正' })
+    setEditingId(null)
   }
 
   return (
     <>
-      <FubonOutlookCard />
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          總經三支柱判斷
-        </h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">總經三支柱判斷</h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           景氣體制（達利歐四象限）＋ 流動性（朱肯米勒）＋ 情緒溫度（馬克斯鐘擺）。總經只調整股債比例，不決定個股進出。
         </p>
+        <div className="mt-4 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
+          <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
+            每月按一次：自動整理{' '}
+            <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className="font-medium text-indigo-700 underline dark:text-indigo-400">
+              富邦金控研究報告
+            </a>{' '}
+            最新一期「富邦總經觀點」，只上網補查富邦未涵蓋的訊號，再自動判斷 17 個訊號並存成本月的總經檢視（同月重新取得會覆蓋）。
+          </p>
+          <AiActionButton
+            label="取得最新總經資訊"
+            running={task.running}
+            error={task.error}
+            hasApiKey={task.hasApiKey}
+            costNote="每月一次，約 US$0.3–0.6，使用你的 Anthropic API 金鑰"
+            runningLabel={step === 'digest' ? '1/2 整理富邦最新報告…' : '2/2 補查其餘訊號並判斷…（約 1–3 分鐘）'}
+            onClick={() => void refresh()}
+          />
+          {digestWarning && (
+            <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
+              富邦報告整理失敗（{digestWarning}），這次總經判斷改由網路搜尋取得。
+            </p>
+          )}
+        </div>
         {assessment && latest ? (
           <>
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -149,76 +203,51 @@ export function MacroPanel() {
                 </div>
               )}
             </dl>
+            <SignalReasons checkIn={latest} />
+            {reports.find((r) => r.id === latest.reportId) && (
+              <FubonUsageNote report={reports.find((r) => r.id === latest.reportId)!} />
+            )}
+            <button
+              type="button"
+              onClick={() => setEditingId(latest.id)}
+              className="mt-3 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
+            >
+              判斷有誤？手動修正
+            </button>
           </>
         ) : (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            還沒有總經檢視，建議每月第一週新增一筆。
+            還沒有總經檢視。建議每月第一週按上方按鈕取得一次。
           </p>
         )}
       </div>
 
-      <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {editing ? '編輯總經檢視' : draft ? '新增總經檢視（AI 草稿）' : '新增總經檢視'}
-        </h2>
-        {!editing && (
-          <div className="mt-3 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
-            <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
-              AI 會直接使用上方「富邦總經觀點」的整理，只上網補查富邦未涵蓋的訊號；還沒整理或整理已過期時，改為自行讀取{' '}
-              <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className="font-medium text-indigo-700 underline dark:text-indigo-400">
-                富邦金控研究報告
-              </a>{' '}
-              最新一期 PDF。完成後產出研究報告並預填下方 17 個訊號與判斷理由，你確認或修改後才會儲存。
-            </p>
-            <AiActionButton
-              label="AI 取得總經資訊並預填"
-              running={task.running}
-              error={task.error}
-              hasApiKey={task.hasApiKey}
-              onClick={() => void runMarketAnalysis()}
+      {editing && (
+        <div className={cardClass}>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">手動修正總經檢視（{editing.date}）</h2>
+          <div className="mt-4">
+            <MacroCheckInForm
+              key={editing.id}
+              initialValues={editing}
+              reasons={editing.reasons}
+              onSubmit={handleEdit}
+              onCancel={() => setEditingId(null)}
             />
           </div>
-        )}
-        {draft && !editing && (
-          <p className="mt-3 text-sm text-orange-800 dark:text-orange-200">
-            以下是 AI 預填的草稿，橘色文字是每個訊號的判斷理由與出處。請逐項確認，必要時修改，再按「確認並新增總經檢視」。
-            <button type="button" onClick={() => setDraft(null)} className="ml-2 font-medium underline">
-              放棄草稿
-            </button>
-          </p>
-        )}
-        {draft && !editing && reports.find((r) => r.id === draft.reportId) && (
-          <FubonUsageNote report={reports.find((r) => r.id === draft.reportId)!} />
-        )}
-        <div className="mt-4">
-          <MacroCheckInForm
-            key={editingId ?? draft?.reportId ?? 'new'}
-            initialValues={editing ?? draft?.values}
-            reasons={editing ? undefined : draft?.reasons}
-            submitLabel={draft && !editing ? '確認並新增總經檢視' : undefined}
-            onSubmit={handleSubmit}
-            onCancel={editing ? () => setEditingId(null) : undefined}
-          />
         </div>
-      </div>
+      )}
+
+      <FubonOutlookCard />
 
       {marketReports.length > 0 && (
         <div className={cardClass}>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">AI 市場分析報告</h2>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">每次取得總經資訊時的研究全文與出處。</p>
           <div className="mt-4 space-y-3">
-            {marketReports.map((r, i) => (
+            {marketReports.map((r) => (
               <div key={r.id}>
-                <ResearchReportCard report={r} defaultOpen={i === 0 && draft?.reportId === r.id} onDelete={() => removeResearchReport(r.id)} />
+                <ResearchReportCard report={r} onDelete={() => removeResearchReport(r.id)} />
                 <FubonUsageNote report={r} />
-                {r.facts !== undefined && (
-                  <button
-                    type="button"
-                    onClick={() => applyReportDraft(r.id, r.facts)}
-                    className="mt-1 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
-                  >
-                    用這份報告預填總經檢視
-                  </button>
-                )}
               </div>
             ))}
           </div>
