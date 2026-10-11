@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type Anthropic from '@anthropic-ai/sdk'
-import { collectSources, runWebResearch, type ResearchClient } from './webResearch'
+import { compileResearch, runWebResearch, type ResearchClient } from './webResearch'
 import { estimateCostUsd, ResearchRefusedError } from './client'
 
 type BetaMessage = Anthropic.Beta.Messages.BetaMessage
@@ -37,16 +37,17 @@ describe('runWebResearch', () => {
   it('sends the web tools, model and fallback, and returns cited text', async () => {
     const client = fakeClient([message({ content: [cited('# 報告\n', 'https://a.tw'), { type: 'text', text: '結論' }] })])
     const result = await runWebResearch({ prompt: 'p' }, client)
-    expect(result.markdown).toBe('# 報告\n結論')
-    expect(result.sources).toEqual([{ title: 'T https://a.tw', url: 'https://a.tw' }])
+    expect(result.markdown).toBe('# 報告\n ［1］結論')
+    expect(result.sources).toEqual([
+      { title: 'T https://a.tw', url: 'https://a.tw', kind: 'search', citedCount: 1 },
+    ])
     expect(result.searchCount).toBe(2)
     const params = client.calls[0] as Record<string, unknown>
     expect(params.model).toBe('claude-opus-5-5')
     expect(params.fallbacks).toBe('default')
-    expect((params.tools as { type: string }[]).map((t) => t.type)).toEqual([
-      'web_search_20260209',
-      'web_fetch_20260209',
-    ])
+    const tools = params.tools as { type: string; citations?: { enabled: boolean } }[]
+    expect(tools.map((t) => t.type)).toEqual(['web_search_20260209', 'web_fetch_20260209'])
+    expect(tools[1].citations).toEqual({ enabled: true })
   })
 
   it('resumes a paused turn by sending the assistant content back', async () => {
@@ -81,17 +82,57 @@ describe('runWebResearch', () => {
   })
 })
 
-describe('collectSources', () => {
-  it('dedupes citations and falls back to search results', () => {
-    const withCitations = message({ content: [cited('a', 'https://x'), cited('b', 'https://x')] })
-    expect(collectSources([withCitations])).toHaveLength(1)
+describe('compileResearch', () => {
+  const fetched = (url: string, title: string) => ({
+    type: 'web_fetch_tool_result',
+    tool_use_id: 'f',
+    content: { type: 'web_fetch_result', url, retrieved_at: null, content: { type: 'document', title, citations: null, source: {} } },
+  })
+  const pageCite = (title: string, index: number, start: number, end: number) => ({
+    type: 'page_location', cited_text: 'x', document_index: index, document_title: title, file_id: null,
+    start_page_number: start, end_page_number: end,
+  })
+
+  it('numbers fetched documents and marks cited pages inline', () => {
+    const fubon = 'https://fblkeyin.moneydj.com/SaveFile/msgtable/outlook.pdf'
+    const m = message({
+      content: [
+        fetched('https://invest.fubonlife.com.tw/list', '富邦金控研究報告'),
+        fetched(fubon, '富邦總經觀點-9月市場展望'),
+        { type: 'text', text: '美國 PMI 回升至 51', citations: [pageCite('富邦總經觀點-9月市場展望', 1, 3, 4)] },
+        { type: 'text', text: '，VIX 15', citations: cited('', 'https://cboe.com').citations.map((c) => ({ ...c, title: 'Cboe' })) },
+        { type: 'text', text: '。', citations: null },
+      ],
+    })
+    const { markdown, sources } = compileResearch([m])
+    expect(markdown).toBe('美國 PMI 回升至 51 ［2, p.3］，VIX 15 ［3］。')
+    expect(sources).toEqual([
+      { title: '富邦金控研究報告', url: 'https://invest.fubonlife.com.tw/list', kind: 'fetched', citedCount: 0 },
+      { title: '富邦總經觀點-9月市場展望', url: fubon, kind: 'fetched', pages: [3], citedCount: 1 },
+      { title: 'Cboe', url: 'https://cboe.com', kind: 'search', citedCount: 1 },
+    ])
+  })
+
+  it('resolves documents by index when the title is missing and dedupes markers', () => {
+    const m = message({
+      content: [
+        fetched('https://a/doc.pdf', 'A'),
+        { type: 'text', text: '數據', citations: [pageCite('', 0, 2, 4), pageCite('', 0, 2, 3)] },
+      ],
+    })
+    const { markdown, sources } = compileResearch([m])
+    expect(markdown).toBe('數據 ［1, p.2］')
+    expect(sources[0]).toMatchObject({ pages: [2, 3], citedCount: 2 })
+  })
+
+  it('falls back to search results when nothing was cited or fetched', () => {
     const searchOnly = message({
       content: [
         { type: 'web_search_tool_result', content: [{ type: 'web_search_result', url: 'https://y', title: 'Y' }] },
         { type: 'text', text: 'no citations' },
       ],
     })
-    expect(collectSources([searchOnly])).toEqual([{ title: 'Y', url: 'https://y' }])
+    expect(compileResearch([searchOnly]).sources).toEqual([{ title: 'Y', url: 'https://y', kind: 'search', citedCount: 0 }])
   })
 })
 

@@ -438,7 +438,15 @@ export type MarketSnapshot = z.infer<typeof MarketSnapshotSchema>
 export const ResearchKindSchema = z.enum(['market', 'industry', 'stock', 'fund'])
 export type ResearchKind = z.infer<typeof ResearchKindSchema>
 
-export const ResearchSourceSchema = z.object({ title: z.string(), url: z.string() })
+// A report source. `fetched` documents were read in full (e.g. a PDF);
+// `pages` and `citedCount` show where the report actually used them.
+export const ResearchSourceSchema = z.object({
+  title: z.string(),
+  url: z.string(),
+  kind: z.enum(['search', 'fetched']).optional(),
+  pages: z.array(z.number()).optional(),
+  citedCount: z.number().optional(),
+})
 export type ResearchSource = z.infer<typeof ResearchSourceSchema>
 
 // An AI web-research report. `facts` holds the structured extraction (macro

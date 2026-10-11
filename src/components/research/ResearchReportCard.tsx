@@ -68,12 +68,26 @@ export function ResearchReportCard({
           {report.sources.length > 0 && (
             <div className="mt-6">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">資料來源</h4>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                報告中的［編號, p.頁數］對應下列來源；「已讀取全文」表示 AI 實際開啟了該文件。
+              </p>
               <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs">
                 {report.sources.map((s) => (
                   <li key={s.url}>
                     <a href={s.url} target="_blank" rel="noreferrer" className="text-indigo-700 hover:underline dark:text-indigo-400">
                       {s.title}
                     </a>
+                    {s.kind === 'fetched' && (
+                      <span className="ml-1 rounded bg-indigo-100 px-1 text-[10px] font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                        已讀取全文
+                      </span>
+                    )}
+                    {s.citedCount !== undefined && (
+                      <span className="ml-1 text-gray-500 dark:text-gray-400">
+                        {s.citedCount > 0 ? `引用 ${s.citedCount} 處` : '未被引用'}
+                        {s.pages && s.pages.length > 0 && `（p.${s.pages.join('、')}）`}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>

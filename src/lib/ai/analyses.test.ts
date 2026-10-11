@@ -7,6 +7,7 @@ import {
   buildIndustryPrompt,
   buildMarketPrompt,
   MACRO_PRIMARY_SOURCE,
+  fubonUsage,
   buildStockPrompt,
   macroDraftToForm,
   MacroDraftSchema,
@@ -77,12 +78,29 @@ describe('stockFactsToDraft', () => {
   })
 })
 
+describe('fubonUsage', () => {
+  it('finds the fetched Fubon PDF and its citations', () => {
+    const pdf = { title: '富邦總經觀點-9月市場展望', url: 'https://fblkeyin.moneydj.com/SaveFile/msgtable/x.pdf', kind: 'fetched' as const, pages: [2, 5], citedCount: 4 }
+    expect(fubonUsage([{ title: 'list', url: MACRO_PRIMARY_SOURCE, kind: 'fetched', citedCount: 0 }, pdf])).toEqual({
+      report: pdf,
+      citedCount: 4,
+      pages: [2, 5],
+    })
+  })
+
+  it('reports no usage when the PDF was only a search hit or missing', () => {
+    expect(fubonUsage([{ title: 'x', url: 'https://fblkeyin.moneydj.com/a.pdf', kind: 'search', citedCount: 1 }]).report).toBeNull()
+    expect(fubonUsage([]).report).toBeNull()
+  })
+})
+
 describe('market prompt', () => {
   it('reads the Fubon outlook first and searches only to fill gaps', () => {
     const prompt = buildMarketPrompt('2026-10-11')
     expect(prompt).toContain(MACRO_PRIMARY_SOURCE)
     expect(prompt).toContain('富邦總經觀點-○月市場展望')
     expect(prompt.indexOf(MACRO_PRIMARY_SOURCE)).toBeLessThan(prompt.indexOf('上網搜尋補充'))
+    expect(prompt).toContain('（出處：富邦總經觀點-○月市場展望，第 X 頁）')
   })
 })
 

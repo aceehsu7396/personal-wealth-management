@@ -9,12 +9,16 @@ import { extractStructured, type ExtractionClient } from './extractStructured'
 
 const trend = z.object({
   value: z.enum(['up', 'flat', 'down']).describe('相較 3–6 個月前：up 改善/上升、flat 持平或資料不足、down 惡化/下降'),
-  reason: z.string().describe('一句話理由，含數字與資料日期；資料不足寫「未取得」'),
+  reason: z
+    .string()
+    .describe('一句話理由，含數字與資料日期，結尾加出處，例如「（富邦 9 月市場展望 p.3）」或「（美國勞工統計局）」；資料不足寫「未取得」'),
 })
 const signal = (meaning: string) =>
   z.object({
     value: z.enum(['1', '0', '-1']).describe(meaning),
-    reason: z.string().describe('一句話理由，含數字與資料日期；資料不足寫「未取得」並填 0'),
+    reason: z
+      .string()
+      .describe('一句話理由，含數字與資料日期，結尾加出處，例如「（富邦 9 月市場展望 p.3）」；資料不足寫「未取得」並填 0'),
   })
 const liquidity = signal('1 寬鬆、0 中性或資料不足、-1 緊縮')
 const sentiment = signal('1 過熱、0 正常或資料不足、-1 恐慌')
@@ -54,8 +58,14 @@ export function buildMarketPrompt(today: string): string {
 3. **只在報告沒有涵蓋，或報告日期之後有更新的數據時**，才上網搜尋補充（例如最新的 PMI、CPI、VIX、信用利差），並註明哪些數據來自富邦報告、哪些來自其他來源。
 4. 若列表或 PDF 無法開啟，改以上網搜尋取得資料，並在報告開頭說明。
 
+## 出處標註（必須遵守）
+- 每一個數字、指標方向或觀點後面都要標註出處：
+  - 來自富邦報告：（出處：富邦總經觀點-○月市場展望，第 X 頁）
+  - 來自其他來源：（出處：來源名稱，資料日期）
+- 沒有出處的數字不要寫。
+
 ## 報告結構
-1. 依據來源：富邦報告名稱與日期，以及補充來源
+1. 依據來源：富邦報告名稱、發布日期、PDF 網址，以及是否成功讀取全文；補充來源清單
 2. 摘要（3–5 點），包含富邦報告的主要觀點
 3. 支柱一：景氣體制——成長與通膨的方向（相較 3–6 個月前）
    - 美國：ISM 製造業 PMI、非農就業與失業率趨勢、CPI／核心 PCE
@@ -69,7 +79,7 @@ export function buildMarketPrompt(today: string): string {
 }
 
 export const MACRO_EXTRACTION_INSTRUCTIONS =
-  '把研究報告中的總經資料，轉成總經三支柱的 17 個訊號判斷。方向以「相較 3–6 個月前」為準；流動性 1 代表寬鬆；情緒 1 代表過熱、-1 代表恐慌（例如本益比在歷史高檔為 1、VIX 高於 30 為 -1、低於 13 為 1）。'
+  '把研究報告中的總經資料，轉成總經三支柱的 17 個訊號判斷。方向以「相較 3–6 個月前」為準；流動性 1 代表寬鬆；情緒 1 代表過熱、-1 代表恐慌（例如本益比在歷史高檔為 1、VIX 高於 30 為 -1、低於 13 為 1）。每個理由都要保留報告中標註的出處（富邦報告註明頁數）。'
 
 export type MacroDraftValues = Omit<MacroCheckIn, 'id' | 'createdAt'>
 
@@ -395,4 +405,16 @@ export async function analyzeStock(
     followUp,
     stillMissing,
   }
+}
+
+// Whether a market report actually read the Fubon outlook: the fetched
+// Fubon PDF (moneydj.com hosts the files) and how often it was cited.
+export function fubonUsage(sources: ResearchSource[]): {
+  report: ResearchSource | null
+  citedCount: number
+  pages: number[]
+} {
+  const report =
+    sources.find((s) => s.kind === 'fetched' && /moneydj\.com/i.test(s.url) && /\.pdf($|\?)/i.test(s.url)) ?? null
+  return { report, citedCount: report?.citedCount ?? 0, pages: report?.pages ?? [] }
 }
