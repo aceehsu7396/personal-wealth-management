@@ -42,8 +42,24 @@ export const MacroDraftSchema = z.object({
     vix: sentiment,
   }),
   policyNote: z.string().describe('貨幣、財政、產業政策與地緣政治重點，2–4 句'),
+  fubonSummary: z.object({
+    read: z.boolean().describe('研究報告是否實際依據富邦報告全文撰寫'),
+    reportTitle: z.string().describe('富邦報告名稱，例如「富邦總經觀點-9月市場展望」；未讀取填空字串'),
+    reportDate: z.string().describe('富邦報告發布日期 YYYY/MM/DD；未知填空字串'),
+    keyPoints: z
+      .array(z.object({ point: z.string().describe('一句話重點'), page: z.string().describe('頁碼，例如「p.3」；未知填空字串') }))
+      .describe('富邦報告的 3–6 點重點觀點；未讀取則為空陣列'),
+  }),
 })
 export type MacroDraft = z.infer<typeof MacroDraftSchema>
+
+export const FubonSummarySchema = MacroDraftSchema.shape.fubonSummary
+export type FubonSummary = z.infer<typeof FubonSummarySchema>
+
+// Reports saved before the Fubon summary existed lack it; reading stored
+// facts tolerates that.
+export const StoredMacroDraftSchema = MacroDraftSchema.extend({ fubonSummary: FubonSummarySchema.optional() })
+export type StoredMacroDraft = z.infer<typeof StoredMacroDraftSchema>
 
 // Primary macro source: Fubon Financial's research report list. The model
 // fetches the list, then the latest monthly outlook PDF linked from it.
@@ -79,14 +95,14 @@ export function buildMarketPrompt(today: string): string {
 }
 
 export const MACRO_EXTRACTION_INSTRUCTIONS =
-  '把研究報告中的總經資料，轉成總經三支柱的 17 個訊號判斷。方向以「相較 3–6 個月前」為準；流動性 1 代表寬鬆；情緒 1 代表過熱、-1 代表恐慌（例如本益比在歷史高檔為 1、VIX 高於 30 為 -1、低於 13 為 1）。每個理由都要保留報告中標註的出處（富邦報告註明頁數）。'
+  '把研究報告中的總經資料，轉成總經三支柱的 17 個訊號判斷。方向以「相較 3–6 個月前」為準；流動性 1 代表寬鬆；情緒 1 代表過熱、-1 代表恐慌（例如本益比在歷史高檔為 1、VIX 高於 30 為 -1、低於 13 為 1）。每個理由都要保留報告中標註的出處（富邦報告註明頁數）。另外整理 fubonSummary：報告是否依據富邦報告全文撰寫、報告名稱、發布日期，以及 3–6 點富邦的重點觀點（各附頁碼）；報告說明未能讀取富邦報告時，read 填 false、其他留空。'
 
 export type MacroDraftValues = Omit<MacroCheckIn, 'id' | 'createdAt'>
 
 // Converts the AI draft into form values plus a reason per field path
 // (e.g. "liquidity.policyRate") for display next to each select.
 export function macroDraftToForm(
-  draft: MacroDraft,
+  draft: StoredMacroDraft,
   date: string,
 ): { values: MacroDraftValues; reasons: Record<string, string> } {
   const reasons: Record<string, string> = {}

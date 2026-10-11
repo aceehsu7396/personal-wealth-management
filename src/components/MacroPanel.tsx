@@ -10,32 +10,13 @@ import { MacroCheckInForm, type MacroCheckInFormValues } from './forms/MacroChec
 import { StatCard } from './StatCard'
 import { AiActionButton } from './research/AiActionButton'
 import { ResearchReportCard } from './research/ResearchReportCard'
-import { analyzeMarket, fubonUsage, MACRO_PRIMARY_SOURCE, macroDraftToForm, MacroDraftSchema } from '../lib/ai/analyses'
-import type { ResearchSource } from '../lib/storage/schema'
+import { analyzeMarket, MACRO_PRIMARY_SOURCE, macroDraftToForm, StoredMacroDraftSchema } from '../lib/ai/analyses'
+import { FubonOutlookCard, FubonUsageNote } from './research/FubonOutlookCard'
 import { useResearchTask } from '../lib/ai/useResearchTask'
 import { todayIsoDate } from '../lib/market/twse'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
-
-// Shows whether a market report actually read and cited the Fubon outlook.
-function FubonUsageNote({ sources }: { sources: ResearchSource[] }) {
-  const usage = fubonUsage(sources)
-  if (!usage.report) {
-    return (
-      <p className="mt-1 text-xs text-orange-700 dark:text-orange-400">
-        ⚠ 這份報告沒有讀取到富邦報告全文，資料來自網路搜尋。
-      </p>
-    )
-  }
-  return (
-    <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-400">
-      ✓ 已讀取「{usage.report.title}」全文，引用 {usage.citedCount} 處
-      {usage.pages.length > 0 && `（p.${usage.pages.join('、')}）`}
-      {usage.citedCount === 0 && '，但報告內容沒有標註引用，請展開報告確認'}
-    </p>
-  )
-}
 
 const DIRECTION_TEXT = { up: '上升 ↑', flat: '持平 →', down: '下降 ↓' } as const
 
@@ -66,7 +47,7 @@ export function MacroPanel() {
   const marketReports = reports.filter((r) => r.kind === 'market').reverse()
 
   function applyReportDraft(reportId: string, facts: unknown) {
-    const parsed = MacroDraftSchema.safeParse(facts)
+    const parsed = StoredMacroDraftSchema.safeParse(facts)
     if (!parsed.success) return
     setEditingId(null)
     setDraft({ ...macroDraftToForm(parsed.data, todayIsoDate()), reportId })
@@ -104,6 +85,7 @@ export function MacroPanel() {
 
   return (
     <>
+      <FubonOutlookCard latest={marketReports[0]} />
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           總經三支柱判斷

@@ -11,6 +11,7 @@ import {
   buildStockPrompt,
   macroDraftToForm,
   MacroDraftSchema,
+  StoredMacroDraftSchema,
   stockFactsToDraft,
   type MacroDraft,
   type StockFacts,
@@ -31,6 +32,12 @@ const draft: MacroDraft = {
   },
   sentiment: { valuation: s('1'), credit: s('0'), ipoHype: s('0'), media: s('0'), margin: s('-1'), vix: s('0') },
   policyNote: '聯準會降息',
+  fubonSummary: {
+    read: true,
+    reportTitle: '富邦總經觀點-9月市場展望',
+    reportDate: '2026/09/02',
+    keyPoints: [{ point: '美國軟著陸機率提高', page: 'p.3' }],
+  },
 }
 
 describe('macroDraftToForm', () => {
@@ -44,6 +51,12 @@ describe('macroDraftToForm', () => {
     expect(values.policyNote).toBe('聯準會降息')
     expect(reasons['liquidity.policyRate']).toBe('理由 1')
     expect(Object.keys(reasons)).toHaveLength(17)
+  })
+
+  it('still reads drafts saved before the Fubon summary existed', () => {
+    const { fubonSummary: _omit, ...older } = draft
+    expect(MacroDraftSchema.safeParse(older).success).toBe(false)
+    expect(StoredMacroDraftSchema.safeParse(older).success).toBe(true)
   })
 })
 
