@@ -32,12 +32,6 @@ const draft: MacroDraft = {
   },
   sentiment: { valuation: s('1'), credit: s('0'), ipoHype: s('0'), media: s('0'), margin: s('-1'), vix: s('0') },
   policyNote: '聯準會降息',
-  fubonSummary: {
-    read: true,
-    reportTitle: '富邦總經觀點-9月市場展望',
-    reportDate: '2026/09/02',
-    keyPoints: [{ point: '美國軟著陸機率提高', page: 'p.3' }],
-  },
 }
 
 describe('macroDraftToForm', () => {
@@ -53,10 +47,10 @@ describe('macroDraftToForm', () => {
     expect(Object.keys(reasons)).toHaveLength(17)
   })
 
-  it('still reads drafts saved before the Fubon summary existed', () => {
-    const { fubonSummary: _omit, ...older } = draft
-    expect(MacroDraftSchema.safeParse(older).success).toBe(false)
-    expect(StoredMacroDraftSchema.safeParse(older).success).toBe(true)
+  it('reads stored drafts with or without the legacy Fubon summary', () => {
+    const legacy = { ...draft, fubonSummary: { read: true, reportTitle: 'x', reportDate: '', keyPoints: [] } }
+    expect(StoredMacroDraftSchema.safeParse(draft).success).toBe(true)
+    expect(StoredMacroDraftSchema.safeParse(legacy).success).toBe(true)
   })
 })
 
@@ -104,6 +98,33 @@ describe('fubonUsage', () => {
   it('reports no usage when the PDF was only a search hit or missing', () => {
     expect(fubonUsage([{ title: 'x', url: 'https://fblkeyin.moneydj.com/a.pdf', kind: 'search', citedCount: 1 }]).report).toBeNull()
     expect(fubonUsage([]).report).toBeNull()
+  })
+})
+
+describe('market prompt with a Fubon digest', () => {
+  const outlook = {
+    id: 'o', reportTitle: '富邦總經觀點-9月市場展望', reportDate: '2026-09-02', pdfUrl: 'https://x/9.pdf',
+    createdAt: '', markdown: '', sources: [], estimatedCostUsd: 0,
+    summary: 'Fed 轉鷹', sections: [{ title: '總經觀點', bullets: [{ text: 'Warsh 鷹派', page: 'p.4' }] }],
+    allocation: [{ asset: '台灣股市', view: 'neutral' as const, note: 'AI 支撐' }],
+    forecasts: [], actuals: [],
+    coverage: [
+      { signal: 'liquidity.policyRate' as const, status: 'covered' as const, note: '升息機率上升', page: 'p.4' },
+      { signal: 'growth.usPmi' as const, status: 'missing' as const, note: '', page: '' },
+    ],
+  }
+
+  it('hands over the digest and asks to search only the gaps', () => {
+    const prompt = buildMarketPrompt('2026-10-11', outlook)
+    expect(prompt).toContain('不需要再開啟 PDF')
+    expect(prompt).toContain('<fubon_digest>')
+    expect(prompt).toContain('Warsh 鷹派（p.4）')
+    expect(prompt).toContain('台灣股市：●中性')
+    expect(prompt).toContain('共 16 個')
+    expect(prompt).toContain('- 美國 ISM 製造業採購經理人指數')
+    expect(prompt).not.toContain('- 政策利率方向（Fed、台灣央行）\n')
+    expect(prompt).not.toContain(MACRO_PRIMARY_SOURCE)
+    expect(prompt).toContain('出處標註')
   })
 })
 

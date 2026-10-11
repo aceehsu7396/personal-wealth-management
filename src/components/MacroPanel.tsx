@@ -13,6 +13,7 @@ import { ResearchReportCard } from './research/ResearchReportCard'
 import { analyzeMarket, MACRO_PRIMARY_SOURCE, macroDraftToForm, StoredMacroDraftSchema } from '../lib/ai/analyses'
 import { FubonOutlookCard, FubonUsageNote } from './research/FubonOutlookCard'
 import { useResearchTask } from '../lib/ai/useResearchTask'
+import { isOutlookFresh, latestOutlook } from '../lib/calculations/fubonTracking'
 import { todayIsoDate } from '../lib/market/twse'
 
 const cardClass =
@@ -54,10 +55,16 @@ export function MacroPanel() {
   }
 
   async function runMarketAnalysis() {
-    const result = await task.run(() => analyzeMarket(todayIsoDate()))
+    // Use a fresh Fubon digest when there is one: the analysis then only
+    // searches for the signals Fubon does not cover.
+    const today = todayIsoDate()
+    const latest = latestOutlook(useAppStore.getState().fubonOutlooks)
+    const outlook = latest && isOutlookFresh(latest, today) ? latest : undefined
+    const result = await task.run(() => analyzeMarket(today, undefined, outlook))
     if (!result) return
     const reportId = addResearchReport({
       kind: 'market',
+      fubonOutlookId: outlook?.id,
       subject: '台股＋美股總經三支柱',
       market: 'TW+US',
       markdown: result.research.markdown,
@@ -85,7 +92,7 @@ export function MacroPanel() {
 
   return (
     <>
-      <FubonOutlookCard latest={marketReports[0]} />
+      <FubonOutlookCard />
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           總經三支柱判斷
@@ -157,11 +164,11 @@ export function MacroPanel() {
         {!editing && (
           <div className="mt-3 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
             <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
-              AI 會先讀取{' '}
+              AI 會直接使用上方「富邦總經觀點」的整理，只上網補查富邦未涵蓋的訊號；還沒整理或整理已過期時，改為自行讀取{' '}
               <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className="font-medium text-indigo-700 underline dark:text-indigo-400">
                 富邦金控研究報告
               </a>{' '}
-              最新一期「市場展望」，報告沒有的最新數據再上網補充，產出研究報告並預填下方 17 個訊號與判斷理由。你確認或修改後才會儲存。
+              最新一期 PDF。完成後產出研究報告並預填下方 17 個訊號與判斷理由，你確認或修改後才會儲存。
             </p>
             <AiActionButton
               label="AI 取得總經資訊並預填"
@@ -181,7 +188,7 @@ export function MacroPanel() {
           </p>
         )}
         {draft && !editing && reports.find((r) => r.id === draft.reportId) && (
-          <FubonUsageNote sources={reports.find((r) => r.id === draft.reportId)!.sources} />
+          <FubonUsageNote report={reports.find((r) => r.id === draft.reportId)!} />
         )}
         <div className="mt-4">
           <MacroCheckInForm
@@ -202,7 +209,7 @@ export function MacroPanel() {
             {marketReports.map((r, i) => (
               <div key={r.id}>
                 <ResearchReportCard report={r} defaultOpen={i === 0 && draft?.reportId === r.id} onDelete={() => removeResearchReport(r.id)} />
-                <FubonUsageNote sources={r.sources} />
+                <FubonUsageNote report={r} />
                 {r.facts !== undefined && (
                   <button
                     type="button"

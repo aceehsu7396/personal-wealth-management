@@ -451,12 +451,91 @@ export type ResearchSource = z.infer<typeof ResearchSourceSchema>
 
 // An AI web-research report. `facts` holds the structured extraction (macro
 // signal draft or stock facts) and is validated again where it is used.
+// The 17 macro check-in signals, as "pillar.field" paths.
+export const MacroSignalKeySchema = z.enum([
+  'growth.usPmi',
+  'growth.usEmployment',
+  'growth.twBusinessSignal',
+  'growth.twExportOrders',
+  'inflation.usCpi',
+  'inflation.twCpi',
+  'liquidity.policyRate',
+  'liquidity.yieldCurve',
+  'liquidity.creditSpread',
+  'liquidity.centralBankBalanceSheet',
+  'liquidity.usDollar',
+  'sentiment.valuation',
+  'sentiment.credit',
+  'sentiment.ipoHype',
+  'sentiment.media',
+  'sentiment.margin',
+  'sentiment.vix',
+])
+export type MacroSignalKey = z.infer<typeof MacroSignalKeySchema>
+
+// Indices and rates the Fubon outlook forecasts each month.
+export const TrackedIndexSchema = z.enum([
+  'taiex',
+  'sp500',
+  'stoxx600',
+  'csi300',
+  'us10y',
+  'tw10y',
+  'cn10y',
+  'dxy',
+  'eurusd',
+  'usdjpy',
+  'usdcny',
+  'usdtwd',
+])
+export type TrackedIndex = z.infer<typeof TrackedIndexSchema>
+
+export const AllocationViewSchema = z.enum(['positive', 'neutral', 'negative'])
+export type AllocationView = z.infer<typeof AllocationViewSchema>
+
+// Structured digest of one monthly Fubon "市場展望" report.
+export const FubonOutlookContentSchema = z.object({
+  reportTitle: z.string(),
+  reportDate: z.string(),
+  summary: z.string(),
+  sections: z.array(
+    z.object({
+      title: z.string(),
+      bullets: z.array(z.object({ text: z.string(), page: z.string() })),
+    }),
+  ),
+  allocation: z.array(z.object({ asset: z.string(), view: AllocationViewSchema, note: z.string() })),
+  forecasts: z.array(z.object({ index: TrackedIndexSchema, low: z.number(), high: z.number() })),
+  actuals: z.array(z.object({ index: TrackedIndexSchema, value: z.number() })),
+  coverage: z.array(
+    z.object({
+      signal: MacroSignalKeySchema,
+      status: z.enum(['covered', 'partial', 'missing']),
+      note: z.string(),
+      page: z.string(),
+    }),
+  ),
+})
+export type FubonOutlookContent = z.infer<typeof FubonOutlookContentSchema>
+
+export const FubonOutlookSchema = FubonOutlookContentSchema.extend({
+  id: z.string(),
+  pdfUrl: z.string(),
+  createdAt: z.string(),
+  markdown: z.string(),
+  sources: z.array(ResearchSourceSchema),
+  estimatedCostUsd: z.number(),
+})
+export type FubonOutlook = z.infer<typeof FubonOutlookSchema>
+
 export const ResearchReportSchema = z.object({
   id: z.string(),
   kind: ResearchKindSchema,
   subject: z.string(),
   market: z.string(),
   thesisId: z.string().optional(),
+  // Market analyses built on a stored Fubon digest record which one.
+  fubonOutlookId: z.string().optional(),
   createdAt: z.string(),
   markdown: z.string(),
   sources: z.array(ResearchSourceSchema),
@@ -504,6 +583,7 @@ export const AppDataSchema = z.object({
   marketSnapshot: MarketSnapshotSchema.default({ fetchedOn: null, valuations: {} }),
   researchReports: z.array(ResearchReportSchema).default([]),
   portfolioSnapshots: z.array(PortfolioSnapshotSchema).default([]),
+  fubonOutlooks: z.array(FubonOutlookSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -552,5 +632,6 @@ export function createDefaultAppData(): AppData {
     marketSnapshot: { fetchedOn: null, valuations: {} },
     researchReports: [],
     portfolioSnapshots: [],
+    fubonOutlooks: [],
   }
 }

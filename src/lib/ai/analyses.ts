@@ -1,5 +1,6 @@
 import { z } from 'zod'
-import type { MacroCheckIn, Market, ResearchSource } from '../storage/schema'
+import type { FubonOutlook, MacroCheckIn, Market, ResearchSource } from '../storage/schema'
+import { gapSignals, MACRO_SIGNAL_LABELS } from '../calculations/fubonTracking'
 import { runWebResearch, type ResearchClient, type ResearchResult } from './webResearch'
 import { extractStructured, type ExtractionClient } from './extractStructured'
 
@@ -42,22 +43,19 @@ export const MacroDraftSchema = z.object({
     vix: sentiment,
   }),
   policyNote: z.string().describe('貨幣、財政、產業政策與地緣政治重點，2–4 句'),
-  fubonSummary: z.object({
-    read: z.boolean().describe('研究報告是否實際依據富邦報告全文撰寫'),
-    reportTitle: z.string().describe('富邦報告名稱，例如「富邦總經觀點-9月市場展望」；未讀取填空字串'),
-    reportDate: z.string().describe('富邦報告發布日期 YYYY/MM/DD；未知填空字串'),
-    keyPoints: z
-      .array(z.object({ point: z.string().describe('一句話重點'), page: z.string().describe('頁碼，例如「p.3」；未知填空字串') }))
-      .describe('富邦報告的 3–6 點重點觀點；未讀取則為空陣列'),
-  }),
 })
 export type MacroDraft = z.infer<typeof MacroDraftSchema>
 
-export const FubonSummarySchema = MacroDraftSchema.shape.fubonSummary
+// Older market reports carried a Fubon summary in their facts; the
+// separate Fubon digest replaces it, but stored facts may still contain it.
+export const FubonSummarySchema = z.object({
+  read: z.boolean(),
+  reportTitle: z.string(),
+  reportDate: z.string(),
+  keyPoints: z.array(z.object({ point: z.string(), page: z.string() })),
+})
 export type FubonSummary = z.infer<typeof FubonSummarySchema>
 
-// Reports saved before the Fubon summary existed lack it; reading stored
-// facts tolerates that.
 export const StoredMacroDraftSchema = MacroDraftSchema.extend({ fubonSummary: FubonSummarySchema.optional() })
 export type StoredMacroDraft = z.infer<typeof StoredMacroDraftSchema>
 
@@ -65,15 +63,8 @@ export type StoredMacroDraft = z.infer<typeof StoredMacroDraftSchema>
 // fetches the list, then the latest monthly outlook PDF linked from it.
 export const MACRO_PRIMARY_SOURCE = 'https://invest.fubonlife.com.tw/w/wa/waFubonlifeMSG.djhtm'
 
-export function buildMarketPrompt(today: string): string {
-  return `今天是 ${today}。請撰寫台股與美股的「總經三支柱」研究報告，供長期投資人每月檢視使用。
-
-## 資料來源（請照順序）
-1. **主要來源**：先用網頁讀取工具開啟富邦金控研究報告列表 ${MACRO_PRIMARY_SOURCE} ，找出日期最新的一期「富邦總經觀點-○月市場展望」，再開啟它連結的 PDF 全文。若最近 1 個月內另有「富邦總經分析」與台灣、美國或金融市場風險相關，也一併讀取。
-2. 以這份報告為主要依據撰寫各支柱，並在報告開頭註明所依據的報告名稱與日期。
-3. **只在報告沒有涵蓋，或報告日期之後有更新的數據時**，才上網搜尋補充（例如最新的 PMI、CPI、VIX、信用利差），並註明哪些數據來自富邦報告、哪些來自其他來源。
-4. 若列表或 PDF 無法開啟，改以上網搜尋取得資料，並在報告開頭說明。
-
+// Source-citation rules and report structure shared by both market prompts.
+const MARKET_PROMPT_TAIL = `
 ## 出處標註（必須遵守）
 - 每一個數字、指標方向或觀點後面都要標註出處：
   - 來自富邦報告：（出處：富邦總經觀點-○月市場展望，第 X 頁）
@@ -92,10 +83,64 @@ export function buildMarketPrompt(today: string): string {
 7. 估值概況：台股與美股大盤目前的評價水準
 
 每個指標寫出最新數值、資料日期、與 3–6 個月前相比的方向。富邦報告中的投資建議或配置看法可以摘要呈現，但要標明是富邦的觀點。`
+
+// Compact text form of a stored Fubon digest, handed to the market analysis
+// so it does not need to re-read the PDF.
+export function outlookBrief(outlook: FubonOutlook): string {
+  const sections = outlook.sections
+    .map((sec) => `### ${sec.title}\n${sec.bullets.map((b) => `- ${b.text}${b.page ? `（${b.page}）` : ''}`).join('\n')}`)
+    .join('\n')
+  const views = { positive: '▲正向', neutral: '●中性', negative: '▼負向' } as const
+  const allocation = outlook.allocation.map((a) => `- ${a.asset}：${views[a.view]}，${a.note}`).join('\n')
+  const coverage = outlook.coverage
+    .filter((c) => c.status !== 'missing')
+    .map((c) => `- ${MACRO_SIGNAL_LABELS[c.signal]}（${c.status === 'covered' ? '涵蓋' : '部分'}）：${c.note}${c.page ? `（${c.page}）` : ''}`)
+    .join('\n')
+  return `報告：${outlook.reportTitle}（發布日期 ${outlook.reportDate}）${outlook.pdfUrl ? `\nPDF：${outlook.pdfUrl}` : ''}
+
+## 摘要
+${outlook.summary}
+
+## 各段重點
+${sections}
+
+## 月度配置觀點
+${allocation}
+
+## 富邦已涵蓋的訊號
+${coverage}`
+}
+
+export function buildMarketPrompt(today: string, outlook?: FubonOutlook): string {
+  if (outlook) {
+    const gaps = gapSignals(outlook)
+    const gapList = gaps.map((k) => `- ${MACRO_SIGNAL_LABELS[k]}`).join('\n')
+    return `今天是 ${today}。請撰寫台股與美股的「總經三支柱」研究報告，供長期投資人每月檢視使用。
+
+## 資料來源
+1. **主要依據**：以下是已整理好的富邦金控「${outlook.reportTitle}」內容（不需要再開啟 PDF）。富邦已涵蓋的訊號直接使用這份整理，頁碼照抄。
+2. **只上網查詢富邦未涵蓋或只部分涵蓋的訊號**（共 ${gaps.length} 個），取得最新數值、資料日期與方向：
+${gapList}
+3. 若某個已涵蓋的訊號在富邦報告發布日期之後有重大更新，可以補充，但要註明。
+
+<fubon_digest>
+${outlookBrief(outlook)}
+</fubon_digest>
+${MARKET_PROMPT_TAIL}`
+  }
+  return `今天是 ${today}。請撰寫台股與美股的「總經三支柱」研究報告，供長期投資人每月檢視使用。
+
+## 資料來源（請照順序）
+1. **主要來源**：先用網頁讀取工具開啟富邦金控研究報告列表 ${MACRO_PRIMARY_SOURCE} ，找出日期最新的一期「富邦總經觀點-○月市場展望」，再開啟它連結的 PDF 全文。若最近 1 個月內另有「富邦總經分析」與台灣、美國或金融市場風險相關，也一併讀取。
+2. 以這份報告為主要依據撰寫各支柱，並在報告開頭註明所依據的報告名稱與日期。
+3. **只在報告沒有涵蓋，或報告日期之後有更新的數據時**，才上網搜尋補充（例如最新的 PMI、CPI、VIX、信用利差），並註明哪些數據來自富邦報告、哪些來自其他來源。
+4. 若列表或 PDF 無法開啟，改以上網搜尋取得資料，並在報告開頭說明。
+
+${MARKET_PROMPT_TAIL}`
 }
 
 export const MACRO_EXTRACTION_INSTRUCTIONS =
-  '把研究報告中的總經資料，轉成總經三支柱的 17 個訊號判斷。方向以「相較 3–6 個月前」為準；流動性 1 代表寬鬆；情緒 1 代表過熱、-1 代表恐慌（例如本益比在歷史高檔為 1、VIX 高於 30 為 -1、低於 13 為 1）。每個理由都要保留報告中標註的出處（富邦報告註明頁數）。另外整理 fubonSummary：報告是否依據富邦報告全文撰寫、報告名稱、發布日期，以及 3–6 點富邦的重點觀點（各附頁碼）；報告說明未能讀取富邦報告時，read 填 false、其他留空。'
+  '把研究報告中的總經資料，轉成總經三支柱的 17 個訊號判斷。方向以「相較 3–6 個月前」為準；流動性 1 代表寬鬆；情緒 1 代表過熱、-1 代表恐慌（例如本益比在歷史高檔為 1、VIX 高於 30 為 -1、低於 13 為 1）。每個理由都要保留報告中標註的出處（富邦報告註明頁數）。'
 
 export type MacroDraftValues = Omit<MacroCheckIn, 'id' | 'createdAt'>
 
@@ -329,8 +374,10 @@ export interface AnalysisOutcome<Facts> {
 export async function analyzeMarket(
   today: string,
   clients?: { research?: ResearchClient; extraction?: ExtractionClient },
+  // A fresh Fubon digest: the analysis uses it and searches only the gaps.
+  outlook?: FubonOutlook,
 ): Promise<AnalysisOutcome<MacroDraft>> {
-  const research = await runWebResearch({ prompt: buildMarketPrompt(today) }, clients?.research)
+  const research = await runWebResearch({ prompt: buildMarketPrompt(today, outlook) }, clients?.research)
   const extraction = await extractStructured(
     MacroDraftSchema,
     MACRO_EXTRACTION_INSTRUCTIONS,

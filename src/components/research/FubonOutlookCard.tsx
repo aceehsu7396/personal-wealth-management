@@ -1,9 +1,52 @@
-import { fubonUsage, MACRO_PRIMARY_SOURCE, StoredMacroDraftSchema } from '../../lib/ai/analyses'
-import type { ResearchReport, ResearchSource } from '../../lib/storage/schema'
+import { lazy, Suspense } from 'react'
+import { useAppStore } from '../../lib/storage/appStore'
+import { fubonUsage, MACRO_PRIMARY_SOURCE } from '../../lib/ai/analyses'
+import { digestFubonOutlook } from '../../lib/ai/fubonOutlook'
+import { useResearchTask } from '../../lib/ai/useResearchTask'
+import {
+  gapSignals,
+  isOutlookFresh,
+  latestOutlook,
+  MACRO_SIGNAL_LABELS,
+  PILLAR_LABELS,
+  trackForecasts,
+} from '../../lib/calculations/fubonTracking'
+import { todayIsoDate } from '../../lib/market/twse'
+import type { AllocationView, FubonOutlook, ResearchReport } from '../../lib/storage/schema'
+import { AiActionButton } from './AiActionButton'
+import { FubonTrackingTable } from './FubonTrackingTable'
 
-// Whether a market report actually read and cited the Fubon outlook PDF.
-export function FubonUsageNote({ sources }: { sources: ResearchSource[] }) {
-  const usage = fubonUsage(sources)
+const MarkdownView = lazy(() => import('../MarkdownView').then((m) => ({ default: m.MarkdownView })))
+
+const linkClass = 'font-medium text-indigo-700 underline dark:text-indigo-400'
+const subTitle = 'mt-5 text-sm font-semibold text-gray-900 dark:text-gray-100'
+
+const VIEW_STYLE: Record<AllocationView, { mark: string; className: string }> = {
+  positive: { mark: '▲ 正向', className: 'text-indigo-700 dark:text-indigo-400' },
+  neutral: { mark: '● 中性', className: 'text-gray-600 dark:text-gray-300' },
+  negative: { mark: '▼ 負向', className: 'text-orange-700 dark:text-orange-400' },
+}
+
+const COVERAGE_MARK = { covered: '✓', partial: '△', missing: '✗' } as const
+
+function formatDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+}
+
+// How a market report used Fubon: built on a stored digest, or by reading
+// the PDF itself (older flow), or not at all.
+export function FubonUsageNote({ report }: { report: ResearchReport }) {
+  const outlooks = useAppStore((s) => s.fubonOutlooks)
+  if (report.fubonOutlookId) {
+    const o = outlooks.find((x) => x.id === report.fubonOutlookId)
+    return (
+      <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-400">
+        ✓ 依據已整理的「{o?.reportTitle ?? '富邦報告'}」{o && `（${o.reportDate}）`}，只上網補查富邦未涵蓋的訊號
+        {o && `（${gapSignals(o).length} 個）`}
+      </p>
+    )
+  }
+  const usage = fubonUsage(report.sources)
   if (!usage.report) {
     return (
       <p className="mt-1 text-xs text-orange-700 dark:text-orange-400">
@@ -15,51 +58,107 @@ export function FubonUsageNote({ sources }: { sources: ResearchSource[] }) {
     <p className="mt-1 text-xs text-indigo-700 dark:text-indigo-400">
       ✓ 已讀取「{usage.report.title}」全文，引用 {usage.citedCount} 處
       {usage.pages.length > 0 && `（p.${usage.pages.join('、')}）`}
-      {usage.citedCount === 0 && '，但報告內容沒有標註引用，請展開報告確認'}
     </p>
   )
 }
 
-function formatDateTime(iso: string): string {
-  return new Intl.DateTimeFormat('zh-TW', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))
+function CoverageList({ outlook }: { outlook: FubonOutlook }) {
+  const byPillar = new Map<string, FubonOutlook['coverage']>()
+  for (const c of outlook.coverage) {
+    const pillar = c.signal.split('.')[0]
+    byPillar.set(pillar, [...(byPillar.get(pillar) ?? []), c])
+  }
+  const gaps = gapSignals(outlook)
+  return (
+    <div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {Object.entries(PILLAR_LABELS).map(([pillar, label]) => (
+          <div key={pillar}>
+            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">{label}</p>
+            <ul className="mt-1 space-y-0.5 text-xs">
+              {(byPillar.get(pillar) ?? []).map((c) => (
+                <li
+                  key={c.signal}
+                  className={
+                    c.status === 'covered'
+                      ? 'text-indigo-700 dark:text-indigo-400'
+                      : c.status === 'partial'
+                        ? 'text-gray-700 dark:text-gray-300'
+                        : 'text-gray-400'
+                  }
+                >
+                  {COVERAGE_MARK[c.status]} {MACRO_SIGNAL_LABELS[c.signal]}
+                  {c.note && `：${c.note}`}
+                  {c.page && `（${c.page}）`}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+      <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        ✓ 涵蓋　△ 部分　✗ 未涵蓋。總經分析會直接使用富邦已涵蓋的訊號，只上網補查其餘 {gaps.length} 個。
+      </p>
+    </div>
+  )
 }
 
-const linkClass = 'font-medium text-indigo-700 underline dark:text-indigo-400'
+// Research → Market: the latest Fubon outlook digested into summary,
+// bullets, allocation views, signal coverage and forecast tracking.
+export function FubonOutlookCard() {
+  const outlooks = useAppStore((s) => s.fubonOutlooks)
+  const taiex = useAppStore((s) => s.marketPriceHistory.taiex)
+  const upsertFubonOutlook = useAppStore((s) => s.upsertFubonOutlook)
+  const task = useResearchTask()
 
-// Fubon's latest macro outlook as used by the most recent AI market analysis.
-// Refreshed every time the market analysis runs.
-export function FubonOutlookCard({ latest }: { latest: ResearchReport | undefined }) {
-  const parsed = latest ? StoredMacroDraftSchema.safeParse(latest.facts) : null
-  const summary = parsed?.success ? parsed.data.fubonSummary : undefined
-  const usage = latest ? fubonUsage(latest.sources) : null
+  const latest = latestOutlook(outlooks)
+  const tracking = trackForecasts(outlooks, taiex)
+  const today = todayIsoDate()
+
+  async function run() {
+    const digest = await task.run(() => digestFubonOutlook(todayIsoDate()))
+    if (digest) upsertFubonOutlook(digest)
+  }
 
   return (
     <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">富邦總經觀點</h2>
-        {latest && <span className="text-xs text-gray-500 dark:text-gray-400">更新於 {formatDateTime(latest.createdAt)}</span>}
+        {latest && (
+          <span className="text-xs text-gray-500 dark:text-gray-400">整理於 {formatDateTime(latest.createdAt)}</span>
+        )}
       </div>
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-        總經檢視以富邦金控每月「富邦總經觀點－市場展望」為主要依據，每次執行下方「AI 取得總經資訊並預填」時更新。
+        每月整理一次富邦金控「富邦總經觀點－市場展望」：摘要、條列重點、配置觀點、對總經三支柱的涵蓋度，以及預測區間的命中追蹤。之後的總經分析會直接使用這份整理。
       </p>
+      <div className="mt-3">
+        <AiActionButton
+          label="整理富邦最新報告"
+          running={task.running}
+          error={task.error}
+          hasApiKey={task.hasApiKey}
+          costNote="每月一次，約 US$0.1，使用你的 Anthropic API 金鑰"
+          onClick={() => void run()}
+        />
+      </div>
 
       {!latest ? (
         <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
-          還沒有市場分析。執行「AI 取得總經資訊並預填」後，這裡會顯示最新一期報告與重點；也可以直接到{' '}
+          還沒有整理過富邦報告。按上方按鈕整理最新一期，或直接到{' '}
           <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className={linkClass}>
             富邦金控研究報告列表
           </a>{' '}
           閱讀。
         </p>
       ) : (
-        <div className="mt-4">
+        <div className="mt-5">
           <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            {summary?.reportTitle || usage?.report?.title || '未讀取到富邦報告'}
-            {summary?.reportDate && <span className="ml-2 text-sm font-normal text-gray-500">{summary.reportDate}</span>}
+            {latest.reportTitle}
+            <span className="ml-2 text-sm font-normal text-gray-500">{latest.reportDate}</span>
           </p>
           <div className="mt-1 flex flex-wrap gap-4 text-sm">
-            {usage?.report && (
-              <a href={usage.report.url} target="_blank" rel="noreferrer" className={linkClass}>
+            {latest.pdfUrl && (
+              <a href={latest.pdfUrl} target="_blank" rel="noreferrer" className={linkClass}>
                 開啟報告 PDF
               </a>
             )}
@@ -67,35 +166,93 @@ export function FubonOutlookCard({ latest }: { latest: ResearchReport | undefine
               富邦金控研究報告列表
             </a>
           </div>
-          <FubonUsageNote sources={latest.sources} />
-
-          {summary && summary.keyPoints.length > 0 ? (
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-gray-700 dark:text-gray-300">
-              {summary.keyPoints.map((k) => (
-                <li key={k.point}>
-                  {k.point}
-                  {k.page && <span className="ml-1 text-xs text-gray-500">（{k.page}）</span>}
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">
-              這次分析沒有整理出富邦重點（可能是舊版分析或未讀取到報告），重新執行一次市場分析即可更新。
+          {!isOutlookFresh(latest, today) && (
+            <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
+              這份整理已超過 45 天，總經分析會改為自行讀取最新 PDF；建議先整理最新一期。
             </p>
           )}
+
+          <h3 className={subTitle}>摘要</h3>
+          <p className="mt-1 text-sm leading-6 text-gray-700 dark:text-gray-300">{latest.summary}</p>
+
+          {latest.allocation.length > 0 && (
+            <>
+              <h3 className={subTitle}>月度配置觀點</h3>
+              <div className="mt-1 overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <tbody>
+                    {latest.allocation.map((a) => (
+                      <tr key={a.asset} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
+                        <td className="py-1.5 pr-3 whitespace-nowrap text-gray-900 dark:text-gray-100">{a.asset}</td>
+                        <td className={`py-1.5 pr-3 whitespace-nowrap ${VIEW_STYLE[a.view].className}`}>
+                          {VIEW_STYLE[a.view].mark}
+                        </td>
+                        <td className="py-1.5 pr-3 text-gray-600 dark:text-gray-400">{a.note}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                這是富邦的觀點，僅供參考；本工具的股債傾斜仍依總經三支柱判斷與配置微調上限。
+              </p>
+            </>
+          )}
+
+          {latest.sections.length > 0 && (
+            <>
+              <h3 className={subTitle}>各段重點</h3>
+              <div className="mt-1 space-y-2">
+                {latest.sections.map((sec) => (
+                  <details key={sec.title} className="text-sm" open={sec.title.includes('總經')}>
+                    <summary className="cursor-pointer font-medium text-gray-800 dark:text-gray-200">{sec.title}</summary>
+                    <ul className="mt-1 list-disc space-y-0.5 pl-5 text-gray-700 dark:text-gray-300">
+                      {sec.bullets.map((b) => (
+                        <li key={b.text}>
+                          {b.text}
+                          {b.page && <span className="ml-1 text-xs text-gray-500">（{b.page}）</span>}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                ))}
+              </div>
+            </>
+          )}
+
+          <h3 className={subTitle}>對總經三支柱的涵蓋度</h3>
+          <div className="mt-1">
+            <CoverageList outlook={latest} />
+          </div>
+
+          <h3 className={subTitle}>指數追蹤：預測區間 vs 實際</h3>
+          <div className="mt-1">
+            <FubonTrackingTable rows={tracking.rows} evaluations={tracking.evaluations} />
+          </div>
+
+          <details className="mt-5 text-sm">
+            <summary className="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">
+              整理全文與出處（［編號, p.頁數］對應來源）
+            </summary>
+            <div className="mt-2">
+              <Suspense fallback={<p className="text-xs text-gray-500">載入中…</p>}>
+                <MarkdownView content={latest.markdown} />
+              </Suspense>
+              <ol className="mt-3 list-decimal space-y-0.5 pl-5 text-xs">
+                {latest.sources.map((s) => (
+                  <li key={s.url}>
+                    <a href={s.url} target="_blank" rel="noreferrer" className="text-indigo-700 hover:underline dark:text-indigo-400">
+                      {s.title}
+                    </a>
+                    {s.kind === 'fetched' && <span className="ml-1 text-gray-500">已讀取全文</span>}
+                    {s.pages && s.pages.length > 0 && <span className="ml-1 text-gray-500">p.{s.pages.join('、')}</span>}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          </details>
         </div>
       )}
-
-      <details className="mt-4 text-xs text-gray-600 dark:text-gray-400">
-        <summary className="cursor-pointer font-medium text-gray-700 dark:text-gray-300">資料來源與出處標註說明</summary>
-        <ul className="mt-2 list-disc space-y-1 pl-5">
-          <li>AI 先開啟富邦金控研究報告列表，讀取最新一期「市場展望」PDF 全文；最近 1 個月相關的「富邦總經分析」也一併參考。</li>
-          <li>報告沒有涵蓋、或報告發布後才公布的數據（例如最新 PMI、CPI、VIX），再上網搜尋補充。</li>
-          <li>每段引用後面標示［來源編號, p.頁數］，對應報告下方的來源清單；清單會註明哪些文件「已讀取全文」、被引用幾處。</li>
-          <li>預填的 17 個訊號理由結尾也會附出處，例如「（富邦 9 月市場展望 p.3）」。</li>
-          <li>富邦每月初發布新一期展望；月底檢視時，主要觀點可能已接近一個月前，最新數字以網路補充為準。</li>
-        </ul>
-      </details>
     </div>
   )
 }

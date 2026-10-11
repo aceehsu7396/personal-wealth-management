@@ -23,6 +23,7 @@ import {
   type Foundation,
   type MarketSnapshot,
   type ResearchReport,
+  type FubonOutlook,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -109,6 +110,9 @@ interface AppStore extends AppData {
   setThesisPrices: (prices: Record<string, number>) => void
   addResearchReport: (entry: Omit<ResearchReport, 'id' | 'createdAt'>) => string
   removeResearchReport: (id: string) => void
+  // Stores a Fubon digest; re-digesting the same report replaces it.
+  upsertFubonOutlook: (entry: Omit<FubonOutlook, 'id' | 'createdAt'>) => string
+  removeFubonOutlook: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -139,6 +143,7 @@ function toAppData(state: AppData): AppData {
     marketSnapshot: state.marketSnapshot,
     researchReports: state.researchReports,
     portfolioSnapshots: state.portfolioSnapshots,
+    fubonOutlooks: state.fubonOutlooks,
   }
 }
 
@@ -361,6 +366,22 @@ export const useAppStore = create<AppStore>()(
         }))
         return id
       },
+
+      upsertFubonOutlook: (entry) => {
+        const id = crypto.randomUUID()
+        const sameReport = (o: FubonOutlook) =>
+          o.reportTitle === entry.reportTitle && o.reportDate === entry.reportDate
+        set((state) => ({
+          fubonOutlooks: [
+            ...state.fubonOutlooks.filter((o) => !sameReport(o)),
+            { ...entry, id, createdAt: new Date().toISOString() },
+          ].sort((a, b) => a.reportDate.localeCompare(b.reportDate)),
+        }))
+        return id
+      },
+
+      removeFubonOutlook: (id) =>
+        set((state) => ({ fubonOutlooks: state.fubonOutlooks.filter((o) => o.id !== id) })),
 
       removeResearchReport: (id) =>
         set((state) => ({ researchReports: state.researchReports.filter((r) => r.id !== id) })),
