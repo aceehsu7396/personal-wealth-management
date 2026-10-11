@@ -36,6 +36,12 @@ export function describeAiError(error: unknown): string {
   if (error instanceof MissingApiKeyError || error instanceof ResearchRefusedError) return error.message
   if (error instanceof Anthropic.AuthenticationError) return 'API 金鑰無效，請至設定頁確認。'
   if (error instanceof Anthropic.RateLimitError) return '已達 API 速率限制，請稍後再試。'
+  if (error instanceof Anthropic.BadRequestError && /credit balance/i.test(error.message)) {
+    return 'Anthropic API 帳戶額度不足（預付額度已用完或尚未儲值）。請到 Claude Console（platform.claude.com）→ Settings → Billing 購買額度後再試；可在 Limits 設定每月花費上限。'
+  }
+  if (error instanceof Anthropic.PermissionDeniedError) return 'API 金鑰沒有使用這項功能的權限，請到 Claude Console 確認金鑰所屬的組織與權限。'
+  if (error instanceof Anthropic.APIConnectionError) return '無法連線到 AI 服務，請確認網路後再試。'
+  if (error instanceof Anthropic.InternalServerError) return 'AI 服務暫時忙碌或發生故障，請稍後再試。'
   if (error instanceof Anthropic.APIError) return `AI 服務發生錯誤：${error.message}`
   if (error instanceof Error) return error.message
   return '發生未知錯誤，請稍後再試。'
