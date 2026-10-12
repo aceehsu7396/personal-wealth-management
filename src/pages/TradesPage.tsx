@@ -25,6 +25,7 @@ export function TradesPage() {
   const trades = useAppStore((s) => s.trades)
   const holdings = useAppStore((s) => s.holdings)
   const theses = useAppStore((s) => s.stockTheses)
+  const strategies = useAppStore((s) => s.tradingStrategies)
   const { policy, journey } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
   const meta = useAppStore((s) => s.portfolioMeta)
@@ -47,6 +48,7 @@ export function TradesPage() {
     guardrails,
     meta,
     macro: latestMacro ? assessMacro(latestMacro, guardrails) : null,
+    strategies,
     satelliteGate: {
       unlocked: journey.satelliteUnlocked,
       missingSteps: journey.missingForSatellite.map((s) => `${s.id} ${s.title}`),
@@ -78,6 +80,7 @@ export function TradesPage() {
         avgCost: pending.price,
         currentPrice: pending.price,
         thesisId: pending.thesisId,
+        strategyId: pending.strategyId,
         priceUpdatedAt: trade.date,
       })
     }
@@ -102,7 +105,7 @@ export function TradesPage() {
 
       <JourneyNotice
         missing={journey.missingForSatellite}
-        intro="核心 ETF 的定期定額可以照常記錄；個股（衛星）買進要先完成這些起步步驟，否則交易前檢核會標示未通過："
+        intro="核心 ETF 的定期定額可以照常記錄；交易部位（衛星）的買進要先完成這些步驟，否則交易前檢核會標示未通過："
       />
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">

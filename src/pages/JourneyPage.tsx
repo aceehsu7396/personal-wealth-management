@@ -22,7 +22,7 @@ export function JourneyPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">行動路線</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        先打好財務地基、買下整個市場，再學看懂市場，最後才練習選股。每一步都對應手冊的一章與工具的一頁。
+        目標是成為全職交易者：先打好財務地基、用核心 ETF 買下整個市場、看懂市場，再把交易策略回測、虛擬交易、小額實單逐關驗證。每一步都對應手冊的一章與工具的一頁。
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -37,14 +37,14 @@ export function JourneyPage() {
           hint={journey.nextStep?.title}
         />
         <StatCard
-          label="個股（衛星）"
+          label="交易部位（實單）"
           value={journey.satelliteUnlocked ? '已解鎖' : '尚未解鎖'}
           hint={journey.satelliteUnlocked ? undefined : `還缺 ${journey.missingForSatellite.length} 個步驟`}
         />
         <StatCard
           label="學習階段"
           value={learning.title}
-          hint={`衛星上限 ${learning.satelliteCapPercent}%`}
+          hint={`交易部位上限 ${learning.satelliteCapPercent}%`}
         />
       </div>
 
@@ -63,7 +63,7 @@ export function JourneyPage() {
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">{stage.summary}</p>
           {stage.number === 4 && !journey.satelliteUnlocked && (
             <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
-              研究卡可以先寫來觀察；衛星買進要等起步前置步驟完成（
+              策略卡、回測與虛擬交易隨時可以做；實單買進要等前置步驟完成（
               {journey.missingForSatellite.map((s) => s.id).join('、')}）。
             </p>
           )}
@@ -96,13 +96,12 @@ export function JourneyPage() {
 
           {stage.number === 1 && (
             <div className="mt-4 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">緊急預備金</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">緊急預備金／生活費緩衝</h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                放在活存或貨幣市場等隨時可動用的地方，不計入投資組合。每月支出
-                取「目標與政策」財務自由試算的數字：
-                {formatCurrency(baseline, state.profile.currency)}。
+                放在活存、貨幣市場或短債等隨時可動用的地方，不計入投資組合。每月支出取「目標與政策」的數字：
+                {formatCurrency(baseline, state.profile.currency)}。上班期間先備足目標月數；轉為全職交易前要擴大到生活費緩衝月數。
               </p>
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <label className="block">
                   <span className={labelClass}>目前預備金金額</span>
                   <input
@@ -132,6 +131,21 @@ export function JourneyPage() {
                     }}
                   />
                 </label>
+                <label className="block">
+                  <span className={labelClass}>全職前的生活費緩衝（月）</span>
+                  <input
+                    type="number"
+                    min="6"
+                    max="60"
+                    step="1"
+                    className={inputClass}
+                    defaultValue={state.foundation.livingBufferMonths}
+                    onChange={(e) => {
+                      const v = Number(e.target.value)
+                      if (Number.isFinite(v) && v >= 6) setFoundation({ livingBufferMonths: v })
+                    }}
+                  />
+                </label>
               </div>
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
                 <div className="h-full bg-indigo-600" style={{ width: `${fundPercent}%` }} />
@@ -148,12 +162,14 @@ export function JourneyPage() {
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">學習階段：{learning.title}</h2>
         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-          衛星上限依學習階段自動調整，目前為 {learning.satelliteCapPercent}%。
-          {learning.demoted && '衛星連續 3 年落後基準，已降回上一階段。'}
+          交易部位上限依學習階段自動調整，目前為 {learning.satelliteCapPercent}%。
+          {learning.demoted && '交易部位連續 3 年落後基準，已降回上一階段。'}
         </p>
         {learning.nextCriteria.length > 0 ? (
           <>
-            <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">晉級下一階段的條件</h3>
+            <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {learning.stage === 4 ? '轉為全職交易的條件' : '晉級下一階段的條件'}
+            </h3>
             <ul className="mt-2 space-y-1 text-sm">
               {learning.nextCriteria.map((c) => (
                 <li
@@ -169,7 +185,7 @@ export function JourneyPage() {
           <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">已是最後一個階段。</p>
         )}
         <Link to="/handbook/09" className={`${linkClass} mt-3 inline-block`}>
-          閱讀十年學習路線
+          閱讀學習路線
         </Link>
       </div>
     </div>

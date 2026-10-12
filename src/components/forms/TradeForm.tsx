@@ -8,6 +8,7 @@ import {
   TradeReasonSchema,
   TradeSideSchema,
   type Trade,
+  type TradeReason,
 } from '../../lib/storage/schema'
 import {
   BUY_REASONS,
@@ -30,6 +31,8 @@ const schema = z.object({
   sleeve: SleeveSchema,
   currency: CurrencySchema,
   thesisId: z.string(),
+  strategyId: z.string(),
+  stopLoss: z.string(),
   shares: z.coerce.number().positive('須大於 0'),
   price: z.coerce.number().positive('須大於 0'),
   emotion: z.coerce.number().int().min(1).max(5),
@@ -67,6 +70,8 @@ function blankDefaults(): FormInput {
     sleeve: 'core_tw',
     currency: 'TWD',
     thesisId: '',
+    strategyId: '',
+    stopLoss: '',
     shares: '',
     price: '',
     emotion: 3,
@@ -89,9 +94,13 @@ function toPending(v: FormOutput, ctx: ChecklistContext): PendingTrade {
     price: v.price,
     holdingId: holding?.id,
     thesisId: holding?.thesisId ?? (v.thesisId || undefined),
+    strategyId: STRATEGY_REASONS.includes(v.reason) ? v.strategyId || undefined : undefined,
+    stopLoss: v.reason === 'strategy_entry' && Number(v.stopLoss) > 0 ? Number(v.stopLoss) : undefined,
     biasNotes: v.biasNotes,
   }
 }
+
+const STRATEGY_REASONS: TradeReason[] = ['strategy_entry', 'strategy_exit', 'stop_loss']
 
 interface Props {
   ctx: ChecklistContext
@@ -147,6 +156,8 @@ export function TradeForm({ ctx, onSubmit }: Props) {
         name: pending.name,
         holdingId: pending.holdingId,
         thesisId: pending.thesisId,
+        strategyId: pending.strategyId,
+        stopLoss: pending.stopLoss,
         side: values.side,
         reason: values.reason,
         shares: values.shares,
@@ -230,7 +241,7 @@ export function TradeForm({ ctx, onSubmit }: Props) {
             </select>
           </label>
           <label className="block sm:col-span-2">
-            <span className={labelClass}>研究卡（衛星必填）</span>
+            <span className={labelClass}>研究卡（個股基本面建倉必填）</span>
             <select className={inputClass} {...register('thesisId')}>
               <option value="">（無）</option>
               {ctx.theses
@@ -242,6 +253,30 @@ export function TradeForm({ ctx, onSubmit }: Props) {
                 ))}
             </select>
           </label>
+        </>
+      )}
+
+      {STRATEGY_REASONS.includes(reason as TradeReason) && (
+        <>
+          <label className="block sm:col-span-2">
+            <span className={labelClass}>策略卡（策略交易必填）</span>
+            <select className={inputClass} {...register('strategyId')}>
+              <option value="">（未選擇）</option>
+              {(ctx.strategies ?? [])
+                .filter((t) => t.status !== 'retired')
+                .map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          {reason === 'strategy_entry' && (
+            <label className="block">
+              <span className={labelClass}>停損價</span>
+              <input type="number" step="any" className={inputClass} {...register('stopLoss')} />
+            </label>
+          )}
         </>
       )}
 
@@ -267,7 +302,7 @@ export function TradeForm({ ctx, onSubmit }: Props) {
       </label>
 
       <label className="block sm:col-span-3">
-        <span className={labelClass}>偏誤自問（衛星交易必填）</span>
+        <span className={labelClass}>偏誤自問（交易部位必填）</span>
         <ul className="mt-1 list-disc pl-5 text-xs text-gray-500 dark:text-gray-400">
           {BIAS_QUESTIONS.map((q) => (
             <li key={q}>{q}</li>

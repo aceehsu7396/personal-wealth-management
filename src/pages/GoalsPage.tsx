@@ -13,15 +13,18 @@ import { StatCard } from '../components/StatCard'
 import { AssumptionsForm } from '../components/forms/AssumptionsForm'
 import { NetWorthProjectionChart } from '../components/charts/NetWorthProjectionChart'
 import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
+import { useTraderReadiness } from '../lib/useTraderReadiness'
+import { ReadinessChecklist } from '../components/ReadinessChecklist'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 
 const PRINCIPLES = [
   '投資政策定框架：只在每年 1 月或人生重大事件時修改，市場大漲大跌時不改。',
-  '由上而下決定「多少」：總經只能在 ± 配置微調上限內調整股債比例。',
-  '由下而上決定「買什麼」：衛星個股必須通過產業、財務、估值三關。',
-  '風控優先於看法：部位上限與回撤熔斷不因個別觀點而放寬。',
+  '核心 ETF 拿市場報酬，交易部位用自有策略追求超額報酬；交易部位必須用績效證明自己。',
+  '先證明、再用真錢：策略要先通過回測與虛擬交易，才能小額實單。',
+  '風控優先於看法：每筆停損風險、持有檔數、部位上限與回撤熔斷不因個別觀點而放寬。',
+  '生活費不靠當月交易損益：從整體資產依提領率提領，另備生活費緩衝。',
   '評估流程而非結果：每筆交易留下理由，事後以歸因區分運氣與能力。',
 ]
 
@@ -31,6 +34,7 @@ export function GoalsPage() {
   const policy = useAppStore((s) => s.investmentPolicy)
   const setInvestmentPolicy = useAppStore((s) => s.setInvestmentPolicy)
   const { learning } = useJourney()
+  const readiness = useTraderReadiness()
 
   const projection = computeFireProjection(profile, assumptions)
   const required = computeRequiredReturn(
@@ -71,10 +75,10 @@ export function GoalsPage() {
       example: 'BND、短期美債',
     },
     {
-      layer: '衛星',
-      name: '台股 + 美股個股',
+      layer: '交易部位',
+      name: '自有交易策略（ETF、個股）',
       percent: policy.satellitePercent,
-      example: `依個股研究卡；目前學習階段上限 ${learning.satelliteCapPercent}%`,
+      example: `依策略卡交易；目前學習階段上限 ${learning.satelliteCapPercent}%`,
     },
   ]
 
@@ -82,7 +86,7 @@ export function GoalsPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">目標與政策</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        先設定財務自由目標、確認所需報酬是否實際，再把目標、風險與配置寫成投資政策並簽署。完整說明見手冊{' '}
+        目標是成為全職獨立交易者、以自有資產維生。先算出全職門檻與所需報酬，再把目標、風險與配置寫成投資政策並簽署。完整說明見手冊{' '}
         <Link to="/handbook/01" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
           01 第一步
         </Link>{' '}
@@ -90,14 +94,18 @@ export function GoalsPage() {
         <Link to="/handbook/02" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
           02 投資政策聲明
         </Link>
+        、
+        <Link to="/handbook/11" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+          11 轉為全職交易
+        </Link>
         。
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
-          label="財務自由目標金額"
+          label="全職門檻（投資組合）"
           value={Number.isFinite(projection.fireNumber) ? formatCurrency(projection.fireNumber, profile.currency) : '—'}
-          hint={`年支出 ${formatCurrency(projection.targetAnnualExpenses, profile.currency)} ÷ 安全提領率`}
+          hint={`年生活費 ÷ 提領率；另備緩衝 ${formatCurrency(readiness.target.bufferTarget, profile.currency)}`}
         />
         <StatCard
           label="依假設報酬預估達成"
@@ -139,9 +147,25 @@ export function GoalsPage() {
       )}
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">財務自由試算</h2>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">全職準備度</h2>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            {readiness.metCount}/{readiness.items.length}
+            {readiness.ready ? '　可以轉為全職' : '　尚未達標，維持本業'}
+          </span>
+        </div>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          填寫現況與假設（修改後自動儲存）。每月支出也用來計算緊急預備金目標。
+          五項全部達標才建議離開本業。資產與緩衝決定「能不能」，實單紀錄、績效與紀律決定「該不該」。
+        </p>
+        <div className="mt-4">
+          <ReadinessChecklist readiness={readiness} />
+        </div>
+      </div>
+
+      <div className={cardClass}>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">全職交易門檻試算</h2>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          填寫現況與假設（修改後自動儲存）。門檻 ＝ 年生活費 ÷ 可持續提領率；月生活費也用來計算緊急預備金與生活費緩衝。
         </p>
         <div className="mt-4">
           <NetWorthProjectionChart
@@ -193,8 +217,8 @@ export function GoalsPage() {
           </table>
         </div>
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          核心合計 {coreTotal}%。衛星上限依學習階段自動調整：目前是階段
-          {learning.title}，上限 {learning.satelliteCapPercent}%；未使用的衛星額度按比例留在核心。
+          核心合計 {coreTotal}%。交易部位上限依學習階段自動調整：目前是階段
+          {learning.title}，上限 {learning.satelliteCapPercent}%；未使用的額度按比例留在核心。
         </p>
       </div>
 
@@ -203,7 +227,7 @@ export function GoalsPage() {
           投資政策參數
         </h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          修改後自動儲存。這些參數會套用在個股研究卡、投資組合風控與交易前檢核。
+          修改後自動儲存。這些參數會套用在策略卡、研究卡、投資組合風控與交易前檢核；每筆交易都必須設停損（策略進場）。
         </p>
         <div className="mt-4">
           <InvestmentPolicyForm />

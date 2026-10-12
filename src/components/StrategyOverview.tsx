@@ -7,6 +7,7 @@ import { assessMacro, STANCE_LABELS } from '../lib/calculations/macroRegime'
 import { analyzePortfolio } from '../lib/calculations/portfolioRisk'
 import { addMonths, computeDiscipline } from '../lib/calculations/disciplineScore'
 import { todayIsoDate } from '../lib/market/twse'
+import { useTraderReadiness } from '../lib/useTraderReadiness'
 import { StatCard } from './StatCard'
 import { RiskViolationList } from './RiskViolationList'
 
@@ -31,6 +32,7 @@ export function StrategyOverview() {
   const macro = latestMacro ? assessMacro(latestMacro, guardrails) : null
   const risk = analyzePortfolio(holdings, theses, policy, guardrails, meta)
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
+  const readiness = useTraderReadiness()
 
   const todos: { text: string; to: string }[] = []
   // Macro reviews belong to stage three; only nag once the core is in place
@@ -72,16 +74,14 @@ export function StrategyOverview() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Link to="/goals" className="block">
           <StatCard
-            label={`${policy.targetYears} 年所需報酬`}
-            value={
-              required.requiredNominalReturnPercent === null
-                ? '—'
-                : `${required.requiredNominalReturnPercent.toFixed(1)}%`
-            }
+            label="全職準備度"
+            value={`${readiness.metCount}/${readiness.items.length}`}
             hint={
-              assumptions.monthlyExpenses > 0
-                ? FEASIBILITY_LABELS[required.feasibility].split('：')[0]
-                : '尚未設定目標'
+              assumptions.monthlyExpenses <= 0
+                ? '尚未設定目標'
+                : required.requiredNominalReturnPercent === null
+                  ? FEASIBILITY_LABELS[required.feasibility].split('：')[0]
+                  : `${policy.targetYears} 年所需報酬 ${required.requiredNominalReturnPercent.toFixed(1)}%`
             }
           />
         </Link>

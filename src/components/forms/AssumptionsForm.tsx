@@ -94,7 +94,7 @@ export function AssumptionsForm({ netWorthFromPortfolio = null }: { netWorthFrom
         <input type="number" className={inputClass} {...register('monthlyIncome')} />
       </Field>
 
-      <Field label="月支出" error={errors.monthlyExpenses?.message}>
+      <Field label="月生活費" error={errors.monthlyExpenses?.message}>
         <input type="number" className={inputClass} {...register('monthlyExpenses')} />
       </Field>
 
@@ -152,7 +152,7 @@ export function AssumptionsForm({ netWorthFromPortfolio = null }: { netWorthFrom
       </Field>
 
       <Field
-        label="安全提領率（%）"
+        label="可持續提領率（%，全職交易建議 3.5）"
         error={errors.safeWithdrawalRatePercent?.message}
       >
         <input

@@ -296,6 +296,8 @@ export const HoldingSchema = z.object({
   currentPrice: z.number(),
   sector: z.string().optional(),
   thesisId: z.string().optional(),
+  // Trading-strategy positions are documented by a strategy card instead.
+  strategyId: z.string().optional(),
   priceUpdatedAt: z.string().optional(),
   createdAt: z.string(),
 })
@@ -331,6 +333,10 @@ export const TradeReasonSchema = z.enum([
   'exit_opportunity_cost',
   'exit_deep_drawdown_review',
   'exit_over_limit',
+  // Trading-strategy trades: entries follow a strategy card with a stop.
+  'strategy_entry',
+  'strategy_exit',
+  'stop_loss',
 ])
 export type TradeReason = z.infer<typeof TradeReasonSchema>
 
@@ -356,6 +362,8 @@ export const TradeSchema = z.object({
   name: z.string(),
   holdingId: z.string().optional(),
   thesisId: z.string().optional(),
+  strategyId: z.string().optional(),
+  stopLoss: z.number().optional(),
   side: TradeSideSchema,
   reason: TradeReasonSchema,
   shares: z.number(),
@@ -410,6 +418,11 @@ export const InvestmentPolicySchema = z.object({
   maxDrawdownTolerancePercent: z.number(),
   drawdownCircuitBreakerPercent: z.number(),
   reviewDrawdownFromCostPercent: z.number(),
+  // Trading-sleeve risk rules: risk per trade as % of the trading budget,
+  // open-position limit, and whether strategy entries need a stop.
+  riskPerTradePercent: z.number().default(1),
+  maxOpenPositions: z.number().default(8),
+  requireStopLoss: z.boolean().default(true),
   signedAt: z.string().optional(),
   updatedAt: z.string(),
 })
@@ -418,6 +431,8 @@ export type InvestmentPolicy = z.infer<typeof InvestmentPolicySchema>
 export const FoundationSchema = z.object({
   emergencyFundAmount: z.number(),
   emergencyFundTargetMonths: z.number(),
+  // Living-expense buffer required before trading full time (same cash pot).
+  livingBufferMonths: z.number().default(24),
 })
 export type Foundation = z.infer<typeof FoundationSchema>
 
@@ -563,9 +578,137 @@ export function createDefaultInvestmentPolicy(): InvestmentPolicy {
     maxDrawdownTolerancePercent: 30,
     drawdownCircuitBreakerPercent: 20,
     reviewDrawdownFromCostPercent: 25,
+    riskPerTradePercent: 1,
+    maxOpenPositions: 8,
+    requireStopLoss: true,
     updatedAt: new Date().toISOString(),
   }
 }
+
+// ---------------------------------------------------------------------------
+// Trading strategies, backtests and paper trading
+// ---------------------------------------------------------------------------
+
+export const StrategyTemplateSchema = z.enum([
+  'buy_hold',
+  'dca',
+  'ma_cross',
+  'donchian',
+  'rsi_reversion',
+  'momentum_rotation',
+  'discretionary',
+])
+export type StrategyTemplate = z.infer<typeof StrategyTemplateSchema>
+
+// dev → paper (virtual trading) → live (real money) → retired.
+export const StrategyStatusSchema = z.enum(['dev', 'paper', 'live', 'retired'])
+export type StrategyStatus = z.infer<typeof StrategyStatusSchema>
+
+// A strategy card: the written trading plan. Symbols are "TW:0050" or
+// "US:SPY" style keys.
+export const TradingStrategySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  template: StrategyTemplateSchema,
+  params: z.record(z.string(), z.number()).default({}),
+  symbols: z.array(z.string()).default([]),
+  edge: z.string().default(''),
+  entryRules: z.string().default(''),
+  exitRules: z.string().default(''),
+  riskPerTradePercent: z.number().default(1),
+  status: StrategyStatusSchema,
+  notes: z.string().default(''),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+export type TradingStrategy = z.infer<typeof TradingStrategySchema>
+
+export const BacktestStatsSchema = z.object({
+  totalReturn: z.number(),
+  cagr: z.number(),
+  maxDrawdown: z.number(),
+  sharpe: z.number().nullable(),
+  trades: z.number(),
+  winRate: z.number().nullable(),
+  profitFactor: z.number().nullable(),
+  exposure: z.number(),
+})
+export type BacktestStats = z.infer<typeof BacktestStatsSchema>
+
+const BacktestSplitSchema = z.object({
+  full: BacktestStatsSchema,
+  inSample: BacktestStatsSchema.nullable(),
+  outOfSample: BacktestStatsSchema.nullable(),
+})
+
+// A saved backtest: settings, summary statistics and a weekly equity curve.
+export const BacktestRunSchema = z.object({
+  id: z.string(),
+  strategyId: z.string().optional(),
+  label: z.string(),
+  template: StrategyTemplateSchema,
+  params: z.record(z.string(), z.number()),
+  symbols: z.array(z.string()),
+  start: z.string(),
+  end: z.string(),
+  initialCapital: z.number(),
+  outOfSampleStart: z.string().nullable(),
+  dividendAdjusted: z.boolean(),
+  stats: BacktestSplitSchema,
+  benchmark: BacktestSplitSchema,
+  equity: z.array(z.object({ date: z.string(), strategy: z.number(), benchmark: z.number() })),
+  createdAt: z.string(),
+})
+export type BacktestRun = z.infer<typeof BacktestRunSchema>
+
+export const PaperPositionSchema = z.object({
+  symbol: z.string(),
+  name: z.string(),
+  shares: z.number(),
+  avgCost: z.number(),
+  lastPrice: z.number(),
+  lastPriceDate: z.string(),
+  stopLoss: z.number().optional(),
+  openedAt: z.string(),
+})
+export type PaperPosition = z.infer<typeof PaperPositionSchema>
+
+export const PaperOrderSchema = z.object({
+  id: z.string(),
+  createdAt: z.string(),
+  symbol: z.string(),
+  name: z.string(),
+  side: TradeSideSchema,
+  type: z.enum(['market', 'limit', 'stop']),
+  // Limit price, or the trigger price of a stop order.
+  price: z.number().optional(),
+  shares: z.number(),
+  status: z.enum(['open', 'filled', 'cancelled']),
+  filledAt: z.string().optional(),
+  fillPrice: z.number().optional(),
+  fee: z.number().optional(),
+  stopLoss: z.number().optional(),
+  reason: z.string().default(''),
+  emotion: z.number().int().min(1).max(5).optional(),
+  // Realized profit of a sell, and in R (risk at entry), when known.
+  realizedPnl: z.number().optional(),
+  rMultiple: z.number().optional(),
+})
+export type PaperOrder = z.infer<typeof PaperOrderSchema>
+
+export const PaperAccountSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  strategyId: z.string().optional(),
+  market: z.enum(['TW', 'US']),
+  initialCash: z.number(),
+  cash: z.number(),
+  positions: z.array(PaperPositionSchema),
+  orders: z.array(PaperOrderSchema),
+  equityHistory: z.array(z.object({ date: z.string(), equity: z.number() })),
+  createdAt: z.string(),
+})
+export type PaperAccount = z.infer<typeof PaperAccountSchema>
 
 export const AppDataSchema = z.object({
   schemaVersion: z.number(),
@@ -583,11 +726,14 @@ export const AppDataSchema = z.object({
   portfolioMeta: PortfolioMetaSchema.default({ fxUsdTwd: 32, peakValueTwd: 0, peakDate: null }),
   trades: z.array(TradeSchema).default([]),
   performanceReviews: z.array(PerformanceReviewSchema).default([]),
-  foundation: FoundationSchema.default({ emergencyFundAmount: 0, emergencyFundTargetMonths: 6 }),
+  foundation: FoundationSchema.default({ emergencyFundAmount: 0, emergencyFundTargetMonths: 6, livingBufferMonths: 24 }),
   marketSnapshot: MarketSnapshotSchema.default({ fetchedOn: null, valuations: {} }),
   researchReports: z.array(ResearchReportSchema).default([]),
   portfolioSnapshots: z.array(PortfolioSnapshotSchema).default([]),
   fubonOutlooks: z.array(FubonOutlookSchema).default([]),
+  tradingStrategies: z.array(TradingStrategySchema).default([]),
+  backtestRuns: z.array(BacktestRunSchema).default([]),
+  paperAccounts: z.array(PaperAccountSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -632,10 +778,13 @@ export function createDefaultAppData(): AppData {
     portfolioMeta: { fxUsdTwd: 32, peakValueTwd: 0, peakDate: null },
     trades: [],
     performanceReviews: [],
-    foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6 },
+    foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6, livingBufferMonths: 24 },
     marketSnapshot: { fetchedOn: null, valuations: {} },
     researchReports: [],
     portfolioSnapshots: [],
     fubonOutlooks: [],
+    tradingStrategies: [],
+    backtestRuns: [],
+    paperAccounts: [],
   }
 }

@@ -41,7 +41,7 @@ describe('resolveDocHref', () => {
 describe('HANDBOOK', () => {
   it('bundles every strategy document and every internal link resolves', () => {
     expect(HANDBOOK.map((d) => d.slug)).toEqual([
-      'index', '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '附錄A',
+      'index', '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '附錄A',
     ])
     for (const doc of HANDBOOK) {
       for (const [, href] of doc.content.matchAll(/\]\(([^)]+\.md[^)]*)\)/g)) {

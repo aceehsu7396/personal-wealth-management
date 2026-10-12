@@ -2,8 +2,9 @@ import type { AppData, InvestmentPolicy } from '../storage/schema'
 import { computeRequiredReturn } from './requiredReturn'
 import { computeDiscipline } from './disciplineScore'
 import { summarizeAttribution } from './attribution'
-import { evaluateThesis } from './thesisScoring'
 import { isSatellite } from './portfolioRisk'
+import { backtestPasses, PAPER_RULES, paperProgress, paperProvenStrategies } from './strategyProgress'
+import { computeTraderReadiness } from './traderReadiness'
 
 export type JourneyState = Pick<
   AppData,
@@ -16,6 +17,9 @@ export type JourneyState = Pick<
   | 'macroCheckIns'
   | 'stockTheses'
   | 'performanceReviews'
+  | 'tradingStrategies'
+  | 'backtestRuns'
+  | 'paperAccounts'
 >
 
 export interface JourneyStep {
@@ -59,12 +63,13 @@ export interface LearningStage {
   nextCriteria: StageCriterion[]
 }
 
-// Steps that must be done before satellite (individual stock) buys pass the
-// pre-trade checklist.
-export const SATELLITE_PREREQUISITES = ['1.1', '1.2', '1.4', '2.1', '2.3', '3.1']
+// Steps that must be done before trading-sleeve (satellite) buys pass the
+// pre-trade checklist: the foundation, the core, a macro view, and a
+// strategy proven by backtest and paper trading.
+export const SATELLITE_PREREQUISITES = ['1.1', '1.2', '1.4', '2.1', '2.3', '3.1', '4.2', '4.3']
 
-export const LEARNING_STAGE_TITLES = ['一 打地基', '二 練研究', '三 建系統', '四 穩定複利'] as const
-const STAGE_CAPS = [10, 20, 30, Infinity]
+export const LEARNING_STAGE_TITLES = ['一 打地基', '二 實單驗證', '三 擴大部位', '四 全職交易'] as const
+const STAGE_CAPS = [10, 20, 40, Infinity]
 
 const PAGES = {
   goals: { to: '/goals', label: '目標與政策' },
@@ -74,6 +79,9 @@ const PAGES = {
   review: { to: '/portfolio/review', label: '績效歸因' },
   market: { to: '/research/market', label: '研究分析・市場' },
   stocks: { to: '/research/stocks', label: '研究分析・個股' },
+  strategies: { to: '/sim/strategies', label: '模擬交易・策略卡' },
+  backtest: { to: '/sim/backtest', label: '模擬交易・回測' },
+  paper: { to: '/sim/paper', label: '模擬交易・虛擬帳戶' },
 }
 
 function distinctMonths(dates: string[]): number {
@@ -93,7 +101,7 @@ function formatTwd(value: number): string {
   return `${Math.round(value).toLocaleString('zh-TW')} 元`
 }
 
-export function computeJourney(state: JourneyState): JourneyReport {
+export function computeJourney(state: JourneyState, today: string): JourneyReport {
   const { assumptions, foundation, investmentPolicy: policy } = state
   const fundTarget = emergencyFundTarget(state)
   const required = computeRequiredReturn(state.profile, assumptions, policy.targetYears)
@@ -106,6 +114,10 @@ export function computeJourney(state: JourneyState): JourneyReport {
   const satelliteBuys = state.trades.filter(
     (t) => t.side === 'buy' && t.holdingId && isSatellite(sleeveOf.get(t.holdingId) ?? 'core_tw'),
   )
+  const passedBacktests = state.backtestRuns.filter(backtestPasses)
+  const bestPaper = state.paperAccounts
+    .map((a) => paperProgress(a, today))
+    .sort((a, b) => Number(b.qualifies) - Number(a.qualifies) || b.fills - a.fills)[0]
 
   const stages: Omit<JourneyStage, 'done'>[] = [
     {
@@ -212,34 +224,55 @@ export function computeJourney(state: JourneyState): JourneyReport {
     },
     {
       number: 4,
-      title: '衛星研究：開始練習選股',
-      summary: '在能力圈內研究個股，通過全部檢核才小額建倉。',
+      title: '交易策略：回測與虛擬交易',
+      summary: '把交易想法寫成策略卡，先回測、再用虛擬帳戶練習，證明有優勢才用真錢。',
       steps: [
         {
           id: '4.1',
-          title: '寫第一張觀察用研究卡',
-          done: state.stockTheses.length > 0,
-          detail: '研究卡隨時可以寫，先觀察不買進',
-          page: PAGES.stocks,
-          handbookSlug: '06',
+          title: '寫第一張策略卡',
+          done: state.tradingStrategies.length > 0,
+          detail: '寫下優勢、進出場規則與每筆風險',
+          page: PAGES.strategies,
+          handbookSlug: '10',
         },
         {
           id: '4.2',
-          title: '完成第一筆衛星交易',
-          done: satelliteBuys.length > 0,
-          detail: '解鎖後依研究卡分批建倉',
-          page: PAGES.trades,
-          handbookSlug: '07',
+          title: '回測通過：樣本外勝過買進持有',
+          done: passedBacktests.length > 0,
+          detail:
+            state.backtestRuns.length === 0
+              ? '還沒有回測紀錄'
+              : `已回測 ${state.backtestRuns.length} 次，通過 ${passedBacktests.length} 次`,
+          page: PAGES.backtest,
+          handbookSlug: '10',
+        },
+        {
+          id: '4.3',
+          title: `虛擬交易 ${PAPER_RULES.months} 個月、${PAPER_RULES.fills} 筆`,
+          done: bestPaper?.qualifies ?? false,
+          detail: bestPaper
+            ? `最佳帳戶：${Math.min(bestPaper.months, PAPER_RULES.months)}/${PAPER_RULES.months} 個月、${Math.min(bestPaper.fills, PAPER_RULES.fills)}/${PAPER_RULES.fills} 筆成交`
+            : '建立虛擬帳戶並照策略卡下單',
+          page: PAGES.paper,
+          handbookSlug: '10',
         },
       ],
     },
     {
       number: 5,
-      title: '風控與檢討：用結果修正自己',
-      summary: '每季做績效歸因，每筆交易事後檢討，區分運氣與能力。',
+      title: '實單驗證與檢討',
+      summary: '小額實單照策略卡執行，每季歸因、每筆檢討，累積轉為全職需要的紀錄。',
       steps: [
         {
           id: '5.1',
+          title: '第一筆實單交易（附策略卡與停損）',
+          done: satelliteBuys.some((t) => t.strategyId !== undefined && t.stopLoss !== undefined),
+          detail: '在交易日誌以「策略進場」記錄，連結策略卡並填停損價',
+          page: PAGES.trades,
+          handbookSlug: '04',
+        },
+        {
+          id: '5.2',
           title: '完成第一次季度績效歸因',
           done: state.performanceReviews.length > 0,
           detail: '在「投資組合 → 績效歸因」新增季度檢討',
@@ -247,7 +280,7 @@ export function computeJourney(state: JourneyState): JourneyReport {
           handbookSlug: '08',
         },
         {
-          id: '5.2',
+          id: '5.3',
           title: '完成第一次交易事後檢討',
           done: state.trades.some((t) => t.review6m || t.review12m),
           detail: '交易滿 6 個月後在交易日誌檢討',
@@ -276,14 +309,15 @@ function criterion(label: string, current: number, target: number): StageCriteri
   return { label, current, target, met: current >= target }
 }
 
-// Promotion follows the handbook's ten-year roadmap. Three consecutive years
-// of the satellite lagging its benchmark drops the learner back one stage.
+// Promotion follows the handbook's learning path (chapter 09). Three
+// consecutive years of the trading sleeve lagging its benchmark drops the
+// learner back one stage.
 export function computeLearningStage(state: JourneyState, today: string): LearningStage {
   const policy = state.investmentPolicy
-  const completeTheses = state.stockTheses.filter((t) => evaluateThesis(t, policy).isComplete).length
   const macroMonths = distinctMonths(state.macroCheckIns.map((c) => c.date))
-  const discipline = computeDiscipline(state.trades, state.holdings, state.stockTheses, policy, today).score ?? 0
+  const discipline = computeDiscipline(state.trades, state.holdings, state.stockTheses, policy, today).score
   const reviewedTrades = state.trades.filter((t) => t.review6m || t.review12m).length
+  const proven = paperProvenStrategies(state.tradingStrategies, state.paperAccounts, today).length
   const attribution = summarizeAttribution(state.performanceReviews, policy)
   const years = attribution.yearlySatellite
   const lastYear = years[years.length - 1]
@@ -293,25 +327,35 @@ export function computeLearningStage(state: JourneyState, today: string): Learni
     if (years[i].satelliteReturn < years[i].benchmarkReturn) break
     consecutiveBeatingYears += 1
   }
+  const readiness = computeTraderReadiness({
+    assumptions: state.assumptions,
+    foundation: state.foundation,
+    holdings: state.holdings,
+    trades: state.trades,
+    performanceReviews: state.performanceReviews,
+    policy,
+    disciplineScore: discipline,
+    today,
+  })
 
   const criteriaByStage: StageCriterion[][] = [
     [
       criterion('總經檢視涵蓋月數', macroMonths, 12),
-      criterion('完整研究卡', completeTheses, 10),
-      criterion('紀律分數', discipline, 75),
+      criterion('紀律分數', discipline ?? 0, 75),
+      criterion('通過虛擬交易的策略', proven, 1),
     ],
     [
-      criterion('研究卡', state.stockTheses.length, 20),
-      criterion('已完成事後檢討的交易', reviewedTrades, 15),
+      criterion('已完成事後檢討的實單交易', reviewedTrades, 15),
       {
-        label: '最近一年衛星落後基準不超過 3 個百分點',
+        label: '最近一年交易部位落後基準不超過 3 個百分點',
         current: lastYearGapPoints === null ? 0 : Math.round(lastYearGapPoints * 10) / 10,
         target: -3,
         met: lastYearGapPoints !== null && lastYearGapPoints >= -3,
       },
     ],
-    [criterion('衛星連續勝過基準年數', consecutiveBeatingYears, 3)],
-    [],
+    [criterion('交易部位連續勝過基準年數', consecutiveBeatingYears, 2)],
+    // Stage four is the last: what remains is the full-time readiness check.
+    [criterion('全職準備度', readiness.metCount, readiness.items.length)],
   ]
 
   let stage = 1

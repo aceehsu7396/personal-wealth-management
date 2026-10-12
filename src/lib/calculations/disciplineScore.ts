@@ -79,7 +79,10 @@ export function computeDiscipline(
 
   const thesisById = new Map(theses.map((t) => [t.id, t]))
   const satelliteHoldings = holdings.filter((h) => isSatellite(h.sleeve) && h.shares > 0)
+  // A position is documented by a complete research card, or by the
+  // strategy card it was entered under.
   const completeCount = satelliteHoldings.filter((h) => {
+    if (h.strategyId) return true
     const thesis = h.thesisId ? thesisById.get(h.thesisId) : undefined
     return thesis !== undefined && evaluateThesis(thesis, policy).isComplete
   }).length

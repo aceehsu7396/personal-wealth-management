@@ -210,3 +210,61 @@ describe('buildPreTradeChecklist', () => {
     expect(items.find((i) => i.key === 'notPriceNoise')?.passed).toBe(false)
   })
 })
+
+describe('strategy entries', () => {
+  const sat: Holding = { ...core, id: 'sat', ticker: '0052', sleeve: 'satellite_tw', shares: 0 }
+  const live = {
+    id: 'st',
+    name: '突破',
+    template: 'donchian' as const,
+    params: {},
+    symbols: [],
+    edge: '',
+    entryRules: '',
+    exitRules: '',
+    riskPerTradePercent: 1,
+    status: 'live' as const,
+    notes: '',
+    createdAt: '',
+    updatedAt: '',
+  }
+  // Portfolio 100k core; trading budget at 30% of the post-trade total.
+  const entry: PendingTrade = {
+    side: 'buy',
+    reason: 'strategy_entry',
+    ticker: '0052',
+    name: '',
+    sleeve: 'satellite_tw',
+    currency: 'TWD',
+    shares: 50,
+    price: 100,
+    holdingId: 'sat',
+    strategyId: 'st',
+    stopLoss: 95,
+    biasNotes: 'x',
+  }
+  const keys = (items: { key: string; passed: boolean }[]) =>
+    Object.fromEntries(items.map((i) => [i.key, i.passed]))
+
+  it('replaces research-card checks with strategy, stop and risk checks', () => {
+    const items = keys(buildPreTradeChecklist(entry, ctx({ holdings: [core, sat], strategies: [live] }), {}))
+    expect(items.thesisLinked).toBeUndefined()
+    expect(items).toMatchObject({ strategyLinked: true, strategyLive: true, stopLoss: true, riskPerTrade: true, openPositions: true })
+  })
+
+  it('fails without a stop, on a paper strategy, or when the stop risks too much', () => {
+    const c = ctx({ holdings: [core, sat], strategies: [{ ...live, status: 'paper' }] })
+    expect(keys(buildPreTradeChecklist({ ...entry, stopLoss: undefined }, c, {})).stopLoss).toBe(false)
+    expect(keys(buildPreTradeChecklist(entry, c, {})).strategyLive).toBe(false)
+    // 50 × (100 − 50) = 2,500 risk vs 1% of ~31.5k budget.
+    expect(keys(buildPreTradeChecklist({ ...entry, stopLoss: 50 }, c, {})).riskPerTrade).toBe(false)
+  })
+
+  it('caps the number of open trading positions', () => {
+    const many = Array.from({ length: 8 }, (_, i) => ({ ...sat, id: `s${i}`, ticker: `${i}`, shares: 1 }))
+    const items = keys(
+      buildPreTradeChecklist(entry, ctx({ holdings: [core, sat, ...many], strategies: [live] }), {}),
+    )
+    expect(items.openPositions).toBe(false)
+  })
+})

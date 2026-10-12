@@ -24,6 +24,9 @@ import {
   type MarketSnapshot,
   type ResearchReport,
   type FubonOutlook,
+  type TradingStrategy,
+  type BacktestRun,
+  type PaperAccount,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -115,6 +118,18 @@ interface AppStore extends AppData {
   // Stores a Fubon digest; re-digesting the same report replaces it.
   upsertFubonOutlook: (entry: Omit<FubonOutlook, 'id' | 'createdAt'>) => string
   removeFubonOutlook: (id: string) => void
+  addTradingStrategy: (entry: Omit<TradingStrategy, 'id' | 'createdAt' | 'updatedAt'>) => string
+  updateTradingStrategy: (
+    id: string,
+    entry: Partial<Omit<TradingStrategy, 'id' | 'createdAt' | 'updatedAt'>>,
+  ) => void
+  removeTradingStrategy: (id: string) => void
+  addBacktestRun: (entry: Omit<BacktestRun, 'id' | 'createdAt'>) => string
+  removeBacktestRun: (id: string) => void
+  addPaperAccount: (entry: Omit<PaperAccount, 'id' | 'createdAt'>) => string
+  // Paper-account changes are computed by pure functions and saved whole.
+  replacePaperAccount: (account: PaperAccount) => void
+  removePaperAccount: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -146,8 +161,14 @@ function toAppData(state: AppData): AppData {
     researchReports: state.researchReports,
     portfolioSnapshots: state.portfolioSnapshots,
     fubonOutlooks: state.fubonOutlooks,
+    tradingStrategies: state.tradingStrategies,
+    backtestRuns: state.backtestRuns,
+    paperAccounts: state.paperAccounts,
   }
 }
+
+// Keep localStorage bounded: only the most recent backtests are stored.
+export const MAX_BACKTEST_RUNS = 40
 
 export function exportAppData(): AppData {
   return toAppData(useAppStore.getState())
@@ -390,6 +411,52 @@ export const useAppStore = create<AppStore>()(
         }))
         return id
       },
+
+      addTradingStrategy: (entry) => {
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+        set((state) => ({
+          tradingStrategies: [...state.tradingStrategies, { ...entry, id, createdAt: now, updatedAt: now }],
+        }))
+        return id
+      },
+
+      updateTradingStrategy: (id, entry) =>
+        set((state) => ({
+          tradingStrategies: state.tradingStrategies.map((t) =>
+            t.id === id ? { ...t, ...entry, updatedAt: new Date().toISOString() } : t,
+          ),
+        })),
+
+      removeTradingStrategy: (id) =>
+        set((state) => ({ tradingStrategies: state.tradingStrategies.filter((t) => t.id !== id) })),
+
+      addBacktestRun: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({
+          backtestRuns: [...state.backtestRuns, { ...entry, id, createdAt: new Date().toISOString() }].slice(
+            -MAX_BACKTEST_RUNS,
+          ),
+        }))
+        return id
+      },
+
+      removeBacktestRun: (id) =>
+        set((state) => ({ backtestRuns: state.backtestRuns.filter((r) => r.id !== id) })),
+
+      addPaperAccount: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({
+          paperAccounts: [...state.paperAccounts, { ...entry, id, createdAt: new Date().toISOString() }],
+        }))
+        return id
+      },
+
+      replacePaperAccount: (account) =>
+        set((state) => ({ paperAccounts: state.paperAccounts.map((a) => (a.id === account.id ? account : a)) })),
+
+      removePaperAccount: (id) =>
+        set((state) => ({ paperAccounts: state.paperAccounts.filter((a) => a.id !== id) })),
 
       removeFubonOutlook: (id) =>
         set((state) => ({ fubonOutlooks: state.fubonOutlooks.filter((o) => o.id !== id) })),

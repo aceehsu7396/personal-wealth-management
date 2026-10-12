@@ -13,6 +13,8 @@ import { PortfolioPage } from './pages/PortfolioPage'
 import { TradesPage } from './pages/TradesPage'
 import { PortfolioReviewPage } from './pages/PortfolioReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { StrategiesPage } from './pages/StrategiesPage'
+import { SimPlaceholderPage } from './pages/SimPlaceholderPage'
 
 // The handbook bundles the Markdown renderer; load it only when opened.
 const HandbookPage = lazy(() =>
@@ -43,6 +45,10 @@ function App() {
           <Route path="/research/market" element={<MarketPage />} />
           <Route path="/research/industry" element={<IndustryPage />} />
           <Route path="/research/stocks" element={<StocksPage />} />
+          {/* 模擬交易 */}
+          <Route path="/sim/strategies" element={<StrategiesPage />} />
+          <Route path="/sim/backtest" element={<SimPlaceholderPage title="回測" />} />
+          <Route path="/sim/paper" element={<SimPlaceholderPage title="虛擬帳戶" />} />
           {/* 投資組合 */}
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/portfolio/trades" element={<TradesPage />} />

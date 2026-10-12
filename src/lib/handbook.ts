@@ -26,6 +26,8 @@ export const CHAPTER_PAGES: Record<string, { to: string; label: string }> = {
   '07': { to: '/research/stocks', label: '研究分析・個股' },
   '08': { to: '/portfolio/review', label: '績效歸因' },
   '09': { to: '/journey', label: '行動路線' },
+  '10': { to: '/sim/strategies', label: '模擬交易・策略卡' },
+  '11': { to: '/goals', label: '目標與政策・全職準備度' },
 }
 
 export function slugOf(fileName: string): string {

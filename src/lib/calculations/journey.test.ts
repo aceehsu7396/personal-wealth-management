@@ -9,10 +9,13 @@ import {
 } from './journey'
 import {
   createDefaultAppData,
+  type BacktestRun,
+  type BacktestStats,
   type Holding,
+  type PaperAccount,
+  type TradingStrategy,
   type MacroCheckIn,
   type PerformanceReview,
-  type StockThesis,
   type Trade,
 } from '../storage/schema'
 
@@ -29,13 +32,16 @@ function base(): JourneyState {
       savingsRatePercent: 50,
       monthlyExpenses: 50_000,
     },
-    foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6 },
+    foundation: { emergencyFundAmount: 0, emergencyFundTargetMonths: 6, livingBufferMonths: 24 },
     investmentPolicy: d.investmentPolicy,
     holdings: [],
     trades: [],
     macroCheckIns: [],
     stockTheses: [],
     performanceReviews: [],
+    tradingStrategies: [],
+    backtestRuns: [],
+    paperAccounts: [],
   }
 }
 
@@ -74,12 +80,81 @@ function macro(date: string): MacroCheckIn {
   }
 }
 
+function stats(cagr: number): BacktestStats {
+  return { totalReturn: cagr, cagr, maxDrawdown: -0.1, sharpe: 1, trades: 10, winRate: 0.5, profitFactor: 1.5, exposure: 0.6 }
+}
+
+function run(strategyCagr: number, benchmarkCagr: number): BacktestRun {
+  return {
+    id: `r${strategyCagr}`,
+    label: '',
+    template: 'ma_cross',
+    params: {},
+    symbols: ['TW:0050'],
+    start: '2020-01-01',
+    end: '2026-01-01',
+    initialCapital: 1_000_000,
+    outOfSampleStart: '2024-03-01',
+    dividendAdjusted: true,
+    stats: { full: stats(strategyCagr), inSample: stats(strategyCagr), outOfSample: stats(strategyCagr) },
+    benchmark: { full: stats(benchmarkCagr), inSample: stats(benchmarkCagr), outOfSample: stats(benchmarkCagr) },
+    equity: [],
+    createdAt: '',
+  }
+}
+
+const strategy: TradingStrategy = {
+  id: 'st',
+  name: '0050 均線',
+  template: 'ma_cross',
+  params: {},
+  symbols: ['TW:0050'],
+  edge: '',
+  entryRules: '',
+  exitRules: '',
+  riskPerTradePercent: 1,
+  status: 'paper',
+  notes: '',
+  createdAt: '',
+  updatedAt: '',
+}
+
+function paper(fills: number, firstFill: string): PaperAccount {
+  return {
+    id: 'pa',
+    name: '',
+    strategyId: 'st',
+    market: 'TW',
+    initialCash: 1_000_000,
+    cash: 1_000_000,
+    positions: [],
+    orders: Array.from({ length: fills }, (_, i) => ({
+      id: `o${i}`,
+      createdAt: firstFill,
+      symbol: 'TW:0050',
+      name: '',
+      side: 'buy' as const,
+      type: 'market' as const,
+      shares: 1,
+      status: 'filled' as const,
+      filledAt: firstFill,
+      fillPrice: 100,
+      reason: '',
+    })),
+    equityHistory: [],
+    createdAt: '',
+  }
+}
+
 // A learner who has finished every satellite prerequisite.
 function readyForSatellite(): JourneyState {
   const s = base()
   return {
     ...s,
-    foundation: { emergencyFundAmount: 300_000, emergencyFundTargetMonths: 6 },
+    tradingStrategies: [strategy],
+    backtestRuns: [run(0.12, 0.08)],
+    paperAccounts: [paper(10, '2026-06-01')],
+    foundation: { emergencyFundAmount: 300_000, emergencyFundTargetMonths: 6, livingBufferMonths: 24 },
     investmentPolicy: { ...s.investmentPolicy, signedAt: '2026-06-01' },
     holdings: [holding('tw', 'core_tw'), holding('gl', 'core_global')],
     trades: ['2026-07-05', '2026-08-05', '2026-09-05'].map((date) => trade({ date, holdingId: 'tw' })),
@@ -100,15 +175,15 @@ describe('monthlyExpenseBaseline', () => {
 describe('computeJourney', () => {
   it('starts a new user at step 1.1 with satellite locked', () => {
     const fresh = { ...base(), assumptions: createDefaultAppData().assumptions }
-    const report = computeJourney(fresh)
+    const report = computeJourney(fresh, TODAY)
     expect(report.nextStep?.id).toBe('1.1')
     expect(report.satelliteUnlocked).toBe(false)
-    expect(report.missingForSatellite.map((s) => s.id)).toEqual(['1.1', '1.2', '1.4', '2.1', '2.3', '3.1'])
+    expect(report.missingForSatellite.map((s) => s.id)).toEqual(['1.1', '1.2', '1.4', '2.1', '2.3', '3.1', '4.2', '4.3'])
   })
 
   it('requires the emergency fund to cover the target months of spending', () => {
-    const short = computeJourney({ ...base(), foundation: { emergencyFundAmount: 299_999, emergencyFundTargetMonths: 6 } })
-    const full = computeJourney({ ...base(), foundation: { emergencyFundAmount: 300_000, emergencyFundTargetMonths: 6 } })
+    const short = computeJourney({ ...base(), foundation: { emergencyFundAmount: 299_999, emergencyFundTargetMonths: 6, livingBufferMonths: 24 } }, TODAY)
+    const full = computeJourney({ ...base(), foundation: { emergencyFundAmount: 300_000, emergencyFundTargetMonths: 6, livingBufferMonths: 24 } }, TODAY)
     const step = (r: typeof short) => r.stages[0].steps.find((s) => s.id === '1.2')!
     expect(step(short).done).toBe(false)
     expect(step(full).done).toBe(true)
@@ -116,68 +191,43 @@ describe('computeJourney', () => {
 
   it('counts DCA and macro months by distinct calendar month', () => {
     const s = readyForSatellite()
-    const sameMonth = computeJourney({
-      ...s,
-      trades: ['2026-09-01', '2026-09-15', '2026-09-28'].map((date) => trade({ date })),
-    })
+    const sameMonth = computeJourney(
+      { ...s, trades: ['2026-09-01', '2026-09-15', '2026-09-28'].map((date) => trade({ date })) },
+      TODAY,
+    )
     expect(sameMonth.stages[1].steps.find((x) => x.id === '2.3')!.done).toBe(false)
-    expect(computeJourney(s).stages[1].steps.find((x) => x.id === '2.3')!.done).toBe(true)
+    expect(computeJourney(s, TODAY).stages[1].steps.find((x) => x.id === '2.3')!.done).toBe(true)
   })
 
   it('unlocks satellite once every prerequisite is done', () => {
-    const report = computeJourney(readyForSatellite())
+    const report = computeJourney(readyForSatellite(), TODAY)
     expect(report.satelliteUnlocked).toBe(true)
     expect(report.missingForSatellite).toEqual([])
     // 3.2 (three macro months) is not a prerequisite, so it is the next step.
     expect(report.nextStep?.id).toBe('3.2')
   })
 
-  it('detects a satellite buy through the holding sleeve', () => {
+  it('needs an out-of-sample win and enough paper trading to unlock', () => {
     const s = readyForSatellite()
-    const report = computeJourney({
-      ...s,
-      holdings: [...s.holdings, holding('sat', 'satellite_tw')],
-      trades: [...s.trades, trade({ reason: 'tranche_1', holdingId: 'sat' })],
-    })
-    expect(report.stages[3].steps.find((x) => x.id === '4.2')!.done).toBe(true)
+    const losing = computeJourney({ ...s, backtestRuns: [run(0.05, 0.08)] }, TODAY)
+    expect(losing.missingForSatellite.map((x) => x.id)).toEqual(['4.2'])
+    const tooShort = computeJourney({ ...s, paperAccounts: [paper(10, '2026-09-01')] }, TODAY)
+    expect(tooShort.missingForSatellite.map((x) => x.id)).toEqual(['4.3'])
+    const tooFew = computeJourney({ ...s, paperAccounts: [paper(9, '2026-06-01')] }, TODAY)
+    expect(tooFew.missingForSatellite.map((x) => x.id)).toEqual(['4.3'])
+  })
+
+  it('counts the first real trade only with a strategy card and a stop', () => {
+    const s = readyForSatellite()
+    const step = (trades: Trade[]) =>
+      computeJourney({ ...s, holdings: [...s.holdings, holding('sat', 'satellite_tw')], trades: [...s.trades, ...trades] }, TODAY)
+        .stages[4].steps.find((x) => x.id === '5.1')!.done
+    expect(step([trade({ reason: 'tranche_1', holdingId: 'sat' })])).toBe(false)
+    expect(step([trade({ reason: 'strategy_entry', holdingId: 'sat', strategyId: 'st', stopLoss: 0.9 })])).toBe(true)
   })
 })
 
 describe('computeLearningStage', () => {
-  const thesis = (i: number): StockThesis => ({
-    id: `t${i}`,
-    ticker: `${i}`,
-    name: '',
-    market: 'TW',
-    sector: 'x',
-    lynchCategory: 'stalwart',
-    inCircleOfCompetence: true,
-    status: 'watch',
-    thesis: 'a',
-    drivers: 'b',
-    killCriteria: 'c',
-    sources: 'd',
-    preMortem: 'e',
-    fiveForces: { rivalry: 3, newEntrants: 3, substitutes: 3, buyerPower: 3, supplierPower: 3 },
-    powers: {
-      scaleEconomies: 3,
-      networkEconomies: 0,
-      counterPositioning: 0,
-      switchingCosts: 0,
-      branding: 0,
-      corneredResource: 0,
-      processPower: 0,
-    },
-    fScore: 6,
-    hasUnexplainedRedFlags: false,
-    fairValueBear: 1,
-    fairValueBase: 2,
-    fairValueBull: 3,
-    currentPrice: 2,
-    updatedAt: '',
-    createdAt: '',
-  })
-
   it('starts at stage one with a 10% satellite cap', () => {
     const learning = computeLearningStage(base(), TODAY)
     expect(learning.stage).toBe(1)
@@ -185,12 +235,13 @@ describe('computeLearningStage', () => {
     expect(effectivePolicy(base().investmentPolicy, learning).satellitePercent).toBe(10)
   })
 
-  it('promotes to stage two after 12 macro months, 10 complete cards and discipline ≥ 75', () => {
+  it('promotes to stage two after 12 macro months, discipline ≥ 75 and a paper-proven strategy', () => {
     const months = Array.from({ length: 12 }, (_, i) => `2025-${String(i + 1).padStart(2, '0')}-01`)
     const state = {
       ...base(),
       macroCheckIns: months.map(macro),
-      stockTheses: Array.from({ length: 10 }, (_, i) => thesis(i)),
+      tradingStrategies: [strategy],
+      paperAccounts: [paper(10, '2026-06-01')],
       trades: [trade({ checklist: [{ key: 'a', label: 'a', passed: true }] })],
     }
     const learning = computeLearningStage(state, TODAY)
@@ -220,7 +271,8 @@ describe('computeLearningStage', () => {
     const state = {
       ...base(),
       macroCheckIns: months.map(macro),
-      stockTheses: Array.from({ length: 10 }, (_, i) => thesis(i)),
+      tradingStrategies: [strategy],
+      paperAccounts: [paper(10, '2026-06-01')],
       trades: [trade({ checklist: [{ key: 'a', label: 'a', passed: true }] })],
       performanceReviews: [2023, 2024, 2025].map(lagging),
     }

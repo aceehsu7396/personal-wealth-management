@@ -52,9 +52,9 @@ export const SLEEVE_LABELS: Record<Sleeve, string> = {
   core_tw: '核心：台股大盤',
   core_global: '核心：美股/全球',
   core_bond_cash: '核心：債券/現金',
-  satellite_tw: '衛星：台股個股',
-  satellite_us: '衛星：美股個股',
-  satellite_fund: '衛星：主動基金',
+  satellite_tw: '交易部位：台股',
+  satellite_us: '交易部位：美股',
+  satellite_fund: '交易部位：主動基金',
 }
 
 const CORE_SLEEVES: Sleeve[] = ['core_tw', 'core_global', 'core_bond_cash']
@@ -186,7 +186,7 @@ export function analyzePortfolio(
     violations.push({
       severity: 'critical',
       rule: '回撤熔斷',
-      message: `組合自高點回撤 ${fmt(drawdownPercent)}%，觸發熔斷（−${policy.drawdownCircuitBreakerPercent}%）：暫停新增衛星部位、全面複查論點；核心定期定額照常，不得賣出核心。`,
+      message: `組合自高點回撤 ${fmt(drawdownPercent)}%，觸發熔斷（−${policy.drawdownCircuitBreakerPercent}%）：暫停新增交易部位、全面複查論點與策略；核心定期定額照常，不得賣出核心。`,
     })
   }
 
@@ -195,7 +195,7 @@ export function analyzePortfolio(
     violations.push({
       severity: 'warning',
       rule: '再平衡',
-      message: `衛星占 ${fmt(satellitePercent)}%，超過上限 ${policy.satellitePercent}%：減碼估值最高的衛星持股，轉入核心。`,
+      message: `交易部位占 ${fmt(satellitePercent)}%，超過上限 ${policy.satellitePercent}%：減碼交易部位，轉入核心。`,
     })
   }
   for (const s of sleeves) {
@@ -218,7 +218,7 @@ export function analyzePortfolio(
     violations.push({
       severity: 'warning',
       rule: '產業集中度',
-      message: `「${sector}」占衛星額度 ${fmt(percentOfSatelliteBudget)}%，超過上限 ${policy.maxSectorPercentOfSatellite}%：停止加碼該產業。`,
+      message: `「${sector}」占交易部位額度 ${fmt(percentOfSatelliteBudget)}%，超過上限 ${policy.maxSectorPercentOfSatellite}%：停止加碼該產業。`,
     })
   }
 
@@ -247,6 +247,8 @@ export function analyzePortfolio(
         message: `${label} 占 ${fmt(v.weightPercent)}%，超過單檔上限 ${v.positionCapPercent}%：減碼回到上限。`,
       })
     }
+    // Strategy positions exit on their own stop and exit rules.
+    if (v.holding.strategyId) continue
     if (v.gainPercent <= -policy.reviewDrawdownFromCostPercent) {
       violations.push({
         severity: 'warning',
@@ -258,7 +260,7 @@ export function analyzePortfolio(
       violations.push({
         severity: 'warning',
         rule: '研究紀律',
-        message: `${label} 沒有連結研究卡：衛星持股必須有書面論點與失效條件。`,
+        message: `${label} 沒有連結研究卡或策略卡：交易部位的持股必須有書面論點或交易計畫。`,
       })
       continue
     }

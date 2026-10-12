@@ -6,12 +6,14 @@ import type {
   Sleeve,
   StockThesis,
   TradeReason,
+  TradingStrategy,
   TradeSide,
 } from '../storage/schema'
 import type { MacroAssessment } from './macroRegime'
 import { analyzePortfolio, isSatellite } from './portfolioRisk'
 import { evaluateThesis } from './thesisScoring'
 import { isFund } from './fundRules'
+import { STRATEGY_STATUS_LABELS } from '../backtest/templates'
 
 export interface ChecklistEntry {
   key: string
@@ -32,6 +34,8 @@ export interface PendingTrade {
   price: number
   holdingId?: string
   thesisId?: string
+  strategyId?: string
+  stopLoss?: number
   biasNotes: string
 }
 
@@ -42,6 +46,7 @@ export interface ChecklistContext {
   guardrails: AdviceGuardrails
   meta: PortfolioMeta
   macro: MacroAssessment | null
+  strategies?: TradingStrategy[]
   // Action-roadmap gate for satellite buys; omitted means no gate.
   satelliteGate?: { unlocked: boolean; missingSteps: string[] }
 }
@@ -57,11 +62,23 @@ export const TRADE_REASON_LABELS: Record<TradeReason, string> = {
   exit_opportunity_cost: '出場規則 ③ 機會成本',
   exit_deep_drawdown_review: '出場規則 ④ 深度回檔複查後出場',
   exit_over_limit: '出場規則 ⑤ 超過上限',
+  strategy_entry: '策略進場（依策略卡）',
+  strategy_exit: '策略出場（依策略卡）',
+  stop_loss: '停損出場',
 }
 
-export const BUY_REASONS: TradeReason[] = ['core_dca', 'rebalance', 'tranche_1', 'tranche_2', 'tranche_3']
+export const BUY_REASONS: TradeReason[] = [
+  'core_dca',
+  'rebalance',
+  'strategy_entry',
+  'tranche_1',
+  'tranche_2',
+  'tranche_3',
+]
 export const SELL_REASONS: TradeReason[] = [
   'rebalance',
+  'strategy_exit',
+  'stop_loss',
   'exit_thesis_broken',
   'exit_overvalued',
   'exit_opportunity_cost',
@@ -80,11 +97,15 @@ export const MANUAL_CHECKS: Partial<Record<TradeReason, { key: string; label: st
   exit_deep_drawdown_review: [
     { key: 'thesisRewritten', label: '已在 2 週內重寫論點，結論是論點不再成立' },
   ],
+  strategy_exit: [{ key: 'exitRuleTriggered', label: '策略卡事先寫下的出場條件確實已觸發' }],
+  stop_loss: [{ key: 'stopHit', label: '價格確實觸及進場時設定的停損價（不是臨時改的價位）' }],
 }
 const SELL_COMMON_MANUAL = [
   { key: 'notPriceNoise', label: '不是因為單日／單週的價格波動或新聞標題' },
   { key: 'costsConsidered', label: '已考慮稅與交易成本' },
 ]
+// Rule-based exits are price-driven by design; only the cost check applies.
+const RULE_EXIT_REASONS: TradeReason[] = ['strategy_exit', 'stop_loss']
 
 // Applies a trade to the holdings list: buys average into the cost basis,
 // sells reduce shares (never below zero). A buy without a matching holding
@@ -194,10 +215,22 @@ export function buildPreTradeChecklist(
       // Active funds skip the individual-stock checks (research card,
       // valuation, single-position and sector caps).
       const fund = holding !== undefined && isFund(holding)
-      if (!fund) items.push(check('thesisLinked', '已連結研究卡', thesis !== undefined))
-      if (evaluation && !fund) {
-        for (const c of evaluation.checks) items.push(check(`thesis.${c.key}`, c.label, c.passed))
+      if (trade.reason === 'strategy_entry') {
+        items.push(...strategyChecks(trade, ctx, after.totalValueTwd))
+      } else {
+        if (!fund) items.push(check('thesisLinked', '已連結研究卡', thesis !== undefined))
+        if (evaluation && !fund) {
+          for (const c of evaluation.checks) items.push(check(`thesis.${c.key}`, c.label, c.passed))
+        }
       }
+      const openPositions = after.holdings.filter((v) => isSatellite(v.holding.sleeve) && v.holding.shares > 0).length
+      items.push(
+        check(
+          'openPositions',
+          `交易後交易部位持有 ${openPositions} 檔 ≤ 上限 ${policy.maxOpenPositions} 檔`,
+          openPositions <= policy.maxOpenPositions,
+        ),
+      )
       if (target && target.positionCapPercent !== null) {
         items.push(
           check(
@@ -273,6 +306,47 @@ export function buildPreTradeChecklist(
       break
   }
   manual(MANUAL_CHECKS[trade.reason] ?? [])
-  manual(SELL_COMMON_MANUAL)
+  manual(RULE_EXIT_REASONS.includes(trade.reason) ? SELL_COMMON_MANUAL.slice(1) : SELL_COMMON_MANUAL)
+  return items
+}
+
+// Risk of one strategy entry: the loss if the stop is hit, as a share of
+// the trading budget (total portfolio × trading-sleeve cap).
+export function tradeRiskPercent(
+  trade: Pick<PendingTrade, 'shares' | 'price' | 'stopLoss' | 'currency'>,
+  totalValueTwd: number,
+  policy: InvestmentPolicy,
+  fxUsdTwd: number,
+): number | null {
+  if (trade.stopLoss === undefined || trade.stopLoss >= trade.price) return null
+  const budget = (totalValueTwd * policy.satellitePercent) / 100
+  const fx = trade.currency === 'USD' ? fxUsdTwd : 1
+  const risk = trade.shares * (trade.price - trade.stopLoss) * fx
+  return budget > 0 ? (risk / budget) * 100 : Infinity
+}
+
+function strategyChecks(trade: PendingTrade, ctx: ChecklistContext, totalValueTwd: number): ChecklistEntry[] {
+  const { policy } = ctx
+  const strategy = trade.strategyId ? ctx.strategies?.find((s) => s.id === trade.strategyId) : undefined
+  const items = [
+    check('strategyLinked', '已連結策略卡', strategy !== undefined),
+    check(
+      'strategyLive',
+      `策略卡狀態為「實單」${strategy ? `（目前：${STRATEGY_STATUS_LABELS[strategy.status]}）` : ''}`,
+      strategy?.status === 'live',
+    ),
+  ]
+  const hasStop = trade.stopLoss !== undefined && trade.stopLoss > 0 && trade.stopLoss < trade.price
+  if (policy.requireStopLoss) items.push(check('stopLoss', '已設定低於成交價的停損價', hasStop))
+  const risk = tradeRiskPercent(trade, totalValueTwd, policy, ctx.meta.fxUsdTwd)
+  if (risk !== null) {
+    items.push(
+      check(
+        'riskPerTrade',
+        `本筆停損風險 ${Number.isFinite(risk) ? risk.toFixed(2) : '—'}% 交易部位 ≤ 上限 ${policy.riskPerTradePercent}%`,
+        risk <= policy.riskPerTradePercent,
+      ),
+    )
+  }
   return items
 }

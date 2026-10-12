@@ -22,6 +22,8 @@ const formSchema = z
     maxDrawdownTolerancePercent: percent,
     drawdownCircuitBreakerPercent: percent,
     reviewDrawdownFromCostPercent: percent,
+    riskPerTradePercent: z.coerce.number().min(0.1, '至少 0.1').max(5, '不建議超過 5'),
+    maxOpenPositions: z.coerce.number().int().min(1).max(30),
   })
   .refine(
     (v) =>
@@ -33,7 +35,7 @@ const formSchema = z
           100,
       ) < 0.01,
     {
-      message: '核心三類 + 衛星的合計必須等於 100%',
+      message: '核心三類 + 交易部位的合計必須等於 100%',
       path: ['satellitePercent'],
     },
   )
@@ -56,7 +58,7 @@ type FormInput = z.input<typeof formSchema>
 type FormOutput = z.output<typeof formSchema>
 
 const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
-  { name: 'targetYears', label: '財務自由目標年限（年）', step: '1' },
+  { name: 'targetYears', label: '全職交易目標年限（年）', step: '1' },
   { name: 'coreTwEquityPercent', label: '核心：台股大盤（%）', step: '1' },
   {
     name: 'coreGlobalEquityPercent',
@@ -64,7 +66,7 @@ const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
     step: '1',
   },
   { name: 'coreBondCashPercent', label: '核心：債券/現金（%）', step: '1' },
-  { name: 'satellitePercent', label: '衛星個股上限（%）', step: '1' },
+  { name: 'satellitePercent', label: '交易部位（衛星）上限（%）', step: '1' },
   {
     name: 'maxSinglePositionPercent',
     label: '單檔個股上限（占總資產 %）',
@@ -77,7 +79,7 @@ const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
   },
   {
     name: 'maxSectorPercentOfSatellite',
-    label: '單一產業上限（占衛星額度 %）',
+    label: '單一產業上限（占交易部位額度 %）',
     step: '1',
   },
   { name: 'maxUsdExposurePercent', label: '美元資產上限（%）', step: '1' },
@@ -97,6 +99,8 @@ const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
     label: '個股複查門檻：從成本下跌（%）',
     step: '1',
   },
+  { name: 'riskPerTradePercent', label: '每筆停損風險（占交易部位 %）', step: '0.1' },
+  { name: 'maxOpenPositions', label: '交易部位最多同時持有（檔）', step: '1' },
 ]
 
 export function InvestmentPolicyForm() {

@@ -21,6 +21,9 @@ export function useJourney() {
   const macroCheckIns = useAppStore((s) => s.macroCheckIns)
   const stockTheses = useAppStore((s) => s.stockTheses)
   const performanceReviews = useAppStore((s) => s.performanceReviews)
+  const tradingStrategies = useAppStore((s) => s.tradingStrategies)
+  const backtestRuns = useAppStore((s) => s.backtestRuns)
+  const paperAccounts = useAppStore((s) => s.paperAccounts)
 
   const state: JourneyState = {
     profile,
@@ -32,8 +35,12 @@ export function useJourney() {
     macroCheckIns,
     stockTheses,
     performanceReviews,
+    tradingStrategies,
+    backtestRuns,
+    paperAccounts,
   }
-  const journey = computeJourney(state)
-  const learning = computeLearningStage(state, todayIsoDate())
+  const today = todayIsoDate()
+  const journey = computeJourney(state, today)
+  const learning = computeLearningStage(state, today)
   return { state, journey, learning, policy: effectivePolicy(investmentPolicy, learning) }
 }

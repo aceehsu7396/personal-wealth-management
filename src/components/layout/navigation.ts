@@ -1,4 +1,4 @@
-// Top-level navigation: five groups, each with its own sub-tabs.
+// Top-level navigation: six groups, each with its own sub-tabs.
 
 export interface NavTab {
   label: string
@@ -9,7 +9,7 @@ export interface NavTab {
 }
 
 export interface NavGroup {
-  id: 'overview' | 'learn' | 'research' | 'portfolio' | 'settings'
+  id: 'overview' | 'learn' | 'research' | 'sim' | 'portfolio' | 'settings'
   label: string
   to: string
   tabs: NavTab[]
@@ -42,6 +42,16 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: '市場', to: '/research/market' },
       { label: '產業', to: '/research/industry' },
       { label: '個股', to: '/research/stocks' },
+    ],
+  },
+  {
+    id: 'sim',
+    label: '模擬交易',
+    to: '/sim/strategies',
+    tabs: [
+      { label: '策略卡', to: '/sim/strategies' },
+      { label: '回測', to: '/sim/backtest' },
+      { label: '虛擬帳戶', to: '/sim/paper' },
     ],
   },
   {
