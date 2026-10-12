@@ -328,3 +328,17 @@ export function isoDaysAgo(today: string, years: number): string {
   return `${y - years}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`
 }
 
+
+// Latest daily bar of a TWSE code (this month, or last month early in a
+// month), unadjusted: paper trades use real prices.
+export async function fetchLatestTwseBar(code: string, today: string, deps: FetchDeps = defaultDeps): Promise<Bar | null> {
+  const [y, m] = today.split('-').map(Number)
+  const months = [`${y}${String(m).padStart(2, '0')}01`, m === 1 ? `${y - 1}1201` : `${y}${String(m - 1).padStart(2, '0')}01`]
+  for (const [i, date] of months.entries()) {
+    if (i > 0) await deps.sleep(TWSE_REQUEST_GAP_MS)
+    const params = new URLSearchParams({ response: 'json', date, stockNo: code })
+    const bars = parseStockDay(await deps.fetchJson(`${STOCK_DAY}?${params}`))
+    if (bars.length > 0) return bars[bars.length - 1]
+  }
+  return null
+}

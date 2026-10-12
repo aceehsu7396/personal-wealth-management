@@ -14,7 +14,7 @@ import { TradesPage } from './pages/TradesPage'
 import { PortfolioReviewPage } from './pages/PortfolioReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StrategiesPage } from './pages/StrategiesPage'
-import { SimPlaceholderPage } from './pages/SimPlaceholderPage'
+import { PaperPage } from './pages/PaperPage'
 import { BacktestPage } from './pages/BacktestPage'
 
 // The handbook bundles the Markdown renderer; load it only when opened.
@@ -49,7 +49,7 @@ function App() {
           {/* 模擬交易 */}
           <Route path="/sim/strategies" element={<StrategiesPage />} />
           <Route path="/sim/backtest" element={<BacktestPage />} />
-          <Route path="/sim/paper" element={<SimPlaceholderPage title="虛擬帳戶" />} />
+          <Route path="/sim/paper" element={<PaperPage />} />
           {/* 投資組合 */}
           <Route path="/portfolio" element={<PortfolioPage />} />
           <Route path="/portfolio/trades" element={<TradesPage />} />

@@ -25,7 +25,15 @@ const BENCHMARK_COLOR = '#f97316'
 
 // Growth of 100 for the strategy and buy-and-hold; the dashed line marks
 // where the out-of-sample period starts.
-export function EquityChart({ data, oosStart }: { data: EquityPoint[]; oosStart: string | null }) {
+export function EquityChart({
+  data,
+  oosStart,
+  labels = ['策略', '買進持有'],
+}: {
+  data: EquityPoint[]
+  oosStart: string | null
+  labels?: [string, string]
+}) {
   // The curve is weekly; mark the first plotted point inside the held-out period.
   const marker = oosStart ? data.find((p) => p.date >= oosStart)?.date : undefined
   return (
@@ -38,8 +46,8 @@ export function EquityChart({ data, oosStart }: { data: EquityPoint[]; oosStart:
           <Tooltip formatter={(v) => Number(v).toFixed(1)} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           {marker && <ReferenceLine x={marker} stroke="#6b7280" strokeDasharray="4 4" label={{ value: '樣本外', fontSize: 11, fill: '#6b7280' }} />}
-          <Line type="monotone" dataKey="strategy" name="策略" stroke={STRATEGY_COLOR} dot={false} strokeWidth={2} isAnimationActive={false} />
-          <Line type="monotone" dataKey="benchmark" name="買進持有" stroke={BENCHMARK_COLOR} dot={false} strokeWidth={1.5} isAnimationActive={false} />
+          <Line type="monotone" dataKey="strategy" name={labels[0]} stroke={STRATEGY_COLOR} dot={false} strokeWidth={2} isAnimationActive={false} />
+          <Line type="monotone" dataKey="benchmark" name={labels[1]} stroke={BENCHMARK_COLOR} dot={false} strokeWidth={1.5} isAnimationActive={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

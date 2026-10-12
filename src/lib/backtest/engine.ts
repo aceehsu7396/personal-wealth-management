@@ -497,3 +497,87 @@ export function weeklySample(dates: string[], ...series: number[][]): { date: st
   })
   return out
 }
+
+// ---------------------------------------------------------------------------
+// Today's signals (paper trading)
+// ---------------------------------------------------------------------------
+
+export interface SignalSuggestion {
+  symbol: string
+  side: 'buy' | 'sell'
+  date: string
+  close: number
+  shares: number
+  stopLoss?: number
+  reason: string
+}
+
+// Applies a strategy's rules to the latest bar of each symbol, given what
+// the paper account holds, and suggests orders for the next session.
+export function latestSignals(
+  template: StrategyTemplate,
+  rawParams: Record<string, number>,
+  data: Record<string, Bar[]>,
+  held: Record<string, { shares: number; openedAt: string }>,
+  equity: number,
+): SignalSuggestion[] {
+  const params = resolveParams(template, rawParams)
+  const symbols = Object.keys(data).filter((s) => data[s].length > 0)
+  if (symbols.length === 0) return []
+  const prepared = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, data[s])]))
+  const out: SignalSuggestion[] = []
+  const last = (s: string) => prepared[s].bars[prepared[s].bars.length - 1]
+  const stopFor = (s: string) => {
+    const d = prepared[s]
+    const a = d.atr[d.bars.length - 1]
+    return params.atrStop > 0 && a > 0 ? Math.round((last(s).close - params.atrStop * a) * 100) / 100 : undefined
+  }
+
+  if (template === 'momentum_rotation') {
+    const date = symbols.map((s) => last(s).date).sort().pop()!
+    const picks = rankMomentum(params, prepared, date)
+    for (const s of symbols) {
+      const bar = last(s)
+      if (held[s] && !picks.includes(s)) {
+        out.push({ symbol: s, side: 'sell', date: bar.date, close: bar.close, shares: held[s].shares, reason: '跌出動能前段班' })
+      }
+    }
+    for (const s of picks.filter((p) => !held[p])) {
+      const bar = last(s)
+      out.push({ symbol: s, side: 'buy', date: bar.date, close: bar.close, shares: Math.floor(equity / picks.length / bar.close), reason: `動能前 ${params.topK} 名` })
+    }
+    return out
+  }
+
+  for (const s of symbols) {
+    const d = prepared[s]
+    const i = d.bars.length - 1
+    const bar = d.bars[i]
+    const h = held[s]
+    if (template === 'buy_hold' || template === 'dca') {
+      const amount = template === 'dca' ? params.monthlyAmount : equity / symbols.length
+      if (template === 'dca' || !h) {
+        out.push({ symbol: s, side: 'buy', date: bar.date, close: bar.close, shares: Math.floor(amount / bar.close), reason: template === 'dca' ? '每月定期定額' : '買進持有' })
+      }
+      continue
+    }
+    const entryBar = h ? Math.max(d.bars.findIndex((b) => b.date >= h.openedAt), 0) : 0
+    const pos = h ? { shares: h.shares, entryPrice: 0, entryDate: h.openedAt, entryBar, stop: null, cost: 0 } : undefined
+    const order = signal(template, params, d, i, pos)
+    if (!order) continue
+    if (order.side === 'sell' && h) {
+      out.push({ symbol: s, side: 'sell', date: bar.date, close: bar.close, shares: h.shares, reason: '策略出場訊號' })
+    } else if (order.side === 'buy') {
+      out.push({
+        symbol: s,
+        side: 'buy',
+        date: bar.date,
+        close: bar.close,
+        shares: Math.floor(equity / symbols.length / bar.close),
+        stopLoss: stopFor(s),
+        reason: '策略進場訊號',
+      })
+    }
+  }
+  return out
+}
