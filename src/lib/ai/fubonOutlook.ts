@@ -2,7 +2,7 @@ import { FubonOutlookContentSchema, type FubonOutlook } from '../storage/schema'
 import { MACRO_SIGNAL_LABELS, TRACKED_INDEX_LABELS } from '../calculations/fubonTracking'
 import { runWebResearch, type ResearchClient } from './webResearch'
 import { extractStructured, type ExtractionClient } from './extractStructured'
-import { fubonUsage, MACRO_PRIMARY_SOURCE } from './analyses'
+import { FUBON_PDF_PATTERN, fubonUsage, MACRO_PRIMARY_SOURCE } from './analyses'
 
 const SIGNAL_LIST = Object.entries(MACRO_SIGNAL_LABELS)
   .map(([key, label]) => `- ${label}（${key}）`)
@@ -11,8 +11,13 @@ const INDEX_LIST = Object.entries(TRACKED_INDEX_LABELS)
   .map(([key, { label }]) => `- ${label}（${key}）`)
   .join('\n')
 
-export function buildFubonDigestPrompt(today: string): string {
-  return `今天是 ${today}。請用網頁讀取工具開啟富邦金控研究報告列表 ${MACRO_PRIMARY_SOURCE} ，找出日期最新的一期「富邦總經觀點-○月市場展望」，再開啟它連結的 PDF 全文，**只根據這份 PDF** 整理下列內容（不需要上網搜尋其他資料）。每一點都要附頁碼（p.X）。
+// With a known PDF url (from the daily data job) the model opens it
+// directly; otherwise it finds the latest issue on the research list.
+export function buildFubonDigestPrompt(today: string, pdfUrl?: string): string {
+  const open = pdfUrl
+    ? `請用網頁讀取工具開啟富邦金控「市場展望」PDF：${pdfUrl}`
+    : `請用網頁讀取工具開啟富邦金控研究報告列表 ${MACRO_PRIMARY_SOURCE} ，找出日期最新的一期「富邦總經觀點-○月市場展望」，再開啟它的 PDF 全文（網址格式為 ${FUBON_PDF_PATTERN}，MMDDYY 是發布日期）`
+  return `今天是 ${today}。${open}，**只根據這份 PDF** 整理下列內容（不需要上網搜尋其他資料）。每一點都要附頁碼（p.X）。
 
 ## 1. 報告資訊
 報告名稱、發布日期（YYYY-MM-DD）、PDF 網址。
@@ -46,8 +51,9 @@ export const FUBON_DIGEST_EXTRACTION_INSTRUCTIONS =
 export async function digestFubonOutlook(
   today: string,
   clients?: { research?: ResearchClient; extraction?: ExtractionClient },
+  pdfUrl?: string,
 ): Promise<Omit<FubonOutlook, 'id' | 'createdAt'>> {
-  const research = await runWebResearch({ prompt: buildFubonDigestPrompt(today), maxSearches: 2 }, clients?.research)
+  const research = await runWebResearch({ prompt: buildFubonDigestPrompt(today, pdfUrl), maxSearches: 2 }, clients?.research)
   const extraction = await extractStructured(
     FubonOutlookContentSchema,
     FUBON_DIGEST_EXTRACTION_INSTRUCTIONS,

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '../lib/storage/appStore'
 import {
   assessMacro,
@@ -17,6 +17,8 @@ import { useResearchTask } from '../lib/ai/useResearchTask'
 import { latestOutlook, MACRO_SIGNAL_LABELS, PILLAR_LABELS } from '../lib/calculations/fubonTracking'
 import { todayIsoDate } from '../lib/market/twse'
 import type { MacroCheckIn, MacroSignalKey } from '../lib/storage/schema'
+import { fetchMacroData, toOutlooks, type MacroData } from '../lib/macro/macroData'
+import { AUTO_NOTE, rulesCheckIn, shouldAutoSave } from '../lib/macro/signalRules'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -53,7 +55,14 @@ function SignalReasons({ checkIn }: { checkIn: MacroCheckIn }) {
               {keys
                 .filter((k) => k.startsWith(`${pillar}.`))
                 .map((k) => (
-                  <li key={k} className="text-gray-600 dark:text-gray-400">
+                  <li
+                    key={k}
+                    className={
+                      checkIn.reasons?.[k]?.includes('手動')
+                        ? 'text-orange-700 dark:text-orange-400'
+                        : 'text-gray-600 dark:text-gray-400'
+                    }
+                  >
                     <span className="font-medium text-gray-800 dark:text-gray-200">
                       {MACRO_SIGNAL_LABELS[k]}：{signalValue(checkIn, k)}
                     </span>
@@ -86,6 +95,30 @@ export function MacroPanel() {
   const [digestWarning, setDigestWarning] = useState<string | null>(null)
   const task = useResearchTask()
   const marketReports = reports.filter((r) => r.kind === 'market').reverse()
+  // Daily snapshot of public data + the parsed Fubon outlook (no API key).
+  const [data, setData] = useState<MacroData | null | undefined>(undefined)
+
+  useEffect(() => {
+    let cancelled = false
+    void fetchMacroData().then((d) => {
+      if (!cancelled) setData(d)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  // The month's check-in follows the rules automatically, unless the user
+  // corrected it or ran an AI review this month.
+  useEffect(() => {
+    if (!data) return
+    const today = todayIsoDate()
+    const { checkIn } = rulesCheckIn(data, today)
+    const existing = useAppStore.getState().macroCheckIns.find((c) => c.date.slice(0, 7) === today.slice(0, 7))
+    if (shouldAutoSave(existing, checkIn)) upsertMonthlyMacroCheckIn(checkIn)
+  }, [data, upsertMonthlyMacroCheckIn])
+
+  const manualSignals = data ? rulesCheckIn(data, todayIsoDate()).manual.length : 0
 
   // One button for the whole monthly review: digest the latest Fubon
   // outlook (when a new month's issue may be out), search only the signals
@@ -93,12 +126,15 @@ export function MacroPanel() {
   async function refresh() {
     const today = todayIsoDate()
     setDigestWarning(null)
-    const result = await task.run(() => refreshMacro(today, useAppStore.getState().fubonOutlooks, undefined, setStep))
+    // Reports parsed by the daily job count as digests, so the AI only
+    // reads the PDF itself when no current issue is available.
+    const known = () => [...(data ? toOutlooks(data) : []), ...useAppStore.getState().fubonOutlooks]
+    const result = await task.run(() => refreshMacro(today, known(), undefined, setStep))
     setStep(null)
     if (!result) return
     if (result.newOutlook) upsertFubonOutlook(result.newOutlook)
     if (result.digestError) setDigestWarning(result.digestError)
-    const outlook = result.usedOutlook ? latestOutlook(useAppStore.getState().fubonOutlooks) : undefined
+    const outlook = result.usedOutlook ? latestOutlook(known()) : undefined
     const reportId = addResearchReport({
       kind: 'market',
       fubonOutlookId: outlook?.id,
@@ -120,7 +156,9 @@ export function MacroPanel() {
 
   function handleEdit(values: MacroCheckInFormValues) {
     if (!editingId) return
-    updateMacroCheckIn(editingId, { ...values, note: values.note || '已手動修正' })
+    // A corrected check-in is no longer automatic: the daily rules leave it alone.
+    const note = values.note && values.note !== AUTO_NOTE ? values.note : '已手動修正'
+    updateMacroCheckIn(editingId, { ...values, note })
     setEditingId(null)
   }
 
@@ -131,28 +169,55 @@ export function MacroPanel() {
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           景氣體制（達利歐四象限）＋ 流動性（朱肯米勒）＋ 情緒溫度（馬克斯鐘擺）。總經只調整股債比例，不決定個股進出。
         </p>
-        <div className="mt-4 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
-          <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
-            每月按一次：自動整理{' '}
-            <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className="font-medium text-indigo-700 underline dark:text-indigo-400">
-              富邦金控研究報告
-            </a>{' '}
-            最新一期「富邦總經觀點」，只上網補查富邦未涵蓋的訊號，再自動判斷 17 個訊號並存成本月的總經檢視（同月重新取得會覆蓋）。
-          </p>
-          <AiActionButton
-            label="取得最新總經資訊"
-            running={task.running}
-            error={task.error}
-            hasApiKey={task.hasApiKey}
-            costNote="每月一次，約 US$0.3–0.6，使用你的 Anthropic API 金鑰"
-            runningLabel={step === 'digest' ? '1/2 整理富邦最新報告…' : '2/2 補查其餘訊號並判斷…（約 1–3 分鐘）'}
-            onClick={() => void refresh()}
-          />
-          {digestWarning && (
-            <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
-              富邦報告整理失敗（{digestWarning}），這次總經判斷改由網路搜尋取得。
+        <div className="mt-4 rounded-md bg-gray-50 p-4 text-sm dark:bg-gray-900/40">
+          {data === undefined ? (
+            <p className="text-gray-500 dark:text-gray-400">讀取每日總經資料中…</p>
+          ) : data === null ? (
+            <p className="text-orange-700 dark:text-orange-400">
+              暫時讀不到每日總經資料；可以用下方的 AI 分析，或手動修正本月檢視。
             </p>
+          ) : (
+            <>
+              <p className="text-gray-700 dark:text-gray-300">
+                ✓ 本月判斷由 GitHub 每天自動更新（免 API 金鑰）：美國數據取自聯準會 FRED，台灣取自國發會、主計總處、證交所，評價取自{' '}
+                <a href={MACRO_PRIMARY_SOURCE} target="_blank" rel="noreferrer" className="font-medium text-indigo-700 underline dark:text-indigo-400">
+                  富邦金控研究報告
+                </a>
+                。資料更新於 {new Date(data.generatedAt).toLocaleString('zh-TW')}。
+              </p>
+              {manualSignals > 0 && (
+                <p className="mt-1 text-xs text-orange-700 dark:text-orange-400">
+                  {manualSignals} 個訊號沒有免費數據，暫列中性（下方橘色），有需要可按「手動修正」。
+                </p>
+              )}
+              {data.errors.length > 0 && (
+                <p className="mt-1 text-xs text-orange-700 dark:text-orange-400">今日部分來源讀取失敗：{data.errors.join('；')}</p>
+              )}
+              {latest && latest.note !== AUTO_NOTE && latest.date.slice(0, 7) === todayIsoDate().slice(0, 7) && (
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">本月檢視已手動修正或由 AI 分析，自動更新不會覆蓋。</p>
+              )}
+            </>
           )}
+          <details className="mt-3">
+            <summary className="cursor-pointer text-xs font-medium text-gray-700 dark:text-gray-300">AI 深入分析（選用，需 API 金鑰）</summary>
+            <p className="mb-3 mt-2 text-xs text-gray-600 dark:text-gray-300">
+              讓 AI 讀富邦報告並上網補查最新數據，產出研究報告並以 AI 的判斷取代本月檢視。
+            </p>
+            <AiActionButton
+              label="AI 深入分析"
+              running={task.running}
+              error={task.error}
+              hasApiKey={task.hasApiKey}
+              costNote="約 US$0.3–0.6，使用你的 Anthropic API 金鑰"
+              runningLabel={step === 'digest' ? '1/2 整理富邦最新報告…' : '2/2 補查其餘訊號並判斷…（約 1–3 分鐘）'}
+              onClick={() => void refresh()}
+            />
+            {digestWarning && (
+              <p className="mt-2 text-xs text-orange-700 dark:text-orange-400">
+                富邦報告整理失敗（{digestWarning}），這次總經判斷改由網路搜尋取得。
+              </p>
+            )}
+          </details>
         </div>
         {assessment && latest ? (
           <>
@@ -217,7 +282,7 @@ export function MacroPanel() {
           </>
         ) : (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-            還沒有總經檢視。建議每月第一週按上方按鈕取得一次。
+            還沒有總經檢視；讀到每日總經資料後會自動建立本月檢視。
           </p>
         )}
       </div>
@@ -237,7 +302,7 @@ export function MacroPanel() {
         </div>
       )}
 
-      <FubonOutlookCard />
+      <FubonOutlookCard data={data ?? null} />
 
       {marketReports.length > 0 && (
         <div className={cardClass}>

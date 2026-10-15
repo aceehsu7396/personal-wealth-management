@@ -3,6 +3,9 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  # Daily at 07:00 Taiwan time: refresh the macro data (public/data/macro.json).
+  schedule:
+    - cron: '0 23 * * *'
   workflow_dispatch:
 
 permissions:
@@ -26,6 +29,12 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test
+      # Public macro data (FRED, 國發會, 主計總處, 證交所, 富邦) needs no API key
+      # but blocks browsers, so it is fetched here and served with the site.
+      # A failed fetch must not block the deploy; the page then says so.
+      - name: Fetch macro data
+        run: npx tsx scripts/macro-data.mts
+        continue-on-error: true
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

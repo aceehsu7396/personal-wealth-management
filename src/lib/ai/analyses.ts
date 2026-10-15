@@ -61,7 +61,10 @@ export type StoredMacroDraft = z.infer<typeof StoredMacroDraftSchema>
 
 // Primary macro source: Fubon Financial's research report list. The model
 // fetches the list, then the latest monthly outlook PDF linked from it.
-export const MACRO_PRIMARY_SOURCE = 'https://invest.fubonlife.com.tw/w/wa/waFubonlifeMSG.djhtm'
+// Fubon moved its research list in 2026/10; the old .djhtm page is gone.
+export const MACRO_PRIMARY_SOURCE = 'https://invest.fubonlife.com.tw/financial-news/research'
+// Monthly outlook PDFs: 富邦市場展望MMDDYY.pdf (e.g. 090226 = 2026/9/2).
+export const FUBON_PDF_PATTERN = 'https://invest.fubonlife.com.tw/api/publish/report/富邦市場展望MMDDYY.pdf'
 
 // Source-citation rules and report structure shared by both market prompts.
 const MARKET_PROMPT_TAIL = `
@@ -131,7 +134,7 @@ ${MARKET_PROMPT_TAIL}`
   return `今天是 ${today}。請撰寫台股與美股的「總經三支柱」研究報告，供長期投資人每月檢視使用。
 
 ## 資料來源（請照順序）
-1. **主要來源**：先用網頁讀取工具開啟富邦金控研究報告列表 ${MACRO_PRIMARY_SOURCE} ，找出日期最新的一期「富邦總經觀點-○月市場展望」，再開啟它連結的 PDF 全文。若最近 1 個月內另有「富邦總經分析」與台灣、美國或金融市場風險相關，也一併讀取。
+1. **主要來源**：先用網頁讀取工具開啟富邦金控研究報告列表 ${MACRO_PRIMARY_SOURCE} ，找出日期最新的一期「富邦總經觀點-○月市場展望」，再開啟它的 PDF 全文（網址格式為 ${FUBON_PDF_PATTERN}，MMDDYY 是發布日期）。若最近 1 個月內另有「富邦總經分析」與台灣、美國或金融市場風險相關，也一併讀取。
 2. 以這份報告為主要依據撰寫各支柱，並在報告開頭註明所依據的報告名稱與日期。
 3. **只在報告沒有涵蓋，或報告日期之後有更新的數據時**，才上網搜尋補充（例如最新的 PMI、CPI、VIX、信用利差），並註明哪些數據來自富邦報告、哪些來自其他來源。
 4. 若列表或 PDF 無法開啟，改以上網搜尋取得資料，並在報告開頭說明。
