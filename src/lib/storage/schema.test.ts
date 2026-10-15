@@ -14,7 +14,7 @@ describe('AppDataSchema', () => {
 
   it('fills trading-sleeve rules and empty simulation data for older saves', () => {
     const current = createDefaultAppData()
-    const { tradingStrategies: _s, backtestRuns: _b, paperAccounts: _p, ...older } = current
+    const { tradingStrategies: _s, backtestRuns: _b, paperAccounts: _p, watchlist: _w, ...older } = current
     const { riskPerTradePercent: _r, maxOpenPositions: _m, requireStopLoss: _q, ...olderPolicy } = current.investmentPolicy
     const { livingBufferMonths: _l, ...olderFoundation } = current.foundation
     const result = AppDataSchema.safeParse({ ...older, investmentPolicy: olderPolicy, foundation: olderFoundation })
@@ -23,5 +23,6 @@ describe('AppDataSchema', () => {
     expect(result.data?.foundation.livingBufferMonths).toBe(24)
     expect(result.data?.tradingStrategies).toEqual([])
     expect(result.data?.paperAccounts).toEqual([])
+    expect(result.data?.watchlist).toEqual([])
   })
 })

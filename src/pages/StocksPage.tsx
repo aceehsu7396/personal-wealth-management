@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { fetchStockData } from '../lib/screener/stockData'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { JourneyNotice } from '../components/JourneyNotice'
@@ -31,7 +33,29 @@ export function StocksPage() {
   const removeStockThesis = useAppStore((s) => s.removeStockThesis)
 
   // null = form closed, 'new' = creating, otherwise the id being edited
-  const [editing, setEditing] = useState<string | null>(null)
+  const [search, setSearch] = useSearchParams()
+  const newCode = search.get('new')
+  const [editing, setEditing] = useState<string | null>(newCode ? 'new' : null)
+  // Started from the screener (?new=2330): prefill from the daily data.
+  const [prefill, setPrefill] = useState<{ ticker: string; name: string; sector: string; currentPrice?: number }>()
+  useEffect(() => {
+    if (!newCode) return
+    const existing = theses.find((t) => t.ticker === newCode)
+    if (existing) {
+      setEditing(existing.id)
+      setSearch({}, { replace: true })
+      return
+    }
+    void fetchStockData().then((data) => {
+      const row = data?.stocks.find((s) => s.code === newCode)
+      setPrefill({ ticker: newCode, name: row?.name ?? '', sector: row?.industry ?? '', currentPrice: row?.close ?? undefined })
+      setSearch({}, { replace: true })
+    })
+  }, [newCode, theses, setSearch])
+  // A prefill applies only to the card it was opened for.
+  useEffect(() => {
+    if (editing === null) setPrefill(undefined)
+  }, [editing])
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
 
@@ -86,7 +110,8 @@ export function StocksPage() {
           </h2>
           <div className="mt-4">
             <StockThesisForm
-              key={editing}
+              key={`${editing}${prefill?.ticker ?? ''}`}
+              prefill={editingThesis ? undefined : prefill}
               policy={policy}
               thesisId={editingThesis?.id}
               valuation={editingThesis ? twse.snapshot.valuations[editingThesis.ticker] : undefined}

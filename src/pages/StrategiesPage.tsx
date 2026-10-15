@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { STARTER_STRATEGIES, type StarterStrategy } from '../lib/backtest/starterStrategies'
+import { SimGuide } from '../components/SimGuide'
 import { useAppStore } from '../lib/storage/appStore'
 import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, resolveParams } from '../lib/backtest/templates'
 import { liveGate, PAPER_RULES } from '../lib/calculations/strategyProgress'
@@ -28,10 +30,17 @@ export function StrategiesPage() {
   const removeTradingStrategy = useAppStore((s) => s.removeTradingStrategy)
 
   // null = form closed, 'new' = creating, otherwise the id being edited
-  const [editing, setEditing] = useState<string | null>(strategies.length === 0 ? 'new' : null)
+  const navigate = useNavigate()
+  const [editing, setEditing] = useState<string | null>(null)
+  const [libraryOpen, setLibraryOpen] = useState(strategies.length === 0)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const today = todayIsoDate()
   const editingStrategy = editing && editing !== 'new' ? strategies.find((s) => s.id === editing) : undefined
+
+  function applyStarter(starter: StarterStrategy, thenBacktest: boolean) {
+    const id = addTradingStrategy({ ...starter.card, status: 'dev' })
+    if (thenBacktest) navigate(`/sim/backtest?strategy=${id}`)
+  }
 
   function handleSubmit(values: StrategyFormValues) {
     if (editingStrategy) updateTradingStrategy(editingStrategy.id, values)
@@ -50,6 +59,54 @@ export function StrategiesPage() {
         </Link>
         。
       </p>
+
+      <SimGuide />
+
+      <div className={cardClass}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">範本庫</h2>
+          <button type="button" onClick={() => setLibraryOpen((v) => !v)} className={linkClass}>
+            {libraryOpen ? '收合' : `展開 ${STARTER_STRATEGIES.length} 個入門策略`}
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          寫好優勢與進出場規則的入門策略。套用後會成為你的策略卡（開發中），可以再修改；建議第一次從「0050 均線趨勢」開始。
+        </p>
+        {libraryOpen && (
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {STARTER_STRATEGIES.map((st) => {
+              const def = STRATEGY_TEMPLATES[st.card.template]
+              const applied = strategies.some((s) => s.name === st.card.name)
+              return (
+                <div key={st.id} className="rounded-md border border-gray-200 p-4 dark:border-gray-700">
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{st.card.name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {def.label}（{def.origin}）{st.card.symbols.length > 0 && `・${st.card.symbols.map(formatSymbol).join('、')}`}
+                  </p>
+                  <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">{st.card.edge}</p>
+                  <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">適合：{st.suits}</p>
+                  <p className="text-xs text-orange-700 dark:text-orange-400">風險：{st.risk}</p>
+                  <div className="mt-3 flex gap-3">
+                    {def.backtestable && (
+                      <button
+                        type="button"
+                        onClick={() => applyStarter(st, true)}
+                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                      >
+                        套用並回測
+                      </button>
+                    )}
+                    <button type="button" onClick={() => applyStarter(st, false)} className={linkClass}>
+                      {applied ? '再套用一份' : '套用'}
+                    </button>
+                    {!def.backtestable && <span className="text-xs text-gray-500">無法自動回測，套用後直接用虛擬帳戶練習</span>}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {editing ? (
         <div className={cardClass}>

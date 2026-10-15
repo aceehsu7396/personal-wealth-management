@@ -28,6 +28,7 @@ export const CHAPTER_PAGES: Record<string, { to: string; label: string }> = {
   '09': { to: '/journey', label: '行動路線' },
   '10': { to: '/sim/strategies', label: '模擬交易・策略卡' },
   '11': { to: '/goals', label: '目標與政策・全職準備度' },
+  附錄B: { to: '/sim/screener', label: '模擬交易・選股' },
 }
 
 export function slugOf(fileName: string): string {

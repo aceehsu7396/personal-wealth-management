@@ -15,6 +15,7 @@ import { PortfolioReviewPage } from './pages/PortfolioReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StrategiesPage } from './pages/StrategiesPage'
 import { PaperPage } from './pages/PaperPage'
+import { ScreenerPage } from './pages/ScreenerPage'
 import { BacktestPage } from './pages/BacktestPage'
 
 // The handbook bundles the Markdown renderer; load it only when opened.
@@ -47,6 +48,7 @@ function App() {
           <Route path="/research/industry" element={<IndustryPage />} />
           <Route path="/research/stocks" element={<StocksPage />} />
           {/* 模擬交易 */}
+          <Route path="/sim/screener" element={<ScreenerPage />} />
           <Route path="/sim/strategies" element={<StrategiesPage />} />
           <Route path="/sim/backtest" element={<BacktestPage />} />
           <Route path="/sim/paper" element={<PaperPage />} />

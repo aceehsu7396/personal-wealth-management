@@ -31,6 +31,9 @@ import { describeAiError } from '../lib/ai/client'
 import { DrawdownChart, EquityChart, type EquityPoint } from '../components/charts/BacktestCharts'
 import { Field, inputClass, labelClass } from '../components/forms/FormField'
 import type { BacktestStats, StrategyTemplate } from '../lib/storage/schema'
+import { interpretBacktest } from '../lib/backtest/interpret'
+import { SimGuide } from '../components/SimGuide'
+import { Term } from '../components/Term'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -67,6 +70,13 @@ const STAT_ROWS: { label: string; get: (s: BacktestStats) => string }[] = [
   { label: '持倉時間', get: (s) => pct(s.exposure, 0) },
 ]
 
+const FINDING_STYLE = {
+  warning: 'border-orange-300 bg-orange-50 text-orange-900 dark:border-orange-800 dark:bg-orange-900/30 dark:text-orange-100',
+  caution: 'border-gray-200 bg-gray-50 text-gray-800 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200',
+  ok: 'border-indigo-200 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-100',
+} as const
+const FINDING_MARK = { warning: '⚠', caution: '△', ok: '✓' } as const
+
 export function BacktestPage() {
   const [search] = useSearchParams()
   const strategies = useAppStore((s) => s.tradingStrategies)
@@ -80,13 +90,21 @@ export function BacktestPage() {
   const today = todayIsoDate()
   const testable = strategies.filter((s) => STRATEGY_TEMPLATES[s.template].backtestable)
   const initialCard = testable.find((s) => s.id === search.get('strategy'))
+  // From the screener or watchlist: ?symbols=TW:2330,TW:2317&template=…
+  const linkedSymbols = search.get('symbols')
+  const linkedTemplate = search.get('template') as StrategyTemplate | null
+  const startTemplate: StrategyTemplate =
+    initialCard?.template ?? (linkedTemplate && STRATEGY_TEMPLATES[linkedTemplate]?.backtestable ? linkedTemplate : 'ma_cross')
 
   const [strategyId, setStrategyId] = useState(initialCard?.id ?? '')
-  const [template, setTemplate] = useState<StrategyTemplate>(initialCard?.template ?? 'ma_cross')
+  const [template, setTemplate] = useState<StrategyTemplate>(startTemplate)
   const [params, setParams] = useState<Record<string, number>>(
-    initialCard ? resolveParams(initialCard.template, initialCard.params) : defaultParams('ma_cross'),
+    initialCard ? resolveParams(initialCard.template, initialCard.params) : defaultParams(startTemplate),
   )
-  const [symbolsText, setSymbolsText] = useState(initialCard?.symbols.join(', ') ?? '0050')
+  const [symbolsText, setSymbolsText] = useState(
+    initialCard?.symbols.join(', ') ??
+      (linkedSymbols ? parseSymbolList(linkedSymbols).map((s) => (s.startsWith('TW:') ? s.slice(3) : s)).join(', ') : '0050'),
+  )
   const [start, setStart] = useState(isoDaysAgo(today, 5))
   const [end, setEnd] = useState(today)
   const [capital, setCapital] = useState(1_000_000)
@@ -256,6 +274,8 @@ export function BacktestPage() {
         。
       </p>
 
+      <SimGuide />
+
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">設定</h2>
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -397,14 +417,38 @@ export function BacktestPage() {
             {output.oosStart && `；樣本外自 ${output.oosStart} 起`}。價格已還原除權息。
           </p>
 
+          <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">解讀</h3>
+          <ul className="mt-2 space-y-2">
+            {interpretBacktest({
+              full: output.stats.full,
+              inSample: output.stats.inSample,
+              outOfSample: output.stats.outOfSample,
+              benchmarkFull: output.benchStats.full,
+              benchmarkOutOfSample: output.benchStats.outOfSample,
+              grid: output.grid,
+              maxDrawdownLimitPercent: policy.maxDrawdownTolerancePercent,
+            }).map((f) => (
+              <li key={f.title} className={`rounded-md border px-3 py-2 text-sm ${FINDING_STYLE[f.level]}`}>
+                <p className="font-medium">
+                  {FINDING_MARK[f.level]} {f.title}
+                </p>
+                <p className="mt-0.5 text-xs leading-5 opacity-90">{f.detail}</p>
+              </li>
+            ))}
+          </ul>
+
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
                   <th className={thClass}>指標</th>
                   <th className={thClass}>策略・全期</th>
-                  <th className={thClass}>策略・樣本內</th>
-                  <th className={thClass}>策略・樣本外</th>
+                  <th className={thClass}>
+                    <Term name="樣本內">策略・樣本內</Term>
+                  </th>
+                  <th className={thClass}>
+                    <Term name="樣本外">策略・樣本外</Term>
+                  </th>
                   <th className={thClass}>買進持有・全期</th>
                   <th className={thClass}>買進持有・樣本外</th>
                 </tr>
@@ -412,7 +456,9 @@ export function BacktestPage() {
               <tbody>
                 {STAT_ROWS.map((row) => (
                   <tr key={row.label} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
-                    <td className={`${tdClass} text-gray-500`}>{row.label}</td>
+                    <td className={`${tdClass} text-gray-500`}>
+                      <Term name={row.label}>{row.label}</Term>
+                    </td>
                     <td className={tdClass}>{row.get(output.stats.full)}</td>
                     <td className={tdClass}>{output.stats.inSample ? row.get(output.stats.inSample) : '—'}</td>
                     <td className={`${tdClass} font-medium`}>{output.stats.outOfSample ? row.get(output.stats.outOfSample) : '—'}</td>
@@ -480,7 +526,7 @@ export function BacktestPage() {
                   <tr>
                     {['標的', '進場', '進價', '出場', '出價', '報酬', 'R', '出場原因'].map((h) => (
                       <th key={h} className={thClass}>
-                        {h}
+                        {h === 'R' ? <Term name="R倍數">R</Term> : h}
                       </th>
                     ))}
                   </tr>

@@ -154,9 +154,11 @@ interface Props {
   thesisId?: string
   // Latest TWSE valuation for this ticker, shown next to the valuation inputs.
   valuation?: TwseValuation
+  // A new card started from the screener: identity fields filled in.
+  prefill?: { ticker: string; name: string; sector: string; currentPrice?: number }
 }
 
-export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, thesisId, valuation }: Props) {
+export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, thesisId, valuation, prefill }: Props) {
   const {
     register,
     handleSubmit,
@@ -166,7 +168,9 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, the
     formState: { errors },
   } = useForm<FormInput, unknown, StockThesisFormValues>({
     resolver: zodResolver(schema),
-    defaultValues: initialValues ? toFormInput(initialValues) : blankDefaults(),
+    defaultValues: initialValues
+      ? toFormInput(initialValues)
+      : { ...blankDefaults(), ...prefill, currentPrice: prefill?.currentPrice ?? '' },
   })
 
   const values = watch()

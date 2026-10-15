@@ -710,6 +710,19 @@ export const PaperAccountSchema = z.object({
 })
 export type PaperAccount = z.infer<typeof PaperAccountSchema>
 
+// A stock or ETF the user is watching, usually added from the screener.
+export const WatchItemSchema = z.object({
+  symbol: z.string(),
+  name: z.string(),
+  industry: z.string().default(''),
+  priceAtAdd: z.number().nullable(),
+  // Which screen (or 手動) put it on the list.
+  source: z.string().default(''),
+  note: z.string().default(''),
+  addedAt: z.string(),
+})
+export type WatchItem = z.infer<typeof WatchItemSchema>
+
 export const AppDataSchema = z.object({
   schemaVersion: z.number(),
   profile: UserProfileSchema,
@@ -734,6 +747,7 @@ export const AppDataSchema = z.object({
   tradingStrategies: z.array(TradingStrategySchema).default([]),
   backtestRuns: z.array(BacktestRunSchema).default([]),
   paperAccounts: z.array(PaperAccountSchema).default([]),
+  watchlist: z.array(WatchItemSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -786,5 +800,6 @@ export function createDefaultAppData(): AppData {
     tradingStrategies: [],
     backtestRuns: [],
     paperAccounts: [],
+    watchlist: [],
   }
 }

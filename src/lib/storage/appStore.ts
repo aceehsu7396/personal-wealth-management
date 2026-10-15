@@ -27,6 +27,7 @@ import {
   type TradingStrategy,
   type BacktestRun,
   type PaperAccount,
+  type WatchItem,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -130,6 +131,10 @@ interface AppStore extends AppData {
   // Paper-account changes are computed by pure functions and saved whole.
   replacePaperAccount: (account: PaperAccount) => void
   removePaperAccount: (id: string) => void
+  // Adding a symbol already on the list keeps the original entry.
+  addWatchItem: (entry: Omit<WatchItem, 'addedAt'>) => void
+  updateWatchItem: (symbol: string, entry: Partial<Omit<WatchItem, 'symbol' | 'addedAt'>>) => void
+  removeWatchItem: (symbol: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -164,6 +169,7 @@ function toAppData(state: AppData): AppData {
     tradingStrategies: state.tradingStrategies,
     backtestRuns: state.backtestRuns,
     paperAccounts: state.paperAccounts,
+    watchlist: state.watchlist,
   }
 }
 
@@ -454,6 +460,18 @@ export const useAppStore = create<AppStore>()(
 
       replacePaperAccount: (account) =>
         set((state) => ({ paperAccounts: state.paperAccounts.map((a) => (a.id === account.id ? account : a)) })),
+
+      addWatchItem: (entry) =>
+        set((state) =>
+          state.watchlist.some((w) => w.symbol === entry.symbol)
+            ? state
+            : { watchlist: [...state.watchlist, { ...entry, addedAt: new Date().toISOString().slice(0, 10) }] },
+        ),
+
+      updateWatchItem: (symbol, entry) =>
+        set((state) => ({ watchlist: state.watchlist.map((w) => (w.symbol === symbol ? { ...w, ...entry } : w)) })),
+
+      removeWatchItem: (symbol) => set((state) => ({ watchlist: state.watchlist.filter((w) => w.symbol !== symbol) })),
 
       removePaperAccount: (id) =>
         set((state) => ({ paperAccounts: state.paperAccounts.filter((a) => a.id !== id) })),

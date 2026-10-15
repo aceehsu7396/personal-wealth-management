@@ -20,6 +20,7 @@ import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
 import { EquityChart } from '../components/charts/BacktestCharts'
 import { StatCard } from '../components/StatCard'
+import { SimGuide } from '../components/SimGuide'
 import { Field, inputClass } from '../components/forms/FormField'
 import type { PaperAccount, PaperOrder } from '../lib/storage/schema'
 
@@ -246,6 +247,8 @@ export function PaperPage() {
         </Link>
         。
       </p>
+
+      <SimGuide />
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {accounts.map((a) => (

@@ -35,6 +35,10 @@ jobs:
       - name: Fetch macro data
         run: npx tsx scripts/macro-data.mts
         continue-on-error: true
+      # Listed stocks and ETFs for the screener (TWSE open data, no key).
+      - name: Fetch stock data
+        run: npx tsx scripts/stocks-data.mts
+        continue-on-error: true
       - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

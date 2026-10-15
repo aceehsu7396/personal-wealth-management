@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { STRATEGY_TEMPLATES, defaultParams, parseSymbolList, resolveParams } from '../../lib/backtest/templates'
+import { useAppStore } from '../../lib/storage/appStore'
 import type { StrategyTemplate, TradingStrategy } from '../../lib/storage/schema'
 import { Field, inputClass, labelClass } from './FormField'
 
@@ -29,6 +30,12 @@ export function StrategyForm({ initial, defaultRiskPercent, onSubmit, onCancel }
   const [error, setError] = useState<string | null>(null)
 
   const def = STRATEGY_TEMPLATES[template]
+  const watchlist = useAppStore((s) => s.watchlist)
+
+  function addFromWatchlist() {
+    const merged = parseSymbolList([symbols, ...watchlist.map((w) => w.symbol)].join(','))
+    setSymbols(merged.map((s) => (s.startsWith('TW:') ? s.slice(3) : s)).join(', '))
+  }
 
   function changeTemplate(next: StrategyTemplate) {
     const prev = STRATEGY_TEMPLATES[template]
@@ -94,6 +101,11 @@ export function StrategyForm({ initial, defaultRiskPercent, onSubmit, onCancel }
       <label className="block sm:col-span-2">
         <span className={labelClass}>標的（逗號分隔；台股直接寫代號，美股寫 US:代號）</span>
         <input className={inputClass} value={symbols} onChange={(e) => setSymbols(e.target.value)} placeholder="0050, 006208, US:SPY" />
+        {watchlist.length > 0 && (
+          <button type="button" onClick={addFromWatchlist} className="mt-1 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+            從觀察名單加入（{watchlist.length} 檔）
+          </button>
+        )}
       </label>
       <label className="block sm:col-span-2">
         <span className={labelClass}>優勢：為什麼這個策略長期能賺錢？誰在虧錢給你？</span>
