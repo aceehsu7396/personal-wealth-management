@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { gapSignals, isOutlookFresh, latestOutlook, monthEndClose, trackForecasts } from './fubonTracking'
+import { gapSignals, isOutlookFresh, latestOutlook, monthEndClose, monthEndCloses, trackForecasts } from './fubonTracking'
 import type { FubonOutlook } from '../storage/schema'
 
 function outlook(reportDate: string, overrides: Partial<FubonOutlook> = {}): FubonOutlook {
@@ -68,7 +68,7 @@ describe('trackForecasts', () => {
     ]
     const { evaluations } = trackForecasts([sep], history)
     expect(evaluations).toEqual([
-      { month: '2026-09', index: 'taiex', low: 44000, high: 48000, actual: 49000, result: 'miss' },
+      { month: '2026-09', index: 'taiex', low: 44000, high: 48000, actual: 49000, source: 'market', result: 'miss' },
     ])
   })
 
@@ -76,6 +76,42 @@ describe('trackForecasts', () => {
     const dec = outlook('2026-12-02', { actuals: [{ index: 'sp500', value: 7500 }] })
     const { evaluations } = trackForecasts([sep, dec])
     expect(evaluations.find((e) => e.index === 'sp500')?.result).toBe('nodata')
+  })
+})
+
+describe('market closes', () => {
+  const closes = {
+    sp500: [
+      { date: '2026-09-30', value: 7651.5 },
+      { date: '2026-10-16', value: 7659.4 },
+    ],
+  }
+
+  it("fills an actual the next report did not state, and marks its source", () => {
+    const { evaluations } = trackForecasts([sep, { ...oct, actuals: [] }], [], closes)
+    const sp = evaluations.find((e) => e.index === 'sp500')!
+    expect(sp).toMatchObject({ actual: 7651.5, source: 'market', result: 'hit' })
+    const fromReport = trackForecasts([sep, oct], [], closes).evaluations.find((e) => e.index === 'sp500')!
+    expect(fromReport).toMatchObject({ actual: 7950, source: 'report' })
+  })
+
+  it('waits until the month is over, and shows the latest level', () => {
+    const { evaluations, rows } = trackForecasts([oct], [], closes)
+    expect(evaluations.find((e) => e.index === 'sp500')).toBeUndefined()
+    expect(rows.find((r) => r.index === 'sp500')!.latest).toEqual({ date: '2026-10-16', value: 7659.4 })
+  })
+
+  it('keeps the last close of each month', () => {
+    expect(
+      monthEndCloses([
+        { date: '2026-09-29', value: 1 },
+        { date: '2026-09-30', value: 2 },
+        { date: '2026-10-01', value: 3 },
+      ]),
+    ).toEqual([
+      { date: '2026-09-30', value: 2 },
+      { date: '2026-10-01', value: 3 },
+    ])
   })
 })
 

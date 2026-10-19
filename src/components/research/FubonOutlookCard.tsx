@@ -119,7 +119,7 @@ export function FubonOutlookCard({ data }: { data: MacroData | null }) {
   const latest = latestOutlook(all)
   const digest = latest ? digests.find((o) => o.reportDate === latest.reportDate) : undefined
   const valuation = latestFubon(data)?.reportDate === latest?.reportDate ? latestFubon(data)?.valuation : null
-  const tracking = trackForecasts(all, taiex)
+  const tracking = trackForecasts(all, taiex, data?.indexCloses ?? {})
   const today = todayIsoDate()
   const keyPoints = latest?.sections.find((s) => s.title.includes('總經'))?.bullets ?? []
 

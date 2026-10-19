@@ -86,29 +86,56 @@ export function monthEndClose(history: DailyClose[], month: string): number | nu
 
 export type ForecastResult = 'hit' | 'miss' | 'nodata'
 
+// Where an actual came from: the next Fubon report, or market data.
+export type ActualSource = 'report' | 'market'
+
 export interface ForecastEvaluation {
   month: string
   index: TrackedIndex
   low: number
   high: number
   actual: number | null
+  source: ActualSource | null
   result: ForecastResult
 }
 
 export interface TrackingRow {
   index: TrackedIndex
   current: { low: number; high: number } | null
+  // Latest market level (month to date), to compare with the current range.
+  latest: { date: string; value: number } | null
   lastEvaluation: ForecastEvaluation | null
   hits: number
   evaluated: number
 }
 
+// Month-end closes per index (the last point of each month; the newest
+// month may still be in progress). Built daily from free sources.
+export type MarketCloses = Partial<Record<TrackedIndex, { date: string; value: number }[]>>
+
+// The last close of each calendar month from daily points.
+export function monthEndCloses(points: { date: string; value: number }[]): { date: string; value: number }[] {
+  const byMonth = new Map<string, { date: string; value: number }>()
+  for (const p of [...points].sort((a, b) => a.date.localeCompare(b.date))) byMonth.set(p.date.slice(0, 7), p)
+  return [...byMonth.values()]
+}
+
+// The close of `month` once that month is over (a later month exists).
+function marketClose(closes: MarketCloses, index: TrackedIndex, month: string): number | null {
+  const series = closes[index] ?? []
+  const point = series.find((p) => p.date.slice(0, 7) === month)
+  const done = series.some((p) => p.date.slice(0, 7) > month)
+  return point && done ? point.value : null
+}
+
 // Each report forecasts the coming month and states last month's actual
 // close. So report N's forecast is checked against report N+1's actuals,
-// provided N+1 is the following month. TAIEX falls back to TWSE history.
+// provided N+1 is the following month. Missing actuals come from market
+// month-end closes (FRED, Yahoo Finance), and TAIEX also from TWSE history.
 export function trackForecasts(
   outlooks: FubonOutlook[],
   taiexHistory: DailyClose[] = [],
+  closes: MarketCloses = {},
 ): { rows: TrackingRow[]; evaluations: ForecastEvaluation[] } {
   const sorted = [...outlooks].sort((a, b) => a.reportDate.localeCompare(b.reportDate))
   const evaluations: ForecastEvaluation[] = []
@@ -120,12 +147,19 @@ export function trackForecasts(
     const nextIsFollowingMonth = next !== undefined && previousMonth(monthOf(next.reportDate)) === month
     for (const f of prev.forecasts) {
       let actual: number | null = null
+      let source: ActualSource | null = null
       if (nextIsFollowingMonth) actual = next.actuals.find((a) => a.index === f.index)?.value ?? null
+      if (actual !== null) source = 'report'
+      if (actual === null) {
+        actual = marketClose(closes, f.index, month)
+        if (actual !== null) source = 'market'
+      }
       if (actual === null && f.index === 'taiex') {
         // Only evaluate once the month is over (a later report exists or
         // history goes past the month).
         const monthDone = next !== undefined || taiexHistory.some((d) => d.date > `${month}-31`)
         if (monthDone) actual = monthEndClose(taiexHistory, month)
+        if (actual !== null) source = 'market'
       }
       if (actual === null && !next) continue // current month: not evaluable yet
       evaluations.push({
@@ -134,6 +168,7 @@ export function trackForecasts(
         low: f.low,
         high: f.high,
         actual,
+        source,
         result: actual === null ? 'nodata' : actual >= f.low && actual <= f.high ? 'hit' : 'miss',
       })
     }
@@ -144,9 +179,12 @@ export function trackForecasts(
     const mine = evaluations.filter((e) => e.index === index)
     const withData = mine.filter((e) => e.result !== 'nodata')
     const current = latest?.forecasts.find((f) => f.index === index)
+    const series = closes[index]
+    const last = series?.[series.length - 1]
     return {
       index,
       current: current ? { low: current.low, high: current.high } : null,
+      latest: last ? { date: last.date, value: last.value } : null,
       lastEvaluation: mine[mine.length - 1] ?? null,
       hits: withData.filter((e) => e.result === 'hit').length,
       evaluated: withData.length,

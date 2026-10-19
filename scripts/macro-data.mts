@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pdfPages } from './pdfText.mts'
 import { dateFromFileName, parseFubonReport, parseResearchList } from '../src/lib/macro/fubonParse.ts'
-import { FRED_SERIES, type FubonReportData, type MacroData, type Point, type SeriesKey } from '../src/lib/macro/macroData.ts'
+import { FRED_SERIES, INDEX_SOURCES, type FubonReportData, type MacroData, type Point, type SeriesKey } from '../src/lib/macro/macroData.ts'
+import { monthEndCloses, type MarketCloses } from '../src/lib/calculations/fubonTracking.ts'
+import type { TrackedIndex } from '../src/lib/storage/schema.ts'
 
 const OUT = 'public/data/macro.json'
 const FUBON = 'https://invest.fubonlife.com.tw'
@@ -130,6 +132,48 @@ async function fubon(): Promise<FubonReportData[]> {
   return [...byDate.values()].sort((a, b) => a.reportDate.localeCompare(b.reportDate))
 }
 
+// --- Index closes for forecast tracking ----------------------------------
+
+// Daily closes from Yahoo Finance's public chart endpoint (no key), dated
+// in the exchange's own time zone.
+async function yahoo(symbol: string): Promise<Point[]> {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=2y&interval=1d`
+  const json = (await (await get(url)).json()) as {
+    chart: { result: { meta: { gmtoffset: number }; timestamp: number[]; indicators: { quote: { close: (number | null)[] }[] } }[] }
+  }
+  const r = json.chart.result[0]
+  const closes = r.indicators.quote[0].close
+  return r.timestamp
+    .map((t, i) => ({ date: new Date((t + r.meta.gmtoffset) * 1000).toISOString().slice(0, 10), value: closes[i] }))
+    .filter((p): p is Point => p.value !== null && p.value > 0)
+}
+
+// Daily closes from 東方財富's public kline API (no key); secid like 1.000300.
+async function eastmoney(secid: string): Promise<Point[]> {
+  const url = `https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=${secid}&fields1=f1&fields2=f51,f53&klt=101&fqt=0&end=20500101&lmt=520`
+  const json = (await (await get(url)).json()) as { data: { klines: string[] } | null }
+  if (!json.data) throw new Error(`東方財富查無 ${secid}`)
+  return json.data.klines
+    .map((k) => k.split(','))
+    .map(([date, close]) => ({ date, value: Number(close) }))
+    .filter((p) => p.value > 0)
+}
+
+const FETCHERS: Record<string, (id: string) => Promise<Point[]>> = { FRED: fred, 'Yahoo Finance': yahoo, 東方財富: eastmoney }
+
+async function indexCloses(errors: string[]): Promise<MarketCloses> {
+  const out: MarketCloses = {}
+  for (const [index, def] of Object.entries(INDEX_SOURCES) as [TrackedIndex, { source: string; id: string }][]) {
+    const points = await attempt(`${def.source} ${def.id}`, errors, () => FETCHERS[def.source](def.id))
+    if (points && points.length > 0) {
+      out[index] = monthEndCloses(points)
+        .slice(-24)
+        .map((p) => ({ date: p.date, value: Math.round(p.value * 10_000) / 10_000 }))
+    }
+  }
+  return out
+}
+
 // --- Assemble -------------------------------------------------------------
 
 async function attempt<T>(label: string, errors: string[], task: () => Promise<T>): Promise<T | null> {
@@ -163,6 +207,7 @@ async function main() {
   const earlier = await attempt('證交所融資餘額（3 個月前）', errors, () => marginOn(before.toISOString().slice(0, 10)))
 
   const reports = (await attempt('富邦市場展望', errors, fubon)) ?? []
+  const closes = await indexCloses(errors)
   if (reports.length === 0 && !errors.some((e) => e.startsWith('富邦'))) errors.push('富邦市場展望：沒有解析到報告')
 
   const data: MacroData = {
@@ -171,6 +216,7 @@ async function main() {
     series,
     margin: now && earlier ? { now, before: earlier } : null,
     fubon: reports,
+    indexCloses: closes,
   }
   mkdirSync('public/data', { recursive: true })
   writeFileSync(OUT, JSON.stringify(data))

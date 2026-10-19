@@ -1,5 +1,6 @@
 import type { ParsedFubon } from './fubonParse'
-import type { FubonOutlook } from '../storage/schema'
+import type { FubonOutlook, TrackedIndex } from '../storage/schema'
+import type { MarketCloses } from '../calculations/fubonTracking'
 
 // public/data/macro.json, built daily by GitHub Actions
 // (scripts/macro-data.ts) from public sources that need no API key and
@@ -52,6 +53,26 @@ export interface MacroData {
   margin: { now: Point; before: Point } | null
   // Monthly Fubon outlooks, oldest first.
   fubon: FubonReportData[]
+  // Month-end closes of the tracked indices (last month may be in
+  // progress), to check Fubon's forecasts when a report gives no actual.
+  indexCloses?: MarketCloses
+}
+
+// Free sources (no API key) for the month-end closes.
+export const INDEX_SOURCES: Partial<Record<TrackedIndex, { source: string; id: string }>> = {
+  sp500: { source: 'FRED', id: 'SP500' },
+  us10y: { source: 'FRED', id: 'DGS10' },
+  eurusd: { source: 'FRED', id: 'DEXUSEU' },
+  usdjpy: { source: 'FRED', id: 'DEXJPUS' },
+  usdcny: { source: 'FRED', id: 'DEXCHUS' },
+  usdtwd: { source: 'FRED', id: 'DEXTAUS' },
+  stoxx600: { source: 'Yahoo Finance', id: '^STOXX' },
+  // Yahoo has no history for the CSI 300; 東方財富's public quote API does.
+  csi300: { source: '東方財富', id: '1.000300' },
+  tw10y: { source: '東方財富', id: '171.TW10Y' },
+  cn10y: { source: '東方財富', id: '171.CN10Y' },
+  dxy: { source: 'Yahoo Finance', id: 'DX-Y.NYB' },
+  taiex: { source: 'Yahoo Finance', id: '^TWII' },
 }
 
 export const MACRO_DATA_PATH = 'data/macro.json'
