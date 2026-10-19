@@ -132,9 +132,11 @@ describe('judgeSignals', () => {
 describe('rulesCheckIn / shouldAutoSave', () => {
   const { checkIn, manual } = rulesCheckIn(data(), '2026-10-15')
 
-  it('builds a check-in with a reason for every signal', () => {
+  it('builds a check-in with a reason for every signal and the numbers behind them', () => {
     expect(checkIn.note).toBe(AUTO_NOTE)
     expect(Object.keys(checkIn.reasons!)).toHaveLength(17)
+    expect(checkIn.metrics).toMatchObject({ 'sentiment.vix': 18, 'liquidity.yieldCurve': 0.3, 'growth.twBusinessSignal': 25 })
+    expect(checkIn.metrics!['sentiment.media']).toBeUndefined()
     expect(manual).toContain('sentiment.media')
   })
 

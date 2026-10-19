@@ -13,6 +13,7 @@ import { ResearchReportCard } from './research/ResearchReportCard'
 import { MACRO_PRIMARY_SOURCE } from '../lib/ai/analyses'
 import { refreshMacro } from '../lib/ai/macroRefresh'
 import { FubonOutlookCard, FubonUsageNote } from './research/FubonOutlookCard'
+import { MacroTracking } from './research/MacroTracking'
 import { useResearchTask } from '../lib/ai/useResearchTask'
 import { latestOutlook, MACRO_SIGNAL_LABELS, PILLAR_LABELS } from '../lib/calculations/fubonTracking'
 import { todayIsoDate } from '../lib/market/twse'
@@ -90,7 +91,6 @@ export function MacroPanel() {
   const removeResearchReport = useAppStore((s) => s.removeResearchReport)
 
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [step, setStep] = useState<'digest' | 'analysis' | null>(null)
   const [digestWarning, setDigestWarning] = useState<string | null>(null)
   const task = useResearchTask()
@@ -288,7 +288,7 @@ export function MacroPanel() {
       </div>
 
       {editing && (
-        <div className={cardClass}>
+        <div id="macro-edit" className={cardClass}>
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">手動修正總經檢視（{editing.date}）</h2>
           <div className="mt-4">
             <MacroCheckInForm
@@ -319,96 +319,20 @@ export function MacroPanel() {
         </div>
       )}
 
-      {sorted.length > 0 && (
-        <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            總經檢視歷史
-          </h2>
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                  <th className="py-2 pr-4">日期</th>
-                  <th className="py-2 pr-4">體制</th>
-                  <th className="py-2 pr-4">流動性</th>
-                  <th className="py-2 pr-4">情緒</th>
-                  <th className="py-2 pr-4">判斷</th>
-                  <th className="py-2 pr-4 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((c) => {
-                  const a = assessMacro(c, guardrails)
-                  return (
-                    <tr
-                      key={c.id}
-                      className="border-b border-gray-100 last:border-0 dark:border-gray-700"
-                    >
-                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{c.date}</td>
-                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                        {REGIME_LABELS[a.regime].split('（')[0]}
-                      </td>
-                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                        {signed(a.liquidityScore)}
-                      </td>
-                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                        {signed(a.sentimentScore)}
-                      </td>
-                      <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100">
-                        {STANCE_LABELS[a.stance]}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <div className="flex justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPendingDeleteId(null)
-                              setEditingId(c.id)
-                            }}
-                            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
-                          >
-                            編輯
-                          </button>
-                          {pendingDeleteId === c.id ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  removeMacroCheckIn(c.id)
-                                  setPendingDeleteId(null)
-                                  if (editingId === c.id) setEditingId(null)
-                                }}
-                                className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                              >
-                                確定刪除
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setPendingDeleteId(null)}
-                                className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
-                              >
-                                取消
-                              </button>
-                            </>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setPendingDeleteId(c.id)}
-                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
-                            >
-                              刪除
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <MacroTracking
+        checkIns={macroCheckIns}
+        guardrails={guardrails}
+        data={data ?? null}
+        onEdit={(id) => {
+          setEditingId(id)
+          // The correction form opens near the top of the page.
+          requestAnimationFrame(() => document.getElementById('macro-edit')?.scrollIntoView({ behavior: 'smooth' }))
+        }}
+        onDelete={(id) => {
+          removeMacroCheckIn(id)
+          if (editingId === id) setEditingId(null)
+        }}
+      />
     </>
   )
 }

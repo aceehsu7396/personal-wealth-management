@@ -19,6 +19,8 @@ const FUBON_REPORTS = 12
 const UA = 'Mozilla/5.0 (personal-wealth-management data job)'
 
 const today = new Date().toISOString().slice(0, 10)
+// Four years of history: year-over-year charts then still span three years.
+const HISTORY_YEARS = 4
 const yearsAgo = (n: number) => `${Number(today.slice(0, 4)) - n}${today.slice(4)}`
 
 async function get(url: string): Promise<Response> {
@@ -30,7 +32,7 @@ async function get(url: string): Promise<Response> {
 // --- FRED (CSV, no key) ---------------------------------------------------
 
 async function fred(id: string): Promise<Point[]> {
-  const csv = await (await get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${yearsAgo(3)}`)).text()
+  const csv = await (await get(`https://fred.stlouisfed.org/graph/fredgraph.csv?id=${id}&cosd=${yearsAgo(HISTORY_YEARS)}`)).text()
   return csv
     .trim()
     .split('\n')
@@ -64,7 +66,7 @@ async function ndc(): Promise<{ score: Point[]; exports: Point[] }> {
   const zip = join(dir, 'ndc.zip')
   writeFileSync(zip, new Uint8Array(await (await get(NDC_ZIP)).arrayBuffer()))
   execFileSync('unzip', ['-o', '-q', zip, '-d', dir])
-  const from = yearsAgo(3)
+  const from = yearsAgo(HISTORY_YEARS)
   return {
     score: csvColumn(readFileSync(join(dir, '景氣指標與燈號.csv'), 'utf8'), '景氣對策信號綜合分數', from),
     exports: csvColumn(readFileSync(join(dir, '同時指標構成項目.csv'), 'utf8'), '海關出口值(十億元)', from),
@@ -74,7 +76,7 @@ async function ndc(): Promise<{ score: Point[]; exports: Point[] }> {
 // --- 主計總處 CPI (SDMX JSON) ----------------------------------------------
 
 async function twCpi(): Promise<Point[]> {
-  const start = `${Number(today.slice(0, 4)) - 3}-M1`
+  const start = `${Number(today.slice(0, 4)) - HISTORY_YEARS}-M1`
   const end = `${today.slice(0, 4)}-M12`
   const url = `https://nstatdb.dgbas.gov.tw/dgbasall/webMain.aspx?sdmx/A030101015/1..1.M.&startTime=${start}&endTime=${end}`
   const json = (await (await get(url)).json()) as {

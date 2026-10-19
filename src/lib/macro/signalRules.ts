@@ -30,13 +30,39 @@ export const RULES = {
   vixPanic: 30,
 } as const
 
+// What each stored metric measures, for tables and tooltips.
+export const METRIC_LABELS: Partial<Record<MacroSignalKey, { label: string; unit: string }>> = {
+  'growth.usPmi': { label: '製造業生產 3 個月變化', unit: '%' },
+  'growth.usEmployment': { label: '失業率（3 個月平均）', unit: '%' },
+  'growth.twBusinessSignal': { label: '景氣對策信號', unit: '分' },
+  'growth.twExportOrders': { label: '出口近 3 個月年增', unit: '%' },
+  'inflation.usCpi': { label: 'CPI 年增', unit: '%' },
+  'inflation.twCpi': { label: 'CPI 年增', unit: '%' },
+  'liquidity.policyRate': { label: '聯邦基金利率', unit: '%' },
+  'liquidity.yieldCurve': { label: '10Y−2Y 利差', unit: '個百分點' },
+  'liquidity.creditSpread': { label: '高收益債利差', unit: '%' },
+  'liquidity.centralBankBalanceSheet': { label: 'Fed 資產負債表 3 個月', unit: '%' },
+  'liquidity.usDollar': { label: '美元指數 3 個月', unit: '%' },
+  'sentiment.valuation': { label: 'S&P 500 預估本益比', unit: '倍' },
+  'sentiment.credit': { label: '高收益債利差', unit: '%' },
+  'sentiment.margin': { label: '融資餘額 3 個月', unit: '%' },
+  'sentiment.vix': { label: 'VIX', unit: '' },
+}
+
 export const AUTO_NOTE = '每日自動判斷（公開數據＋富邦報告，免金鑰）'
+
+export interface SignalMetric {
+  value: number
+  unit: string
+}
 
 export interface SignalJudgement {
   value: Trend | -1 | 0 | 1
   reason: string
   // No usable data: left neutral for the user to confirm.
   manual: boolean
+  // The main number behind the judgement, kept so months can be compared.
+  metric?: SignalMetric
 }
 
 type Series = Point[] | undefined
@@ -92,12 +118,14 @@ function missing(label: string, kind: 'trend' | 'score' = 'score'): SignalJudgem
   }
 }
 
-function trend(value: Trend, reason: string): SignalJudgement {
-  return { value, reason, manual: false }
+const round = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d
+
+function trend(value: Trend, reason: string, metric?: SignalMetric): SignalJudgement {
+  return { value, reason, manual: false, metric }
 }
 
-function score(value: -1 | 0 | 1, reason: string): SignalJudgement {
-  return { value, reason, manual: false }
+function score(value: -1 | 0 | 1, reason: string, metric?: SignalMetric): SignalJudgement {
+  return { value, reason, manual: false, metric }
 }
 
 function byChange(change: number, up: number, down: number): -1 | 0 | 1 {
@@ -121,6 +149,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
         return trend(
           TREND_OF[byChange(pct, RULES.ipChangePercent, -RULES.ipChangePercent)],
           `製造業工業生產近 3 個月平均較前 3 個月 ${signed(pct, 1)}%${src('IPMAN', ip.date)}；ISM 指數無免費資料，以此代理`,
+          { value: round(pct), unit: '%' },
         )
       })()
     : missing('製造業工業生產', 'trend')
@@ -136,6 +165,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
     out['growth.usEmployment'] = trend(
       TREND_OF[Math.sign(points) as -1 | 0 | 1],
       `失業率近 3 個月平均 ${fmt(un.recent, 1)}%（較前 3 個月 ${signed(unChange, 2)}）；非農月均新增 ${Math.round(gain)} 千人${src('UNRATE', un.date)}`,
+      { value: round(un.recent), unit: '%' },
     )
   } else out['growth.usEmployment'] = missing('美國就業', 'trend')
 
@@ -147,6 +177,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
       ? trend(
           TREND_OF[byChange(bizNow.value - bizBefore.value, RULES.businessScorePoints, -RULES.businessScorePoints)],
           `景氣對策信號 ${bizNow.value} 分（${lightOf(bizNow.value)}），3 個月前 ${bizBefore.value} 分${src('TW_BUSINESS_SCORE', bizNow.date)}`,
+          { value: bizNow.value, unit: '分' },
         )
       : missing('台灣景氣對策信號', 'trend')
 
@@ -158,6 +189,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
       ? trend(
           TREND_OF[byChange(exNow - exBefore, RULES.exportYoyPoints, -RULES.exportYoyPoints)],
           `出口近 3 個月年增 ${fmt(exNow, 1)}%，前一季同期 ${fmt(exBefore, 1)}%${src('TW_EXPORTS', exDate)}`,
+          { value: round(exNow, 1), unit: '%' },
         )
       : missing('台灣出口', 'trend')
 
@@ -171,6 +203,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
     out['inflation.usCpi'] = trend(
       TREND_OF[byChange(change, RULES.usInflationPoints, -RULES.usInflationPoints)],
       `CPI 年增 ${fmt(cpiNow.value, 1)}%（3 個月前 ${fmt(cpiBefore.value, 1)}%）、核心 PCE ${fmt(pceNow.value, 1)}%（${fmt(pceBefore.value, 1)}%）${src('CPIAUCSL', cpiNow.date)}`,
+      { value: round(cpiNow.value), unit: '%' },
     )
   } else out['inflation.usCpi'] = missing('美國通膨', 'trend')
 
@@ -181,6 +214,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
       ? trend(
           TREND_OF[byChange(twNow.value - twBefore.value, RULES.twInflationPoints, -RULES.twInflationPoints)],
           `CPI 年增 ${fmt(twNow.value, 2)}%，3 個月前 ${fmt(twBefore.value, 2)}%${src('TW_CPI', twNow.date)}`,
+          { value: round(twNow.value), unit: '%' },
         )
       : missing('台灣 CPI', 'trend')
 
@@ -192,6 +226,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
       ? score(
           (-byChange(ff.value - ffBefore.value, RULES.policyRatePoints, -RULES.policyRatePoints) || 0) as -1 | 0 | 1,
           `聯邦基金利率 ${fmt(ff.value)}%，3 個月前 ${fmt(ffBefore.value)}%${src('FEDFUNDS', ff.date)}；台灣央行另參考富邦報告`,
+          { value: round(ff.value), unit: '%' },
         )
       : missing('政策利率')
 
@@ -200,6 +235,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
     ? score(
         curve.value > RULES.curveLoose ? 1 : curve.value < RULES.curveTight ? -1 : 0,
         `10 年減 2 年利差 ${signed(curve.value)} 個百分點${src('T10Y2Y', curve.date)}`,
+        { value: round(curve.value), unit: '個百分點' },
       )
     : missing('殖利率曲線')
 
@@ -210,6 +246,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
       ? score(
           (-byChange(hy.value - hyBefore.value, RULES.spreadChangePoints, -RULES.spreadChangePoints) || 0) as -1 | 0 | 1,
           `高收益債利差 ${fmt(hy.value)}%，3 個月前 ${fmt(hyBefore.value)}%${src('BAMLH0A0HYM2', hy.date)}`,
+          { value: round(hy.value), unit: '%' },
         )
       : missing('信用利差')
 
@@ -222,6 +259,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
           return score(
             byChange(pct, RULES.balanceSheetPercent, -RULES.balanceSheetPercent),
             `Fed 資產負債表 3 個月 ${signed(pct, 1)}%${src('WALCL', bs.date)}`,
+            { value: round(pct), unit: '%' },
           )
         })()
       : missing('央行資產負債表')
@@ -235,6 +273,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
           return score(
             (-byChange(pct, RULES.dollarPercent, -RULES.dollarPercent) || 0) as -1 | 0 | 1,
             `美元指數 3 個月 ${signed(pct, 1)}%（走弱＝寬鬆）${src('DTWEXBGS', usd.date)}`,
+            { value: round(pct), unit: '%' },
           )
         })()
       : missing('美元')
@@ -255,6 +294,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
         ? score(
             v.pe > high ? 1 : v.pe < low ? -1 : 0,
             `S&P 500 預估本益比 ${v.pe} 倍，近 10 年平均 ${v.average ?? '—'}、一個標準差 ${fmt(low, 1)}～${fmt(high, 1)}（${fubon!.reportTitle}）`,
+            { value: v.pe, unit: '倍' },
           )
         : missing('評價')
   } else out['sentiment.valuation'] = missing('評價')
@@ -263,6 +303,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
     ? score(
         hy.value < RULES.spreadHot ? 1 : hy.value > RULES.spreadPanic ? -1 : 0,
         `高收益債利差 ${fmt(hy.value)}%：低於 ${RULES.spreadHot}% 代表信用過度寬鬆、高於 ${RULES.spreadPanic}% 代表恐慌${src('BAMLH0A0HYM2', hy.date)}`,
+        { value: round(hy.value), unit: '%' },
       )
     : missing('信用條件')
 
@@ -284,6 +325,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
         return score(
           byChange(pct, RULES.marginPercent, -RULES.marginPercent),
           `台股融資餘額 ${(Math.round(mg.now.value / 10_000) / 10).toLocaleString('zh-TW')} 億元，較 ${mg.before.date} ${signed(pct, 1)}%（證交所，${mg.now.date}）`,
+          { value: round(pct), unit: '%' },
         )
       })()
     : missing('融資餘額')
@@ -293,6 +335,7 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
     ? score(
         vix.value < RULES.vixHot ? 1 : vix.value > RULES.vixPanic ? -1 : 0,
         `VIX ${fmt(vix.value)}（低於 ${RULES.vixHot} 過熱、高於 ${RULES.vixPanic} 恐慌）${src('VIXCLS', vix.date)}`,
+        { value: round(vix.value), unit: '' },
       )
     : missing('VIX')
 
@@ -345,6 +388,11 @@ export function rulesCheckIn(data: MacroData, today: string): { checkIn: AutoChe
       policyNote: fubon ? `${fubon.reportTitle}：${fubon.summary}` : undefined,
       note: AUTO_NOTE,
       reasons: Object.fromEntries(Object.entries(j).map(([k, v]) => [k, v.reason])),
+      metrics: Object.fromEntries(
+        Object.entries(j)
+          .filter(([, v]) => v.metric !== undefined)
+          .map(([k, v]) => [k, v.metric!.value]),
+      ),
     },
     manual: (Object.keys(j) as MacroSignalKey[]).filter((k) => j[k].manual),
   }
@@ -356,6 +404,6 @@ export function shouldAutoSave(existing: MacroCheckIn | undefined, next: AutoChe
   if (!existing) return true
   if (existing.note !== AUTO_NOTE) return false
   const strip = (c: AutoCheckIn | MacroCheckIn) =>
-    JSON.stringify([c.growth, c.inflation, c.liquidity, c.sentiment, c.reasons, c.policyNote])
+    JSON.stringify([c.growth, c.inflation, c.liquidity, c.sentiment, c.reasons, c.policyNote, c.metrics])
   return strip(existing) !== strip(next)
 }
