@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pdfPages } from './pdfText.mts'
-import { dateFromFileName, parseFubonReport } from '../src/lib/macro/fubonParse.ts'
+import { dateFromFileName, parseFubonReport, parseResearchList } from '../src/lib/macro/fubonParse.ts'
 import { FRED_SERIES, type FubonReportData, type MacroData, type Point, type SeriesKey } from '../src/lib/macro/macroData.ts'
 
 const OUT = 'public/data/macro.json'
@@ -113,24 +113,21 @@ async function marginOn(date: string): Promise<Point | null> {
 
 async function fubon(): Promise<FubonReportData[]> {
   const html = await (await get(`${FUBON}/financial-news/research`)).text()
-  const files = [...new Set([...html.matchAll(/富邦市場展望(\d{6})\.pdf/g)].map((m) => m[0]))]
-    .map((name) => ({ name, date: dateFromFileName(name) ?? '' }))
-    .filter((f) => f.date)
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, FUBON_REPORTS)
-  const reports: FubonReportData[] = []
-  for (const f of files) {
-    const pdfUrl = `${FUBON}/api/publish/report/${encodeURIComponent(f.name)}`
+  const listed = parseResearchList(html).slice(0, FUBON_REPORTS)
+  // Keyed by the date printed in the PDF; a later upload of the same issue wins.
+  const byDate = new Map<string, FubonReportData>()
+  for (const f of [...listed].reverse()) {
+    const pdfUrl = `${FUBON}${f.path.split('/').map((p) => encodeURIComponent(decodeURIComponent(p))).join('/')}`
     try {
       const pages = await pdfPages(new Uint8Array(await (await get(pdfUrl)).arrayBuffer()))
-      const report = parseFubonReport(pages, f.date)
+      const report = parseFubonReport(pages, dateFromFileName(f.path) ?? f.listedDate)
       // Issues before 2026/4 use an older layout the parser does not read.
-      if (report.allocation.length > 0) reports.push({ ...report, pdfUrl })
+      if (report.allocation.length > 0) byDate.set(report.reportDate, { ...report, pdfUrl })
     } catch (e) {
-      console.warn(`富邦 ${f.name} 解析失敗：${(e as Error).message}`)
+      console.warn(`富邦 ${f.path} 解析失敗：${(e as Error).message}`)
     }
   }
-  return reports.sort((a, b) => a.reportDate.localeCompare(b.reportDate))
+  return [...byDate.values()].sort((a, b) => a.reportDate.localeCompare(b.reportDate))
 }
 
 // --- Assemble -------------------------------------------------------------

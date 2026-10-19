@@ -212,9 +212,12 @@ export function parseForecasts(
 // only if plausible for that index and within ±40% of its forecast.
 export function parseActuals(text: string, forecasts: FubonOutlookContent['forecasts']): FubonOutlookContent['actuals'] {
   const out: FubonOutlookContent['actuals'] = []
-  for (const m of text.matchAll(/(?:收於|收至|全月[^。，]{0,12}?至)\s*(\d[\d,]*(?:\.\d+)?)(?!\s*[%％])/g)) {
+  // 「月底美元指數升至101.8」 is another way the reports state a close.
+  for (const m of text.matchAll(/(?:收於|收至|全月[^。，]{0,12}?至|月底[^。，]{0,10}?至)\s*(\d[\d,]*(?:\.\d+)?)(?!\s*[%％])/g)) {
     const value = num(m[1])
-    const index = indexNear(text, m.index, value, 120, 0)
+    // Look for the index name before the number (it may follow 「月底」).
+    const at = m.index + m[0].length - m[1].length
+    const index = indexNear(text, at, value, 120, 0)
     if (!index || out.some((a) => a.index === index)) continue
     const f = forecasts.find((x) => x.index === index)
     const mid = f ? (f.low + f.high) / 2 : null
@@ -241,7 +244,8 @@ export function parseContents(lines: string[]): { title: string; from: number; t
   const text = lines.join('\n')
   // 「P24.」 is page 2 followed by item 4, hence the lazy page number that
   // must be followed by the next item or the end.
-  return [...text.matchAll(/\d\.\s*([一-龥/／]+?)\s*P(\d+?)(?:\s*-\s*(\d+?))?(?=[ \t]*\d\.|[ \t]*\n|[ \t]*$)/g)]
+  // Items are numbered 1. 2. … or, since 2026/10, I. II. ….
+  return [...text.matchAll(/(?:\d|[IVX]+)\.\s*([一-龥/／]+?)\s*P(\d+?)(?:\s*-\s*(\d+?))?(?=[ \t]*(?:\d|[IVX]+)\.|[ \t]*\n|[ \t]*$)/g)]
     .map((m) => ({ title: m[1], from: Number(m[2]), to: Number(m[3] ?? m[2]) }))
     .sort((a, b) => a.from - b.from)
 }
@@ -267,6 +271,36 @@ export function parseSections(pages: PdfPage[]): FubonOutlookContent['sections']
 export function parseReportDate(lines: string[]): string | null {
   const m = /(20\d{2})\/(\d{1,2})\/(\d{1,2})/.exec(lines.join(' '))
   return m ? `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}` : null
+}
+
+export interface ListedReport {
+  path: string
+  title: string
+  // Upload date on the research list (YYYY-MM-DD).
+  listedDate: string
+}
+
+// Monthly outlooks on the research list page. Uploads are not named
+// consistently (the October 2026 issue has a random file name and a "9月"
+// title), so rows are matched by title and the real date is read from
+// the PDF itself later.
+export function parseResearchList(html: string): ListedReport[] {
+  const out: ListedReport[] = []
+  for (const row of html.split(/<tr\b/).slice(1)) {
+    const date = /(20\d{2})\/(\d{2})\/(\d{2})/.exec(row)
+    const link = /<a href="(\/api\/publish\/report\/[^"]+\.pdf)"[^>]*>([^<]*)<\/a>/.exec(row)
+    if (!date || !link) continue
+    const [, path, title] = link
+    if (!title.includes('市場展望') && !/富邦市場展望\d{6}\.pdf$/.test(path)) continue
+    out.push({ path, title: title.trim(), listedDate: `${date[1]}-${date[2]}-${date[3]}` })
+  }
+  // Older issues appear only in the page's embedded data, by file name.
+  for (const m of html.matchAll(/(?:\/|\\u002F)api(?:\/|\\u002F)publish(?:\/|\\u002F)report(?:\/|\\u002F)(富邦市場展望\d{6}\.pdf)/g)) {
+    const path = `/api/publish/report/${m[1]}`
+    const listedDate = dateFromFileName(m[1])
+    if (listedDate && !out.some((o) => o.path === path)) out.push({ path, title: '', listedDate })
+  }
+  return out.sort((a, b) => b.listedDate.localeCompare(a.listedDate))
 }
 
 // 「富邦市場展望090226.pdf」 → 2026-09-02

@@ -240,7 +240,12 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
       : missing('美元')
 
   // --- Sentiment (+1 overheated, −1 panic) ---
-  const fubon = latestFubon(data)
+  // Not every issue has the valuation chart: use the latest one that does,
+  // if it is at most two months older than the newest issue.
+  const newest = latestFubon(data)
+  const fubon = [...data.fubon]
+    .reverse()
+    .find((r) => r.valuation && (!newest || r.reportDate >= addMonths(newest.reportDate, -2)))
   const v = fubon?.valuation
   if (v) {
     const high = v.sdHigh ?? (v.average ? v.average * (1 + RULES.valuationBandPercent / 100) : null)

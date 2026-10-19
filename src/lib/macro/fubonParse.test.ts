@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import fixture from './__fixtures__/fubon-2026-09.json'
-import { dateFromFileName, parseContents, parseFubonReport, toLines, type PdfPage } from './fubonParse'
+import { dateFromFileName, parseActuals, parseContents, parseFubonReport, parseResearchList, toLines, type PdfPage } from './fubonParse'
 
 // Text items of the 2026/9/2 report (pages 1–2 whole, other pages reduced
 // to the lines the parser reads).
@@ -63,5 +63,37 @@ describe('helpers', () => {
 
   it('dates a report from its file name', () => {
     expect(dateFromFileName('富邦市場展望090226.pdf')).toBe('2026-09-02')
+  })
+})
+
+describe('research list and newer layouts', () => {
+  it('finds outlooks by title, whatever the file name, newest upload first', () => {
+    const row = (date: string, href: string, title: string) =>
+      `<tr class="x"><td class="a">${date} </td><td><a href="${href}" target="_blank" class="b">${title}</a></td></tr>`
+    const html = [
+      row('2026/09/02', '/api/publish/report/富邦市場展望090226.pdf', '富邦總經觀點-9月市場展望'),
+      row('2026/10/08', '/api/publish/report/94416f5f-69da-4124-bee8-72f2ef601f0a.pdf', '富邦總經觀點-9月市場展望'),
+      row('2026/09/20', '/api/publish/report/abc.pdf', '富邦總經分析-拉丁美洲經濟展望'),
+    ].join('') + '"\\u002Fapi\\u002Fpublish\\u002Freport\\u002F富邦市場展望080526.pdf"'
+    expect(parseResearchList(html)).toEqual([
+      { path: '/api/publish/report/94416f5f-69da-4124-bee8-72f2ef601f0a.pdf', title: '富邦總經觀點-9月市場展望', listedDate: '2026-10-08' },
+      { path: '/api/publish/report/富邦市場展望090226.pdf', title: '富邦總經觀點-9月市場展望', listedDate: '2026-09-02' },
+      { path: '/api/publish/report/富邦市場展望080526.pdf', title: '', listedDate: '2026-08-05' },
+    ])
+  })
+
+  it('reads a table of contents numbered with Roman numerals', () => {
+    expect(parseContents(['I.月度配置觀點P2IV.債券市場P10-12', 'II.總經觀點P3-5V.成熟/新興市場P13-16', 'III.外匯市場P6-9VI.財經大事曆P17', '1'])).toEqual([
+      { title: '月度配置觀點', from: 2, to: 2 },
+      { title: '總經觀點', from: 3, to: 5 },
+      { title: '外匯市場', from: 6, to: 9 },
+      { title: '債券市場', from: 10, to: 12 },
+      { title: '成熟/新興市場', from: 13, to: 16 },
+      { title: '財經大事曆', from: 17, to: 17 },
+    ])
+  })
+
+  it('reads 「月底…升至」 closes', () => {
+    expect(parseActuals('月底美元指數升至101.8，全月升幅逾2%', [{ index: 'dxy', low: 97, high: 102 }])).toEqual([{ index: 'dxy', value: 101.8 }])
   })
 })

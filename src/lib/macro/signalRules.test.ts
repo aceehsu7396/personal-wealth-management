@@ -81,7 +81,7 @@ describe('judgeSignals', () => {
         { VIXCLS: monthly([...flat(23, 18), 12.9]), BAMLH0A0HYM2: monthly(flat(24, 2.9)) },
         {
           margin: { now: { date: '2026-10-14', value: 116 }, before: { date: '2026-07-14', value: 100 } },
-          fubon: [{ valuation: { pe: 22, average: 19, sdLow: 17, sdHigh: 21 }, reportTitle: '富邦總經觀點-9月市場展望', summary: '' } as never],
+          fubon: [{ valuation: { pe: 22, average: 19, sdLow: 17, sdHigh: 21 }, reportDate: '2026-09-02', reportTitle: '富邦總經觀點-9月市場展望', summary: '' } as never],
         },
       ),
     )
@@ -108,6 +108,17 @@ describe('judgeSignals', () => {
     expect(j['growth.twBusinessSignal'].value).toBe('up')
     expect(j['growth.twBusinessSignal'].reason).toContain('黃紅燈')
     expect(j['inflation.usCpi'].value).toBe('up')
+  })
+
+  it('uses the latest issue with a valuation chart when the newest has none', () => {
+    const issue = (reportDate: string, valuation: unknown) =>
+      ({ reportDate, reportTitle: `${reportDate} 報告`, summary: '', valuation }) as never
+    const sep = issue('2026-09-02', { pe: 23, average: 19, sdLow: 17, sdHigh: 21 })
+    const j = judgeSignals(data({}, { fubon: [sep, issue('2026-10-07', null)] }))
+    expect(j['sentiment.valuation']).toMatchObject({ value: 1, manual: false })
+    expect(j['sentiment.valuation'].reason).toContain('2026-09-02 報告')
+    const stale = judgeSignals(data({}, { fubon: [issue('2026-06-03', { pe: 23, average: 19, sdLow: 17, sdHigh: 21 }), issue('2026-10-07', null)] }))
+    expect(stale['sentiment.valuation'].manual).toBe(true)
   })
 
   it('marks missing sources as neutral and manual', () => {
