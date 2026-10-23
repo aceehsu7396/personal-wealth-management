@@ -4,13 +4,17 @@ import { fetchStockData } from '../lib/screener/stockData'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { JourneyNotice } from '../components/JourneyNotice'
-import { evaluateThesis, LYNCH_LABELS } from '../lib/calculations/thesisScoring'
 import {
+  evaluateThesis,
+  LYNCH_LABELS,
   MARKET_LABELS,
   STATUS_LABELS,
-  StockThesisForm,
-  type StockThesisFormValues,
-} from '../components/forms/StockThesisForm'
+  VERDICT_LABELS,
+} from '../lib/calculations/thesisScoring'
+import { StockThesisForm, type StockThesisFormValues } from '../components/forms/StockThesisForm'
+import { isStale, refreshedFields } from '../lib/research/autoResearch'
+import { todayIsoDate } from '../lib/market/twse'
+import { describeAiError } from '../lib/ai/client'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
 import { describeValuation, formatRatio } from '../lib/format'
 import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
@@ -77,6 +81,47 @@ export function StocksPage() {
     .map((t) => evaluateThesis(t, policy))
     .filter((e) => e.priceZone === 'trim' || e.priceZone === 'exit_overvalued').length
 
+  const [refreshing, setRefreshing] = useState<string | null>(null)
+  const [refreshError, setRefreshError] = useState<string | null>(null)
+
+  async function refresh(id: string) {
+    const t = useAppStore.getState().stockTheses.find((x) => x.id === id)
+    if (!t || t.market !== 'TW') return
+    setRefreshing(id)
+    try {
+      updateStockThesis(id, await refreshedFields(t, todayIsoDate()))
+      setRefreshError(null)
+    } catch (e) {
+      setRefreshError(`${t.ticker}：${describeAiError(e)}`)
+    } finally {
+      setRefreshing(null)
+    }
+  }
+
+  // Health checks older than a week refresh in the background (a few per
+  // visit, to stay within the free data quota).
+  useEffect(() => {
+    const stale = useAppStore
+      .getState()
+      .stockTheses.filter((t) => t.market === 'TW' && t.status !== 'exited' && isStale(t.auto, todayIsoDate()))
+      .slice(0, 5)
+    if (stale.length === 0) return
+    let cancelled = false
+    void (async () => {
+      for (const t of stale) {
+        if (cancelled) return
+        try {
+          updateStockThesis(t.id, await refreshedFields(t, todayIsoDate()))
+        } catch {
+          return
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [updateStockThesis])
+
   function handleSubmit(values: StockThesisFormValues) {
     if (editingThesis) updateStockThesis(editingThesis.id, values)
     else addStockThesis(values)
@@ -113,8 +158,6 @@ export function StocksPage() {
               key={`${editing}${prefill?.ticker ?? ''}`}
               prefill={editingThesis ? undefined : prefill}
               policy={policy}
-              thesisId={editingThesis?.id}
-              valuation={editingThesis ? twse.snapshot.valuations[editingThesis.ticker] : undefined}
               initialValues={editingThesis}
               onSubmit={handleSubmit}
               onCancel={() => setEditing(null)}
@@ -151,6 +194,7 @@ export function StocksPage() {
             ))}
           </div>
         </div>
+        {refreshError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{refreshError}</p>}
         {evaluated.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             還沒有研究卡。先從能力圈內、最熟悉的公司開始。
@@ -162,7 +206,7 @@ export function StocksPage() {
                 <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">標的</th>
                   <th className="py-2 pr-4">類型</th>
-                  <th className="py-2 pr-4">信心</th>
+                  <th className="py-2 pr-4">結論</th>
                   <th className="py-2 pr-4">現價 / 買進價</th>
                   <th className="py-2 pr-4">上下檔比</th>
                   <th className="py-2 pr-4">價位</th>
@@ -180,6 +224,20 @@ export function StocksPage() {
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {MARKET_LABELS[t.market]}・{t.sector}・{STATUS_LABELS[t.status]}
                       </div>
+                      {t.market === 'TW' && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {t.auto ? `體檢 ${t.auto.fetchedAt.slice(0, 10)}` : '尚未體檢'}
+                          {' · '}
+                          <button
+                            type="button"
+                            disabled={refreshing !== null}
+                            onClick={() => void refresh(t.id)}
+                            className="font-medium text-indigo-700 hover:underline disabled:opacity-50 dark:text-indigo-400"
+                          >
+                            {refreshing === t.id ? '更新中…' : '更新體檢'}
+                          </button>
+                        </div>
+                      )}
                       {t.market === 'TW' && describeValuation(twse.snapshot.valuations[t.ticker]) && (
                         <div className="text-xs text-gray-400 dark:text-gray-500">
                           {describeValuation(twse.snapshot.valuations[t.ticker])}
@@ -187,19 +245,35 @@ export function StocksPage() {
                       )}
                     </td>
                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {LYNCH_LABELS[t.lynchCategory]}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {e.convictionScore.toFixed(1)}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {t.currentPrice} / {e.buyPrice.toFixed(1)}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {formatRatio(e.upsideDownsideRatio)}
+                      {t.kind === 'etf' ? 'ETF' : LYNCH_LABELS[t.lynchCategory]}
                     </td>
                     <td className="py-2 pr-4">
-                      <PriceZoneBadge zone={e.priceZone} />
+                      {t.verdict ? (
+                        <span
+                          className={`rounded px-2 py-0.5 text-xs font-medium ${
+                            t.verdict === 'invest'
+                              ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300'
+                              : t.verdict === 'pass'
+                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
+                                : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+                          }`}
+                          title={t.verdictNote}
+                        >
+                          {VERDICT_LABELS[t.verdict]}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-orange-700 dark:text-orange-400">待判斷</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
+                      {t.currentPrice}
+                      {t.kind !== 'etf' && ` / ${e.buyPrice.toFixed(1)}`}
+                    </td>
+                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
+                      {t.kind === 'etf' ? '—' : formatRatio(e.upsideDownsideRatio)}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {t.kind === 'etf' ? <span className="text-xs text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
                     </td>
                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                       {e.checks.filter((c) => c.passed).length}/{e.checks.length}

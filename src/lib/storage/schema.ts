@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AutoResearch } from '../research/autoResearch'
 
 export const SCHEMA_VERSION = 1
 
@@ -255,6 +256,26 @@ export const StockThesisSchema = z.object({
   impliedGrowthPercent: z.number().optional(),
   historicalGrowthPercent: z.number().optional(),
   marginOfSafetyOverridePercent: z.number().optional(),
+  // --- Automatic health check (FinMind) and the user's judgement ---
+  kind: z.enum(['stock', 'etf']).default('stock'),
+  // Snapshot computed from free data; validated where it is produced.
+  auto: z.custom<AutoResearch>((v) => typeof v === 'object' && v !== null).optional(),
+  verdict: z.enum(['invest', 'watch', 'pass']).optional(),
+  // Why, and what would change it (e.g. "wait for P/E back to the median").
+  verdictNote: z.string().default(''),
+  verdictAt: z.string().optional(),
+  // User overrides of the automatic valuation.
+  assumptions: z
+    .object({
+      growthPercent: z.number().optional(),
+      multiples: z.tuple([z.number(), z.number(), z.number()]).optional(),
+    })
+    .optional(),
+  // Automatic red flags the user has looked into: flag key → explanation.
+  explainedFlags: z.record(z.string(), z.string()).default({}),
+  etfRole: z.enum(['core', 'trading', 'defensive', 'income']).optional(),
+  // Five forces are optional now; undefined (older cards) counts as rated.
+  fiveForcesRated: z.boolean().optional(),
   updatedAt: z.string(),
   createdAt: z.string(),
 })

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AppDataSchema, createDefaultAppData } from './schema'
+import { AppDataSchema, StockThesisSchema, createDefaultAppData } from './schema'
 
 describe('AppDataSchema', () => {
   it('loads data saved before the action roadmap fields existed', () => {
@@ -24,5 +24,20 @@ describe('AppDataSchema', () => {
     expect(result.data?.tradingStrategies).toEqual([])
     expect(result.data?.paperAccounts).toEqual([])
     expect(result.data?.watchlist).toEqual([])
+  })
+
+  it('loads research cards saved before the automatic health check', () => {
+    const card = {
+      id: 'x', ticker: '2330', name: '台積電', market: 'TW', sector: '半導體', lynchCategory: 'stalwart',
+      inCircleOfCompetence: true, status: 'watch', thesis: 'a', drivers: 'b', killCriteria: 'c', sources: 'd', preMortem: 'e',
+      fiveForces: { rivalry: 3, newEntrants: 3, substitutes: 3, buyerPower: 3, supplierPower: 3 },
+      powers: { scaleEconomies: 3, networkEconomies: 0, counterPositioning: 0, switchingCosts: 0, branding: 0, corneredResource: 0, processPower: 0 },
+      fScore: 7, hasUnexplainedRedFlags: false, fairValueBear: 1, fairValueBase: 2, fairValueBull: 3, currentPrice: 2,
+      updatedAt: '', createdAt: '',
+    }
+    const parsed = StockThesisSchema.parse(card)
+    expect(parsed).toMatchObject({ kind: 'stock', verdictNote: '', explainedFlags: {} })
+    expect(parsed.verdict).toBeUndefined()
+    expect(parsed.fiveForcesRated).toBeUndefined()
   })
 })

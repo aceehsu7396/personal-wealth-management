@@ -43,6 +43,10 @@ function thesis(overrides: Partial<StockThesis> = {}): StockThesis {
     fairValueBase: 1200,
     fairValueBull: 1600,
     currentPrice: 950,
+    kind: 'stock',
+    verdict: 'invest',
+    verdictNote: '',
+    explainedFlags: {},
     updatedAt: new Date().toISOString(),
     createdAt: new Date().toISOString(),
     ...overrides,
@@ -143,5 +147,36 @@ describe('targetPositionPercentOf', () => {
 
   it('is zero when there is no upside', () => {
     expect(targetPositionPercentOf(5, -0.5, 8)).toBe(0)
+  })
+})
+
+describe('five judgements and the automatic check', () => {
+  const keys = (t: StockThesis) => Object.fromEntries(evaluateThesis(t, policy).checks.map((c) => [c.key, c.passed]))
+
+  it('needs a verdict to be complete, and "invest" to pass', () => {
+    expect(evaluateThesis(thesis({ verdict: undefined }), policy).isComplete).toBe(false)
+    expect(keys(thesis({ verdict: 'watch' }))).toMatchObject({ complete: true, verdict: false })
+    // Drivers, sources and the pre-mortem are optional now.
+    expect(evaluateThesis(thesis({ drivers: '', sources: '', preMortem: '' }), policy).isComplete).toBe(true)
+  })
+
+  it('checks five forces only when rated', () => {
+    expect(keys(thesis({ fiveForcesRated: false })).fiveForces).toBeUndefined()
+    expect(keys(thesis()).fiveForces).toBe(true)
+  })
+
+  it('uses ROE from the automatic check and skips the F-score for financials', () => {
+    const stock = { roe: 8, fScore: null } as never
+    const k = keys(thesis({ auto: { kind: 'stock', stock } as never }))
+    expect(k.roe).toBe(false)
+    expect(k.fScore).toBeUndefined()
+    expect(k.roic).toBeUndefined()
+  })
+
+  it('judges ETF cards on the verdict and liquidity, without a price zone', () => {
+    const etf = thesis({ kind: 'etf', auto: { kind: 'etf', etf: { avgTradeValue: 0.2 } } as never, fairValueBear: 0, fairValueBase: 0, fairValueBull: 0 })
+    const e = evaluateThesis(etf, policy)
+    expect(e.priceZone).toBe('hold')
+    expect(Object.fromEntries(e.checks.map((c) => [c.key, c.passed]))).toEqual({ complete: true, verdict: true, liquidity: false })
   })
 })

@@ -154,7 +154,60 @@ function filled(text: string | undefined): boolean {
   return (text ?? '').trim().length > 0
 }
 
+export const MARKET_LABELS = { TW: '台股', US: '美股' } as const
+export const STATUS_LABELS = { watch: '觀察', holding: '持有', exited: '已出場' } as const
+
+export const VERDICT_LABELS: Record<NonNullable<StockThesis['verdict']>, string> = {
+  invest: '值得投資',
+  watch: '觀察',
+  pass: '不投資',
+}
+
+// Minimum ROE (last four quarters) when the automatic check has it.
+export const MIN_ROE_PERCENT = 10
+// ETFs need enough daily turnover to trade without moving the price (億元).
+export const MIN_ETF_TRADE_VALUE = 0.5
+
+// ETF cards are judged on the user's verdict and tradability; there is no
+// fair-value range.
+function evaluateEtf(thesis: StockThesis, policy: InvestmentPolicy): ThesisEvaluation {
+  const isComplete = filled(thesis.thesis) && filled(thesis.killCriteria) && thesis.verdict !== undefined
+  const tradeValue = thesis.auto?.etf?.avgTradeValue ?? null
+  const checks: ThesisCheck[] = [
+    { key: 'complete', label: '研究卡完整（持有理由、失效條件、結論）', passed: isComplete },
+    { key: 'verdict', label: '你的結論：值得投資', passed: thesis.verdict === 'invest' },
+  ]
+  if (tradeValue !== null) {
+    checks.push({
+      key: 'liquidity',
+      label: `日均成交金額 ≥ ${MIN_ETF_TRADE_VALUE} 億（目前 ${tradeValue.toFixed(2)} 億）`,
+      passed: tradeValue >= MIN_ETF_TRADE_VALUE,
+    })
+  }
+  return {
+    fiveForcesAverage: 0,
+    topPowerScore: 0,
+    strongestPowers: [],
+    industryScore: 0,
+    qualityScore: 0,
+    convictionScore: 3,
+    qualityTier: 'standard',
+    marginOfSafetyPercent: 0,
+    buyPrice: thesis.currentPrice,
+    expectedValue: thesis.currentPrice,
+    upsideDownsideRatio: 0,
+    priceZone: 'hold',
+    positionCapPercent: policy.maxSinglePositionPercent,
+    targetPositionPercent: policy.maxSinglePositionPercent,
+    isComplete,
+    checks,
+    passesAll: checks.every((c) => c.passed),
+  }
+}
+
 export function evaluateThesis(thesis: StockThesis, policy: InvestmentPolicy): ThesisEvaluation {
+  if (thesis.kind === 'etf') return evaluateEtf(thesis, policy)
+  const auto = thesis.auto?.stock ?? null
   const fiveForcesAverage = average(Object.values(thesis.fiveForces))
   const powerEntries = Object.entries(thesis.powers) as [keyof StockThesis['powers'], number][]
   const topPowerScore = Math.max(...powerEntries.map(([, v]) => v))
@@ -199,24 +252,29 @@ export function evaluateThesis(thesis: StockThesis, policy: InvestmentPolicy): T
     positionCapPercent,
   )
 
-  const isComplete =
-    filled(thesis.thesis) &&
-    filled(thesis.drivers) &&
-    filled(thesis.killCriteria) &&
-    filled(thesis.sources) &&
-    filled(thesis.preMortem)
+  // The five human judgements: competence, thesis, kill criteria, moat and
+  // a verdict. Everything numeric comes from the automatic check.
+  const isComplete = filled(thesis.thesis) && filled(thesis.killCriteria) && thesis.verdict !== undefined
 
   const checks: ThesisCheck[] = [
-    { key: 'complete', label: '研究卡完整（論點、驅動因素、失效條件、資訊來源、事前驗屍）', passed: isComplete },
+    { key: 'complete', label: '研究卡完整（論點、失效條件、結論）', passed: isComplete },
+    { key: 'verdict', label: '你的結論：值得投資', passed: thesis.verdict === 'invest' },
     { key: 'circle', label: '在能力圈內', passed: thesis.inCircleOfCompetence },
-    { key: 'fiveForces', label: `五力平均 ≥ 3（目前 ${fiveForcesAverage.toFixed(1)}）`, passed: fiveForcesAverage >= 3 },
-    { key: 'powers', label: `至少 1 項競爭力量 ≥ 3（目前最高 ${topPowerScore}）`, passed: topPowerScore >= 3 },
-    { key: 'fScore', label: `F 分數 ≥ 6（目前 ${thesis.fScore}）`, passed: thesis.fScore >= 6 },
   ]
-  if (hasRoicInputs) {
+  if (thesis.fiveForcesRated !== false) {
+    checks.push({ key: 'fiveForces', label: `五力平均 ≥ 3（目前 ${fiveForcesAverage.toFixed(1)}）`, passed: fiveForcesAverage >= 3 })
+  }
+  checks.push({ key: 'powers', label: `護城河：至少 1 項競爭力量 ≥ 3（目前最高 ${topPowerScore}）`, passed: topPowerScore >= 3 })
+  // Financials have no F-score (their statements lack gross profit etc.).
+  if (!(auto && auto.fScore === null)) {
+    checks.push({ key: 'fScore', label: `F 分數 ≥ 6（目前 ${thesis.fScore}）`, passed: thesis.fScore >= 6 })
+  }
+  if (auto && auto.roe !== null) {
+    checks.push({ key: 'roe', label: `ROE ≥ ${MIN_ROE_PERCENT}%（近四季 ${auto.roe.toFixed(1)}%）`, passed: auto.roe >= MIN_ROE_PERCENT })
+  } else if (hasRoicInputs) {
     checks.push({ key: 'roic', label: 'ROIC > WACC + 3%', passed: roicBeatsHurdle })
   }
-  checks.push({ key: 'redFlags', label: '沒有未解釋的財報紅旗', passed: !thesis.hasUnexplainedRedFlags })
+  checks.push({ key: 'redFlags', label: '財報紅旗都已確認並說明', passed: !thesis.hasUnexplainedRedFlags })
   if (thesis.impliedGrowthPercent !== undefined && thesis.historicalGrowthPercent !== undefined) {
     checks.push({
       key: 'impliedGrowth',

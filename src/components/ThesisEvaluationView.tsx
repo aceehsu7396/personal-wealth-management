@@ -17,7 +17,8 @@ export function PriceZoneBadge({ zone }: { zone: ThesisEvaluation['priceZone'] }
   )
 }
 
-export function ThesisEvaluationView({ evaluation }: { evaluation: ThesisEvaluation }) {
+// `simple` (ETF cards) shows only the checks: there is no fair-value range.
+export function ThesisEvaluationView({ evaluation, simple = false }: { evaluation: ThesisEvaluation; simple?: boolean }) {
   const metrics = [
     { label: '產業分數', value: evaluation.industryScore.toFixed(1), hint: '五力平均與最強競爭力量' },
     { label: '品質分數', value: evaluation.qualityScore.toFixed(1), hint: 'F 分數、投入資本報酬率、紅旗' },
@@ -31,6 +32,18 @@ export function ThesisEvaluationView({ evaluation }: { evaluation: ThesisEvaluat
       hint: `上限 ${evaluation.positionCapPercent}%（占總資產）`,
     },
   ]
+
+  if (simple) {
+    return (
+      <ul className="space-y-1 text-sm">
+        {evaluation.checks.map((c) => (
+          <li key={c.key} className={c.passed ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'}>
+            {c.passed ? '✓' : '✗'} {c.label}
+          </li>
+        ))}
+      </ul>
+    )
+  }
 
   return (
     <div className="space-y-4">

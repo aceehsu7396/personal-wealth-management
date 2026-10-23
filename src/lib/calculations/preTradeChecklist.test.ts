@@ -44,6 +44,10 @@ const thesis: StockThesis = {
   fairValueBase: 1200,
   fairValueBull: 1600,
   currentPrice: 1000,
+  kind: 'stock',
+  verdict: 'invest',
+  verdictNote: '',
+  explainedFlags: {},
   updatedAt: '',
   createdAt: '',
 }
