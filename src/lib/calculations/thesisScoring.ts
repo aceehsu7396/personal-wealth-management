@@ -1,4 +1,8 @@
 import type { InvestmentPolicy, LynchCategory, StockThesis } from '../storage/schema'
+import { rateAuto, type AutoRating } from '../research/rating'
+
+// Research cards are scored from the automatic health check only (FinMind
+// data) plus the user's one-click verdict.
 
 export type QualityTier = 'high' | 'standard' | 'cyclical'
 export type PriceZone = 'strong_buy' | 'buy' | 'hold' | 'trim' | 'exit_overvalued'
@@ -10,11 +14,8 @@ export interface ThesisCheck {
 }
 
 export interface ThesisEvaluation {
-  fiveForcesAverage: number
-  topPowerScore: number
-  strongestPowers: string[]
-  industryScore: number
-  qualityScore: number
+  rating: AutoRating | null
+  lynchCategory: LynchCategory
   convictionScore: number
   qualityTier: QualityTier
   marginOfSafetyPercent: number
@@ -38,24 +39,6 @@ export const LYNCH_LABELS: Record<LynchCategory, string> = {
   asset_play: '資產股',
 }
 
-export const POWER_LABELS: Record<keyof StockThesis['powers'], string> = {
-  scaleEconomies: '規模經濟',
-  networkEconomies: '網路效應',
-  counterPositioning: '反定位',
-  switchingCosts: '轉換成本',
-  branding: '品牌',
-  corneredResource: '壟斷資源',
-  processPower: '流程力',
-}
-
-export const FIVE_FORCE_LABELS: Record<keyof StockThesis['fiveForces'], string> = {
-  rivalry: '現有競爭強度',
-  newEntrants: '新進者威脅',
-  substitutes: '替代品威脅',
-  buyerPower: '客戶議價力',
-  supplierPower: '供應商議價力',
-}
-
 export const PRICE_ZONE_LABELS: Record<PriceZone, string> = {
   strong_buy: '強力買進區',
   buy: '買進區',
@@ -71,19 +54,11 @@ const CYCLICAL_CAP_PERCENT = 3
 const TURNAROUND_CAP_PERCENT = 2
 const HIGH_CONVICTION_THRESHOLD = 4
 
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(Math.max(value, min), max)
-}
-
-function average(values: number[]): number {
-  return values.reduce((acc, v) => acc + v, 0) / values.length
-}
-
-export function qualityTierOf(thesis: StockThesis, topPowerScore: number): QualityTier {
-  if (thesis.lynchCategory === 'cyclical' || thesis.lynchCategory === 'turnaround') {
-    return 'cyclical'
-  }
-  if (topPowerScore >= 4 && thesis.fScore >= 8) return 'high'
+// High quality: F-score ≥ 8 and ROE ≥ 15%; cyclicals and turnarounds get
+// the thicker margin of safety.
+export function qualityTierOf(lynch: LynchCategory, fScore: number | null, roe: number | null): QualityTier {
+  if (lynch === 'cyclical' || lynch === 'turnaround') return 'cyclical'
+  if ((fScore ?? 0) >= 8 && (roe ?? 0) >= 15) return 'high'
   return 'standard'
 }
 
@@ -150,10 +125,6 @@ export function targetPositionPercentOf(
   return Math.round(Math.min(raw, cap) * 10) / 10
 }
 
-function filled(text: string | undefined): boolean {
-  return (text ?? '').trim().length > 0
-}
-
 export const MARKET_LABELS = { TW: '台股', US: '美股' } as const
 export const STATUS_LABELS = { watch: '觀察', holding: '持有', exited: '已出場' } as const
 
@@ -168,131 +139,84 @@ export const MIN_ROE_PERCENT = 10
 // ETFs need enough daily turnover to trade without moving the price (億元).
 export const MIN_ETF_TRADE_VALUE = 0.5
 
-// ETF cards are judged on the user's verdict and tradability; there is no
-// fair-value range.
-function evaluateEtf(thesis: StockThesis, policy: InvestmentPolicy): ThesisEvaluation {
-  const isComplete = filled(thesis.thesis) && filled(thesis.killCriteria) && thesis.verdict !== undefined
-  const tradeValue = thesis.auto?.etf?.avgTradeValue ?? null
-  const checks: ThesisCheck[] = [
-    { key: 'complete', label: '研究卡完整（持有理由、失效條件、結論）', passed: isComplete },
-    { key: 'verdict', label: '你的結論：值得投資', passed: thesis.verdict === 'invest' },
-  ]
-  if (tradeValue !== null) {
-    checks.push({
-      key: 'liquidity',
-      label: `日均成交金額 ≥ ${MIN_ETF_TRADE_VALUE} 億（目前 ${tradeValue.toFixed(2)} 億）`,
-      passed: tradeValue >= MIN_ETF_TRADE_VALUE,
-    })
-  }
-  return {
-    fiveForcesAverage: 0,
-    topPowerScore: 0,
-    strongestPowers: [],
-    industryScore: 0,
-    qualityScore: 0,
-    convictionScore: 3,
-    qualityTier: 'standard',
-    marginOfSafetyPercent: 0,
-    buyPrice: thesis.currentPrice,
-    expectedValue: thesis.currentPrice,
-    upsideDownsideRatio: 0,
-    priceZone: 'hold',
-    positionCapPercent: policy.maxSinglePositionPercent,
-    targetPositionPercent: policy.maxSinglePositionPercent,
-    isComplete,
-    checks,
-    passesAll: checks.every((c) => c.passed),
-  }
-}
+const NO_AUTO_CHECK: ThesisCheck = { key: 'auto', label: '需要自動體檢資料（目前只支援台股與 ETF）', passed: false }
 
 export function evaluateThesis(thesis: StockThesis, policy: InvestmentPolicy): ThesisEvaluation {
-  if (thesis.kind === 'etf') return evaluateEtf(thesis, policy)
-  const auto = thesis.auto?.stock ?? null
-  const fiveForcesAverage = average(Object.values(thesis.fiveForces))
-  const powerEntries = Object.entries(thesis.powers) as [keyof StockThesis['powers'], number][]
-  const topPowerScore = Math.max(...powerEntries.map(([, v]) => v))
-  const strongestPowers = powerEntries
-    .filter(([, v]) => v >= 3)
-    .sort((a, b) => b[1] - a[1])
-    .map(([k]) => POWER_LABELS[k])
+  const auto = thesis.auto
+  const rating = auto ? rateAuto(auto, policy, thesis.currentPrice || undefined) : null
+  const isComplete = auto !== undefined && thesis.verdict !== undefined
+  const verdictCheck: ThesisCheck = { key: 'verdict', label: '你的結論：值得投資', passed: thesis.verdict === 'invest' }
 
-  const industryScore = (fiveForcesAverage + clamp(topPowerScore, 1, 5)) / 2
+  if (thesis.kind === 'etf') {
+    const tradeValue = auto?.etf?.avgTradeValue ?? null
+    const checks: ThesisCheck[] = auto ? [verdictCheck] : [NO_AUTO_CHECK, verdictCheck]
+    if (tradeValue !== null) {
+      checks.push({
+        key: 'liquidity',
+        label: `日均成交金額 ≥ ${MIN_ETF_TRADE_VALUE} 億（目前 ${tradeValue.toFixed(2)} 億）`,
+        passed: tradeValue >= MIN_ETF_TRADE_VALUE,
+      })
+    }
+    return {
+      rating,
+      lynchCategory: thesis.lynchCategory,
+      convictionScore: 3,
+      qualityTier: 'standard',
+      marginOfSafetyPercent: 0,
+      buyPrice: thesis.currentPrice,
+      expectedValue: thesis.currentPrice,
+      upsideDownsideRatio: 0,
+      priceZone: 'hold',
+      positionCapPercent: policy.maxSinglePositionPercent,
+      targetPositionPercent: policy.maxSinglePositionPercent,
+      isComplete,
+      checks,
+      passesAll: checks.every((c) => c.passed),
+    }
+  }
 
-  const hasRoicInputs = thesis.roicPercent !== undefined && thesis.waccPercent !== undefined
-  const roicBeatsHurdle = hasRoicInputs && thesis.roicPercent! > thesis.waccPercent! + 3
-  let qualityScore = 1 + (thesis.fScore * 4) / 9
-  if (hasRoicInputs && !roicBeatsHurdle) qualityScore -= 1
-  if (thesis.hasUnexplainedRedFlags) qualityScore -= 1
-  qualityScore = clamp(qualityScore, 1, 5)
-
-  const convictionScore = (industryScore + qualityScore) / 2
-
-  const qualityTier = qualityTierOf(thesis, topPowerScore)
+  const stock = auto?.stock ?? null
+  const lynch = stock?.lynch ?? thesis.lynchCategory
+  // Conviction: one point plus one per dimension rated good (max 5).
+  const convictionScore = rating ? Math.min(1 + rating.goodCount, 5) : 1
+  const qualityTier = qualityTierOf(lynch, stock?.fScore?.score ?? null, stock?.roe ?? null)
   const marginOfSafetyPercent = marginOfSafetyFor(thesis, qualityTier, policy)
   const buyPrice = thesis.fairValueBase * (1 - marginOfSafetyPercent / 100)
   const expectedValue =
     thesis.fairValueBear * SCENARIO_WEIGHTS.bear +
     thesis.fairValueBase * SCENARIO_WEIGHTS.base +
     thesis.fairValueBull * SCENARIO_WEIGHTS.bull
-  const upsideDownsideRatio = upsideDownsideRatioOf(
-    thesis.currentPrice,
-    thesis.fairValueBear,
-    thesis.fairValueBull,
-  )
-  const priceZone = priceZoneOf(
-    thesis.currentPrice,
-    thesis.fairValueBear,
-    buyPrice,
-    thesis.fairValueBull,
-  )
-  const positionCapPercent = positionCapFor(thesis.lynchCategory, convictionScore, policy)
-  const targetPositionPercent = targetPositionPercentOf(
-    convictionScore,
-    upsideDownsideRatio,
-    positionCapPercent,
-  )
+  const upsideDownsideRatio = upsideDownsideRatioOf(thesis.currentPrice, thesis.fairValueBear, thesis.fairValueBull)
+  const priceZone = priceZoneOf(thesis.currentPrice, thesis.fairValueBear, buyPrice, thesis.fairValueBull)
+  const positionCapPercent = positionCapFor(lynch, convictionScore, policy)
+  const targetPositionPercent = targetPositionPercentOf(convictionScore, upsideDownsideRatio, positionCapPercent)
 
-  // The five human judgements: competence, thesis, kill criteria, moat and
-  // a verdict. Everything numeric comes from the automatic check.
-  const isComplete = filled(thesis.thesis) && filled(thesis.killCriteria) && thesis.verdict !== undefined
-
-  const checks: ThesisCheck[] = [
-    { key: 'complete', label: '研究卡完整（論點、失效條件、結論）', passed: isComplete },
-    { key: 'verdict', label: '你的結論：值得投資', passed: thesis.verdict === 'invest' },
-    { key: 'circle', label: '在能力圈內', passed: thesis.inCircleOfCompetence },
-  ]
-  if (thesis.fiveForcesRated !== false) {
-    checks.push({ key: 'fiveForces', label: `五力平均 ≥ 3（目前 ${fiveForcesAverage.toFixed(1)}）`, passed: fiveForcesAverage >= 3 })
+  const checks: ThesisCheck[] = []
+  if (!stock) {
+    checks.push(NO_AUTO_CHECK, verdictCheck)
+  } else {
+    checks.push(verdictCheck)
+    // Financials have no F-score (their statements lack gross profit etc.).
+    if (stock.fScore) {
+      checks.push({ key: 'fScore', label: `F 分數 ≥ 6（目前 ${stock.fScore.score}）`, passed: stock.fScore.score >= 6 })
+    }
+    if (stock.roe !== null) {
+      checks.push({ key: 'roe', label: `ROE ≥ ${MIN_ROE_PERCENT}%（近四季 ${stock.roe.toFixed(1)}%）`, passed: stock.roe >= MIN_ROE_PERCENT })
+    }
+    checks.push(
+      {
+        key: 'redFlags',
+        label: stock.redFlags.length === 0 ? '沒有財報紅旗' : `沒有財報紅旗（目前 ${stock.redFlags.map((f) => f.label).join('、')}）`,
+        passed: stock.redFlags.length === 0,
+      },
+      { key: 'price', label: `現價 ≤ 買進價（安全邊際 ${marginOfSafetyPercent}%）`, passed: thesis.currentPrice > 0 && thesis.currentPrice <= buyPrice },
+      { key: 'asymmetry', label: '上下檔比 ≥ 2', passed: upsideDownsideRatio >= 2 },
+    )
   }
-  checks.push({ key: 'powers', label: `護城河：至少 1 項競爭力量 ≥ 3（目前最高 ${topPowerScore}）`, passed: topPowerScore >= 3 })
-  // Financials have no F-score (their statements lack gross profit etc.).
-  if (!(auto && auto.fScore === null)) {
-    checks.push({ key: 'fScore', label: `F 分數 ≥ 6（目前 ${thesis.fScore}）`, passed: thesis.fScore >= 6 })
-  }
-  if (auto && auto.roe !== null) {
-    checks.push({ key: 'roe', label: `ROE ≥ ${MIN_ROE_PERCENT}%（近四季 ${auto.roe.toFixed(1)}%）`, passed: auto.roe >= MIN_ROE_PERCENT })
-  } else if (hasRoicInputs) {
-    checks.push({ key: 'roic', label: 'ROIC > WACC + 3%', passed: roicBeatsHurdle })
-  }
-  checks.push({ key: 'redFlags', label: '財報紅旗都已確認並說明', passed: !thesis.hasUnexplainedRedFlags })
-  if (thesis.impliedGrowthPercent !== undefined && thesis.historicalGrowthPercent !== undefined) {
-    checks.push({
-      key: 'impliedGrowth',
-      label: '反向現金流折現的隱含成長 ≤ 歷史成長 × 1.2',
-      passed: thesis.impliedGrowthPercent <= thesis.historicalGrowthPercent * 1.2,
-    })
-  }
-  checks.push(
-    { key: 'price', label: `現價 ≤ 買進價（安全邊際 ${marginOfSafetyPercent}%）`, passed: thesis.currentPrice <= buyPrice },
-    { key: 'asymmetry', label: '上下檔比 ≥ 2', passed: upsideDownsideRatio >= 2 },
-  )
 
   return {
-    fiveForcesAverage,
-    topPowerScore,
-    strongestPowers,
-    industryScore,
-    qualityScore,
+    rating,
+    lynchCategory: lynch,
     convictionScore,
     qualityTier,
     marginOfSafetyPercent,

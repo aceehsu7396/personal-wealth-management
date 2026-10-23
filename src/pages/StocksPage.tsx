@@ -3,11 +3,11 @@ import { useSearchParams } from 'react-router-dom'
 import { fetchStockData } from '../lib/screener/stockData'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
+import { AutoRatingBar } from '../components/research/AutoRatingBar'
 import { JourneyNotice } from '../components/JourneyNotice'
 import {
   evaluateThesis,
   LYNCH_LABELS,
-  MARKET_LABELS,
   STATUS_LABELS,
   VERDICT_LABELS,
 } from '../lib/calculations/thesisScoring'
@@ -16,7 +16,6 @@ import { isStale, refreshedFields } from '../lib/research/autoResearch'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
-import { describeValuation, formatRatio } from '../lib/format'
 import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
 import { StatCard } from '../components/StatCard'
 import type { ThesisStatus } from '../lib/storage/schema'
@@ -31,7 +30,7 @@ export function StocksPage() {
   const policy = useAppStore((s) => s.investmentPolicy)
   const { journey } = useJourney()
   // Daily TWSE price/valuation refresh for Taiwan research cards.
-  const twse = useTwseAutoRefresh()
+  useTwseAutoRefresh()
   const addStockThesis = useAppStore((s) => s.addStockThesis)
   const updateStockThesis = useAppStore((s) => s.updateStockThesis)
   const removeStockThesis = useAppStore((s) => s.removeStockThesis)
@@ -76,6 +75,7 @@ export function StocksPage() {
     (e) => e.priceZone === 'buy' || e.priceZone === 'strong_buy',
   ).length
   const incomplete = activeEvaluations.filter((e) => !e.isComplete).length
+  const strong = activeEvaluations.filter((e) => e.rating?.overall === 'strong').length
   const needTrim = theses
     .filter((t) => t.status === 'holding')
     .map((t) => evaluateThesis(t, policy))
@@ -132,19 +132,19 @@ export function StocksPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">個股</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        產業與商業模式 ＋ 財務與價值評估：研究卡通過全部檢核，才進入衛星建倉。
+        輸入台股或 ETF 代號，研究卡會自動體檢（免費公開資料、不用 AI）並給出觀察評等；你只要選結論。結論為「值得投資」且通過檢核，才進入交易部位建倉。
       </p>
 
       <JourneyNotice
         missing={journey.missingForSatellite}
-        intro="個股研究是行動路線的第四階段。研究卡可以先寫來觀察，但建議先完成這些步驟再買進個股："
+        intro="研究卡隨時可以建立來觀察；實單買進前，建議先完成這些步驟："
       />
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="研究中標的" value={`${active.length}`} hint="觀察 + 持有" />
-        <StatCard label="進入買進區" value={`${inBuyZone}`} />
-        <StatCard label="持股進入減碼區" value={`${needTrim}`} hint="出場規則 ②" />
-        <StatCard label="研究卡未完整" value={`${incomplete}`} hint="未完整不得建倉" />
+        <StatCard label="評等體質佳" value={`${strong}`} hint="各面向都沒有留意項目" />
+        <StatCard label="進入買進區" value={`${inBuyZone}`} hint={needTrim > 0 ? `持股 ${needTrim} 檔進入減碼區` : undefined} />
+        <StatCard label="待選結論" value={`${incomplete}`} hint="選了結論才能建倉" />
       </div>
 
 
@@ -205,26 +205,25 @@ export function StocksPage() {
               <thead>
                 <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
                   <th className="py-2 pr-4">標的</th>
-                  <th className="py-2 pr-4">類型</th>
+                  <th className="py-2 pr-4">觀察評等</th>
                   <th className="py-2 pr-4">結論</th>
-                  <th className="py-2 pr-4">現價 / 買進價</th>
-                  <th className="py-2 pr-4">上下檔比</th>
+                  <th className="py-2 pr-4">現價 / 基準合理價</th>
+                  <th className="py-2 pr-4">本益比位置</th>
                   <th className="py-2 pr-4">價位</th>
-                  <th className="py-2 pr-4">檢核</th>
                   <th className="py-2 pr-4 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
                 {evaluated.map(({ thesis: t, evaluation: e }) => (
-                  <tr key={t.id} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
+                  <tr key={t.id} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
                     <td className="py-2 pr-4">
                       <div className="font-medium text-gray-900 dark:text-gray-100">
                         {t.ticker} {t.name}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {MARKET_LABELS[t.market]}・{t.sector}・{STATUS_LABELS[t.status]}
+                        {t.kind === 'etf' ? 'ETF' : `${t.sector}・${LYNCH_LABELS[e.lynchCategory]}`}・{STATUS_LABELS[t.status]}
                       </div>
-                      {t.market === 'TW' && (
+                      {t.market === 'TW' ? (
                         <div className="text-xs text-gray-400 dark:text-gray-500">
                           {t.auto ? `體檢 ${t.auto.fetchedAt.slice(0, 10)}` : '尚未體檢'}
                           {' · '}
@@ -237,15 +236,12 @@ export function StocksPage() {
                             {refreshing === t.id ? '更新中…' : '更新體檢'}
                           </button>
                         </div>
-                      )}
-                      {t.market === 'TW' && describeValuation(twse.snapshot.valuations[t.ticker]) && (
-                        <div className="text-xs text-gray-400 dark:text-gray-500">
-                          {describeValuation(twse.snapshot.valuations[t.ticker])}
-                        </div>
+                      ) : (
+                        <div className="text-xs text-orange-700 dark:text-orange-400">美股：無自動資料</div>
                       )}
                     </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {t.kind === 'etf' ? 'ETF' : LYNCH_LABELS[t.lynchCategory]}
+                    <td className="py-2 pr-4">
+                      {e.rating ? <AutoRatingBar rating={e.rating} compact /> : <span className="text-xs text-gray-400">—</span>}
                     </td>
                     <td className="py-2 pr-4">
                       {t.verdict ? (
@@ -262,21 +258,19 @@ export function StocksPage() {
                           {VERDICT_LABELS[t.verdict]}
                         </span>
                       ) : (
-                        <span className="text-xs text-orange-700 dark:text-orange-400">待判斷</span>
+                        <span className="text-xs text-orange-700 dark:text-orange-400">待選結論</span>
                       )}
+                      {t.verdictNote && <div className="mt-1 max-w-40 text-xs text-gray-500 dark:text-gray-400">{t.verdictNote}</div>}
                     </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
+                    <td className="py-2 pr-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
                       {t.currentPrice}
-                      {t.kind !== 'etf' && ` / ${e.buyPrice.toFixed(1)}`}
+                      {t.kind !== 'etf' && t.fairValueBase > 0 && ` / ${t.fairValueBase.toFixed(1)}`}
                     </td>
                     <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {t.kind === 'etf' ? '—' : formatRatio(e.upsideDownsideRatio)}
+                      {t.auto?.stock?.valuation.pe?.percentile != null ? `第 ${t.auto.stock.valuation.pe.percentile} 百分位` : '—'}
                     </td>
                     <td className="py-2 pr-4">
-                      {t.kind === 'etf' ? <span className="text-xs text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {e.checks.filter((c) => c.passed).length}/{e.checks.length}
+                      {t.kind === 'etf' || !t.auto ? <span className="text-xs text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
                     </td>
                     <td className="py-2 pr-4">
                       <div className="flex justify-end gap-2">

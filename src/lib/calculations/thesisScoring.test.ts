@@ -53,59 +53,92 @@ function thesis(overrides: Partial<StockThesis> = {}): StockThesis {
   }
 }
 
+// An automatic health check: high quality, growing, safe, no red flags.
+function stockAuto(overrides: Record<string, unknown> = {}) {
+  return {
+    fetchedAt: '2026-10-23T00:00:00Z',
+    kind: 'stock' as const,
+    name: '台積電',
+    industry: '半導體業',
+    price: 950,
+    priceDate: '2026-10-22',
+    etf: null,
+    stock: {
+      asOf: '2026-06-30',
+      isFinancial: false,
+      epsTtm: 50,
+      epsTtmPrev: 40,
+      roe: 25,
+      grossMargin: 55,
+      grossMarginPrev: 53,
+      operatingMargin: 40,
+      revenueCagr3y: 15,
+      epsCagr3y: 18,
+      revenueYoyTtm: 20,
+      debtRatio: 30,
+      currentRatio: 2,
+      freeCashFlow: [{ year: '2025', value: 1 }],
+      fScore: { score: 8, items: [] },
+      redFlags: [],
+      dividends: { consecutiveYears: 10, lastYearCash: 10, payoutRatio: 20 },
+      valuation: { pe: { current: 19, p20: 14, p50: 24, p80: 32, percentile: 30 }, pb: null, dividendYield: 1, years: 5 },
+      lynch: 'stalwart' as const,
+      ...overrides,
+    },
+  }
+}
+
 describe('evaluateThesis', () => {
-  it('gives high-quality names a thinner margin of safety', () => {
-    const result = evaluateThesis(thesis(), policy)
+  const withAuto = (o: Partial<StockThesis> = {}, a: Record<string, unknown> = {}) => thesis({ auto: stockAuto(a) as never, ...o })
+  const keys = (t: StockThesis) => Object.fromEntries(evaluateThesis(t, policy).checks.map((c) => [c.key, c.passed]))
+
+  it('passes every check for a cheap, high-quality stock the user rates "invest"', () => {
+    const result = evaluateThesis(withAuto(), policy)
     expect(result.qualityTier).toBe('high')
     expect(result.marginOfSafetyPercent).toBe(15)
     expect(result.buyPrice).toBeCloseTo(1020)
+    expect(result.priceZone).toBe('buy')
+    expect(result.upsideDownsideRatio).toBeCloseTo(650 / 250)
+    expect(result.checks.map((c) => c.key)).toEqual(['verdict', 'fScore', 'roe', 'redFlags', 'price', 'asymmetry'])
+    expect(result.passesAll).toBe(true)
+    expect(result.isComplete).toBe(true)
   })
 
-  it('gives cyclicals a thicker margin of safety and a lower cap', () => {
-    const result = evaluateThesis(thesis({ lynchCategory: 'cyclical' }), policy)
+  it('derives conviction from the rating and uses the automatic Lynch category', () => {
+    const result = evaluateThesis(withAuto({ lynchCategory: 'slow_grower' }, { lynch: 'cyclical' }), policy)
+    expect(result.lynchCategory).toBe('cyclical')
     expect(result.qualityTier).toBe('cyclical')
     expect(result.marginOfSafetyPercent).toBe(35)
     expect(result.positionCapPercent).toBe(3)
+    expect(evaluateThesis(withAuto(), policy).convictionScore).toBe(5)
   })
 
-  it('respects an explicit margin-of-safety override', () => {
-    const result = evaluateThesis(thesis({ marginOfSafetyOverridePercent: 40 }), policy)
-    expect(result.marginOfSafetyPercent).toBe(40)
-    expect(result.buyPrice).toBeCloseTo(720)
+  it('needs a verdict to be complete, and "invest" to pass', () => {
+    expect(evaluateThesis(withAuto({ verdict: undefined }), policy).isComplete).toBe(false)
+    expect(keys(withAuto({ verdict: 'watch' })).verdict).toBe(false)
   })
 
-  it('passes every check for a complete, cheap, high-quality thesis', () => {
-    const result = evaluateThesis(thesis(), policy)
-    expect(result.priceZone).toBe('buy')
-    expect(result.upsideDownsideRatio).toBeCloseTo(650 / 250)
-    expect(result.passesAll).toBe(true)
+  it('fails on red flags, a weak F-score or ROE, and skips the F-score for financials', () => {
+    expect(keys(withAuto({}, { redFlags: [{ key: 'loss', label: '近四季虧損', detail: '' }] })).redFlags).toBe(false)
+    expect(keys(withAuto({}, { fScore: { score: 4, items: [] }, roe: 8 }))).toMatchObject({ fScore: false, roe: false })
+    expect(keys(withAuto({}, { fScore: null, isFinancial: true })).fScore).toBeUndefined()
   })
 
-  it('fails completeness when the kill criteria are blank', () => {
-    const result = evaluateThesis(thesis({ killCriteria: '  ' }), policy)
-    expect(result.isComplete).toBe(false)
-    expect(result.passesAll).toBe(false)
-    expect(result.checks.find((c) => c.key === 'complete')?.passed).toBe(false)
+  it('cannot pass without automatic data', () => {
+    const e = evaluateThesis(thesis({ market: 'US', auto: undefined }), policy)
+    expect(e.checks.map((c) => c.key)).toEqual(['auto', 'verdict'])
+    expect(e.isComplete).toBe(false)
   })
 
-  it('lowers the quality score when ROIC misses the hurdle or red flags exist', () => {
-    const clean = evaluateThesis(thesis(), policy)
-    const weak = evaluateThesis(thesis({ roicPercent: 10, hasUnexplainedRedFlags: true }), policy)
-    expect(weak.qualityScore).toBeCloseTo(clean.qualityScore - 2)
-    expect(weak.checks.find((c) => c.key === 'roic')?.passed).toBe(false)
-  })
-
-  it('flags implied growth that runs ahead of history', () => {
-    const result = evaluateThesis(
-      thesis({ impliedGrowthPercent: 20, historicalGrowthPercent: 12 }),
-      policy,
-    )
-    expect(result.checks.find((c) => c.key === 'impliedGrowth')?.passed).toBe(false)
+  it('judges ETF cards on the verdict and liquidity, without a price zone', () => {
+    const etf = thesis({ kind: 'etf', auto: { kind: 'etf', etf: { avgTradeValue: 0.2, returns: {}, distributionYears: 0, maxDrawdown: -10 } } as never })
+    const e = evaluateThesis(etf, policy)
+    expect(e.priceZone).toBe('hold')
+    expect(Object.fromEntries(e.checks.map((c) => [c.key, c.passed]))).toEqual({ verdict: true, liquidity: false })
   })
 
   it('computes the probability-weighted expected value', () => {
-    const result = evaluateThesis(thesis(), policy)
-    expect(result.expectedValue).toBeCloseTo(700 * 0.25 + 1200 * 0.5 + 1600 * 0.25)
+    expect(evaluateThesis(withAuto(), policy).expectedValue).toBeCloseTo(700 * 0.25 + 1200 * 0.5 + 1600 * 0.25)
   })
 })
 
@@ -147,36 +180,5 @@ describe('targetPositionPercentOf', () => {
 
   it('is zero when there is no upside', () => {
     expect(targetPositionPercentOf(5, -0.5, 8)).toBe(0)
-  })
-})
-
-describe('five judgements and the automatic check', () => {
-  const keys = (t: StockThesis) => Object.fromEntries(evaluateThesis(t, policy).checks.map((c) => [c.key, c.passed]))
-
-  it('needs a verdict to be complete, and "invest" to pass', () => {
-    expect(evaluateThesis(thesis({ verdict: undefined }), policy).isComplete).toBe(false)
-    expect(keys(thesis({ verdict: 'watch' }))).toMatchObject({ complete: true, verdict: false })
-    // Drivers, sources and the pre-mortem are optional now.
-    expect(evaluateThesis(thesis({ drivers: '', sources: '', preMortem: '' }), policy).isComplete).toBe(true)
-  })
-
-  it('checks five forces only when rated', () => {
-    expect(keys(thesis({ fiveForcesRated: false })).fiveForces).toBeUndefined()
-    expect(keys(thesis()).fiveForces).toBe(true)
-  })
-
-  it('uses ROE from the automatic check and skips the F-score for financials', () => {
-    const stock = { roe: 8, fScore: null } as never
-    const k = keys(thesis({ auto: { kind: 'stock', stock } as never }))
-    expect(k.roe).toBe(false)
-    expect(k.fScore).toBeUndefined()
-    expect(k.roic).toBeUndefined()
-  })
-
-  it('judges ETF cards on the verdict and liquidity, without a price zone', () => {
-    const etf = thesis({ kind: 'etf', auto: { kind: 'etf', etf: { avgTradeValue: 0.2 } } as never, fairValueBear: 0, fairValueBase: 0, fairValueBull: 0 })
-    const e = evaluateThesis(etf, policy)
-    expect(e.priceZone).toBe('hold')
-    expect(Object.fromEntries(e.checks.map((c) => [c.key, c.passed]))).toEqual({ complete: true, verdict: true, liquidity: false })
   })
 })

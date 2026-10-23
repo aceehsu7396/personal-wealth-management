@@ -3,7 +3,9 @@ import type { FairValues } from '../../lib/research/fundamentals'
 import { MIN_ETF_TRADE_VALUE, MIN_ROE_PERCENT, priceZoneOf } from '../../lib/calculations/thesisScoring'
 import { PriceZoneBadge } from '../ThesisEvaluationView'
 import { Term } from '../Term'
-import { inputClass } from '../forms/FormField'
+import { rateAuto } from '../../lib/research/rating'
+import type { InvestmentPolicy } from '../../lib/storage/schema'
+import { AutoRatingBar } from './AutoRatingBar'
 
 // The automatic health check shown on a research card: numbers with a
 // plain-language reading, so the user only has to judge.
@@ -48,19 +50,7 @@ function Section({ title, metrics }: { title: string; metrics: Metric[] }) {
   )
 }
 
-function StockReport({
-  auto,
-  fair,
-  price,
-  explainedFlags,
-  onExplain,
-}: {
-  auto: AutoResearch
-  fair: FairValues | null
-  price: number | null
-  explainedFlags: Record<string, string>
-  onExplain?: (key: string, text: string) => void
-}) {
+function StockReport({ auto, fair, price }: { auto: AutoResearch; fair: FairValues | null; price: number | null }) {
   const s = auto.stock!
   const v = s.valuation
   const quality: Metric[] = [
@@ -175,22 +165,10 @@ function StockReport({
         {s.redFlags.length === 0 ? (
           <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-400">✓ 沒有偵測到紅旗</p>
         ) : (
-          <ul className="mt-1 space-y-2 text-sm">
+          <ul className="mt-1 space-y-1 text-sm">
             {s.redFlags.map((f) => (
-              <li key={f.key}>
-                <p className={explainedFlags[f.key]?.trim() ? 'text-gray-600 dark:text-gray-400' : 'text-orange-700 dark:text-orange-400'}>
-                  {explainedFlags[f.key]?.trim() ? '✓' : '⚠'} {f.label}：{f.detail}
-                </p>
-                {onExplain ? (
-                  <input
-                    className={`${inputClass} mt-1 text-xs`}
-                    placeholder="查過原因了嗎？寫下說明（例如：擴產備貨、客戶延長付款），留空視為未解釋"
-                    value={explainedFlags[f.key] ?? ''}
-                    onChange={(e) => onExplain(f.key, e.target.value)}
-                  />
-                ) : (
-                  explainedFlags[f.key] && <p className="pl-4 text-xs text-gray-500">說明：{explainedFlags[f.key]}</p>
-                )}
+              <li key={f.key} className="text-orange-700 dark:text-orange-400">
+                ⚠ {f.label}：{f.detail}
               </li>
             ))}
           </ul>
@@ -253,18 +231,16 @@ export function ResearchReportPanel({
   auto,
   fair,
   price,
-  explainedFlags = {},
-  onExplain,
-  maxDrawdownLimit,
+  policy,
 }: {
   auto: AutoResearch
   fair: FairValues | null
   price: number | null
-  explainedFlags?: Record<string, string>
-  onExplain?: (key: string, text: string) => void
-  maxDrawdownLimit: number
+  policy: InvestmentPolicy
 }) {
   const asOf = auto.kind === 'etf' ? auto.etf?.asOf : auto.stock?.asOf
+  const rating = rateAuto(auto, policy, price ?? undefined)
+  const maxDrawdownLimit = policy.maxDrawdownTolerancePercent
   return (
     <div className="rounded-md border border-gray-200 p-4 dark:border-gray-700">
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
@@ -273,10 +249,16 @@ export function ResearchReportPanel({
           {auto.kind === 'etf' ? '價格與配息' : '財報'}資料至 {asOf ?? '—'}・更新於 {auto.fetchedAt.slice(0, 10)}・來源 FinMind 公開資料
         </p>
       </div>
+      {rating && (
+        <div className="mb-4">
+          <p className="mb-1 text-xs font-semibold text-gray-700 dark:text-gray-300">觀察評等</p>
+          <AutoRatingBar rating={rating} />
+        </div>
+      )}
       {auto.kind === 'etf' ? (
         auto.etf ? <EtfReport auto={auto} maxDrawdownLimit={maxDrawdownLimit} /> : <p className="text-sm text-gray-500">價格資料不足。</p>
       ) : auto.stock ? (
-        <StockReport auto={auto} fair={fair} price={price} explainedFlags={explainedFlags} onExplain={onExplain} />
+        <StockReport auto={auto} fair={fair} price={price} />
       ) : (
         <p className="text-sm text-gray-500">財報資料不足，無法體檢（可能是新上市公司）。</p>
       )}

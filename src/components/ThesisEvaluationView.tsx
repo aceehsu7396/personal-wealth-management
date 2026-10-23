@@ -1,5 +1,6 @@
 import { PRICE_ZONE_LABELS, type ThesisEvaluation } from '../lib/calculations/thesisScoring'
 import { formatPrice, formatRatio } from '../lib/format'
+import { AutoRatingBar } from './research/AutoRatingBar'
 
 const ZONE_CLASSES: Record<string, string> = {
   strong_buy: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
@@ -20,9 +21,7 @@ export function PriceZoneBadge({ zone }: { zone: ThesisEvaluation['priceZone'] }
 // `simple` (ETF cards) shows only the checks: there is no fair-value range.
 export function ThesisEvaluationView({ evaluation, simple = false }: { evaluation: ThesisEvaluation; simple?: boolean }) {
   const metrics = [
-    { label: '產業分數', value: evaluation.industryScore.toFixed(1), hint: '五力平均與最強競爭力量' },
-    { label: '品質分數', value: evaluation.qualityScore.toFixed(1), hint: 'F 分數、投入資本報酬率、紅旗' },
-    { label: '信心分數', value: evaluation.convictionScore.toFixed(1), hint: '1–5' },
+    { label: '信心分數', value: evaluation.convictionScore.toFixed(0), hint: '1 ＋ 良好面向數（最高 5）' },
     { label: '買進價', value: formatPrice(evaluation.buyPrice), hint: `安全邊際 ${evaluation.marginOfSafetyPercent}%` },
     { label: '期望價值', value: formatPrice(evaluation.expectedValue), hint: '25/50/25 加權' },
     { label: '上下檔比', value: formatRatio(evaluation.upsideDownsideRatio), hint: '≥ 2 才值得建倉' },
@@ -49,11 +48,7 @@ export function ThesisEvaluationView({ evaluation, simple = false }: { evaluatio
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <PriceZoneBadge zone={evaluation.priceZone} />
-        {evaluation.strongestPowers.length > 0 && (
-          <span className="text-xs text-gray-500 dark:text-gray-400">
-            競爭優勢：{evaluation.strongestPowers.join('、')}
-          </span>
-        )}
+        {evaluation.rating && <AutoRatingBar rating={evaluation.rating} compact />}
       </div>
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {metrics.map((m) => (
