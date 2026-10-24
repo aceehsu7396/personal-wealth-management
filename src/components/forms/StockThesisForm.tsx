@@ -6,6 +6,8 @@ import { todayIsoDate } from '../../lib/market/twse'
 import { describeAiError } from '../../lib/ai/client'
 import { ThesisEvaluationView } from '../ThesisEvaluationView'
 import { ResearchReportPanel } from '../research/ResearchReportPanel'
+import { SignalPanel } from '../research/SignalPanel'
+import { useSignals } from '../../lib/research/useSignals'
 import { errorClass, inputClass, labelClass } from './FormField'
 
 export type StockThesisFormValues = Omit<StockThesis, 'id' | 'createdAt' | 'updatedAt'>
@@ -108,6 +110,8 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, pre
     : { ...base, verdict, verdictNote, verdictAt: verdict ? todayIsoDate() : undefined }
   const evaluation = evaluateThesis({ ...values, id: '', createdAt: '', updatedAt: '' }, policy)
   const fair = auto ? autoFairValues(auto) : null
+  const signalsFor = useSignals()
+  const signals = auto ? signalsFor({ ...values, id: '', createdAt: '', updatedAt: '' }, evaluation) : null
 
   function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -157,6 +161,8 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, pre
       )}
 
       {auto && <ResearchReportPanel auto={auto} fair={fair} price={auto.price} policy={policy} />}
+
+      {signals && <SignalPanel report={signals} price={values.currentPrice || auto?.technical?.close || 0} />}
 
       {(auto || legacy) && (
         <div className="rounded-md border-2 border-indigo-200 p-4 dark:border-indigo-900">

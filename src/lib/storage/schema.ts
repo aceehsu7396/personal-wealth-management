@@ -245,7 +245,8 @@ export const StockThesisSchema = z.object({
     corneredResource: Score0to5,
     processPower: Score0to5,
   }),
-  fScore: z.number().min(0).max(9),
+  // Cards saved before the fix could miss it (ETFs, financials).
+  fScore: z.number().min(0).max(9).default(0),
   roicPercent: z.number().optional(),
   waccPercent: z.number().optional(),
   hasUnexplainedRedFlags: z.boolean(),

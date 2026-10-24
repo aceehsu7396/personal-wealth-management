@@ -14,6 +14,7 @@ import {
   type ValuationStats,
 } from './fundamentals'
 import { analyzeEtf, type EtfProfile, type PriceRow } from './etfProfile'
+import { technicalSnapshot, type TechnicalSnapshot } from './technical'
 
 // The research card's automatic data: one fetch from FinMind, computed
 // into a small snapshot stored on the card (no AI, no key).
@@ -27,7 +28,15 @@ export interface AutoResearch {
   priceDate: string | null
   stock: (StockHealth & { valuation: ValuationStats; lynch: LynchCategory }) | null
   etf: EtfProfile | null
+  // Trend and momentum on the latest close (absent on older snapshots).
+  technical?: TechnicalSnapshot | null
+  // When the technical snapshot was last checked (YYYY-MM-DD).
+  technicalAt?: string
 }
+
+// About 14 months of daily prices: enough for a 200-day average and the
+// 12-month momentum.
+const PRICE_DAYS = 420
 
 // Refresh the snapshot when it is older than this.
 export const AUTO_REFRESH_DAYS = 7
@@ -81,6 +90,8 @@ export async function buildAutoResearch(code: string, today: string, fetcher?: F
       priceDate: last?.date ?? null,
       stock: null,
       etf: analyzeEtf({ prices, dividends, benchmark, today }),
+      technical: technicalSnapshot(prices),
+      technicalAt: today,
     }
   }
 
@@ -89,7 +100,7 @@ export async function buildAutoResearch(code: string, today: string, fetcher?: F
   const cashflow = await get<FinRow>('TaiwanStockCashFlowsStatement', code, fiveYears)
   const dividends = await get<DividendRow>('TaiwanStockDividend', code, '2008-01-01')
   const per = await get<PerRow>('TaiwanStockPER', code, fiveYears)
-  const recent = await get<PriceRow>('TaiwanStockPrice', code, shiftDays(today, 14))
+  const recent = await get<PriceRow>('TaiwanStockPrice', code, shiftDays(today, PRICE_DAYS))
   const last = [...recent].sort((a, b) => a.date.localeCompare(b.date)).pop()
   const health = analyzeStatements({ income, balance, cashflow, dividends, industry, today })
   const valuation = valuationStats(per)
@@ -102,6 +113,8 @@ export async function buildAutoResearch(code: string, today: string, fetcher?: F
     priceDate: last?.date ?? null,
     stock: health ? { ...health, valuation, lynch: suggestLynch(health, industry, valuation.pb?.current ?? null) } : null,
     etf: null,
+    technical: technicalSnapshot(recent),
+    technicalAt: today,
   }
 }
 
@@ -121,7 +134,8 @@ export function derivedFields(
   assumptions: ValuationAssumptions | undefined,
   explainedFlags: Record<string, string>,
 ): {
-  fScore?: number
+  // 0 when there is none (ETFs, financials); the card scores auto.stock.
+  fScore: number
   historicalGrowthPercent?: number
   hasUnexplainedRedFlags: boolean
   fairValueBear: number
@@ -132,7 +146,7 @@ export function derivedFields(
   const s = auto.stock
   const fv = autoFairValues(auto, assumptions)
   return {
-    fScore: s?.fScore?.score,
+    fScore: s?.fScore?.score ?? 0,
     historicalGrowthPercent: s?.epsCagr3y === null || s?.epsCagr3y === undefined ? undefined : Math.round(s.epsCagr3y * 10) / 10,
     hasUnexplainedRedFlags: (s?.redFlags ?? []).some((f) => !explainedFlags[f.key]?.trim()),
     fairValueBear: fv?.bear ?? 0,
@@ -150,4 +164,18 @@ export async function refreshedFields(
 ) {
   const auto = await buildAutoResearch(thesis.ticker, today, fetcher)
   return { auto, kind: auto.kind, ...derivedFields(auto, thesis.assumptions, thesis.explainedFlags) }
+}
+
+// Prices only (one request): today's close and technical snapshot, so the
+// entry/exit signals stay current between weekly health checks.
+export async function refreshTechnical(code: string, today: string, fetcher?: Fetcher) {
+  const prices = await fetchDataset<PriceRow>('TaiwanStockPrice', code, shiftDays(today, PRICE_DAYS), fetcher)
+  const technical = technicalSnapshot(prices)
+  return { technical, technicalAt: today, price: technical?.close ?? null, priceDate: technical?.date ?? null }
+}
+
+// Whether the card's technical snapshot was last checked before today.
+export function technicalStale(auto: AutoResearch | undefined, today: string): boolean {
+  if (!auto) return false
+  return !auto.technical || (auto.technicalAt ?? auto.fetchedAt.slice(0, 10)) < today
 }

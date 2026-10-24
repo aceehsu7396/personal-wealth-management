@@ -12,7 +12,9 @@ import {
   VERDICT_LABELS,
 } from '../lib/calculations/thesisScoring'
 import { StockThesisForm, type StockThesisFormValues } from '../components/forms/StockThesisForm'
-import { isStale, refreshedFields } from '../lib/research/autoResearch'
+import { isStale, refreshedFields, refreshTechnical, technicalStale } from '../lib/research/autoResearch'
+import { useSignals } from '../lib/research/useSignals'
+import { ActionBadge } from '../components/research/SignalPanel'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
@@ -62,11 +64,15 @@ export function StocksPage() {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
 
+  const signalsFor = useSignals()
   const editingThesis =
     editing && editing !== 'new' ? theses.find((t) => t.id === editing) : undefined
   const evaluated = theses
     .filter((t) => filter === 'all' || t.status === filter)
-    .map((t) => ({ thesis: t, evaluation: evaluateThesis(t, policy) }))
+    .map((t) => {
+      const evaluation = evaluateThesis(t, policy)
+      return { thesis: t, evaluation, signals: t.auto ? signalsFor(t, evaluation) : null }
+    })
     .sort((a, b) => b.evaluation.convictionScore - a.evaluation.convictionScore)
 
   const active = theses.filter((t) => t.status !== 'exited')
@@ -98,23 +104,35 @@ export function StocksPage() {
     }
   }
 
-  // Health checks older than a week refresh in the background (a few per
+  // Health checks older than a week refresh in the background, and the
+  // other cards get today's prices for the entry/exit signals (a few per
   // visit, to stay within the free data quota).
   useEffect(() => {
-    const stale = useAppStore
-      .getState()
-      .stockTheses.filter((t) => t.market === 'TW' && t.status !== 'exited' && isStale(t.auto, todayIsoDate()))
-      .slice(0, 5)
-    if (stale.length === 0) return
+    const today = todayIsoDate()
+    const live = useAppStore.getState().stockTheses.filter((t) => t.market === 'TW' && t.status !== 'exited')
+    const stale = live.filter((t) => isStale(t.auto, today)).slice(0, 5)
+    const pricesOnly = live.filter((t) => !stale.includes(t) && technicalStale(t.auto, today)).slice(0, 10)
+    if (stale.length + pricesOnly.length === 0) return
     let cancelled = false
     void (async () => {
-      for (const t of stale) {
-        if (cancelled) return
-        try {
-          updateStockThesis(t.id, await refreshedFields(t, todayIsoDate()))
-        } catch {
-          return
+      try {
+        for (const t of stale) {
+          if (cancelled) return
+          updateStockThesis(t.id, await refreshedFields(t, today))
         }
+        for (const t of pricesOnly) {
+          if (cancelled || !t.auto) return
+          const { technical, technicalAt, price, priceDate } = await refreshTechnical(t.ticker, today)
+          if (cancelled) return
+          const current = useAppStore.getState().stockTheses.find((x) => x.id === t.id)
+          if (!current?.auto) continue
+          updateStockThesis(t.id, {
+            auto: { ...current.auto, technical, technicalAt, price: price ?? current.auto.price, priceDate: priceDate ?? current.auto.priceDate },
+            currentPrice: price ?? current.currentPrice,
+          })
+        }
+      } catch {
+        return
       }
     })()
     return () => {
@@ -210,11 +228,12 @@ export function StocksPage() {
                   <th className="py-2 pr-4">現價 / 基準合理價</th>
                   <th className="py-2 pr-4">本益比位置</th>
                   <th className="py-2 pr-4">價位</th>
+                  <th className="py-2 pr-4">建議</th>
                   <th className="py-2 pr-4 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {evaluated.map(({ thesis: t, evaluation: e }) => (
+                {evaluated.map(({ thesis: t, evaluation: e, signals }) => (
                   <tr key={t.id} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
                     <td className="py-2 pr-4">
                       <div className="font-medium text-gray-900 dark:text-gray-100">
@@ -271,6 +290,16 @@ export function StocksPage() {
                     </td>
                     <td className="py-2 pr-4">
                       {t.kind === 'etf' || !t.auto ? <span className="text-xs text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {signals ? (
+                        <>
+                          <ActionBadge action={signals.action} title={signals.headline} />
+                          <div className="mt-1 max-w-48 text-xs text-gray-500 dark:text-gray-400">{signals.headline}</div>
+                        </>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="py-2 pr-4">
                       <div className="flex justify-end gap-2">

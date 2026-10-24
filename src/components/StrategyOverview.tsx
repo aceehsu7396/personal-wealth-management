@@ -8,6 +8,9 @@ import { analyzePortfolio } from '../lib/calculations/portfolioRisk'
 import { addMonths, computeDiscipline } from '../lib/calculations/disciplineScore'
 import { todayIsoDate } from '../lib/market/twse'
 import { useTraderReadiness } from '../lib/useTraderReadiness'
+import { evaluateThesis } from '../lib/calculations/thesisScoring'
+import { useSignals } from '../lib/research/useSignals'
+import { ACTION_LABELS, EXIT_ALERT_ACTIONS } from '../lib/research/signals'
 import { StatCard } from './StatCard'
 import { RiskViolationList } from './RiskViolationList'
 
@@ -33,6 +36,11 @@ export function StrategyOverview() {
   const risk = analyzePortfolio(holdings, theses, policy, guardrails, meta)
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
   const readiness = useTraderReadiness()
+  const signalsFor = useSignals()
+  const exitAlerts = theses
+    .filter((t) => t.auto && t.status !== 'exited')
+    .map((t) => ({ thesis: t, report: signalsFor(t, evaluateThesis(t, policy)) }))
+    .filter(({ report }) => report.held && EXIT_ALERT_ACTIONS.includes(report.action))
 
   const todos: { text: string; to: string }[] = []
   // Macro reviews belong to stage three; only nag once the core is in place
@@ -50,6 +58,15 @@ export function StrategyOverview() {
         .slice(0, 3)
         .map((t) => t.ticker)
         .join('、')}${stale.length > 3 ? '…' : ''}）`,
+      to: '/research/stocks',
+    })
+  }
+  if (exitAlerts.length > 0) {
+    todos.push({
+      text: `${exitAlerts.length} 檔持股有出場提醒（${exitAlerts
+        .slice(0, 3)
+        .map(({ thesis, report }) => `${thesis.ticker} ${ACTION_LABELS[report.action]}`)
+        .join('、')}${exitAlerts.length > 3 ? '…' : ''}）`,
       to: '/research/stocks',
     })
   }

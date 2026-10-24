@@ -36,9 +36,36 @@ export const MAX_RESEARCH_REPORTS = 30
 export const STORAGE_KEY = 'pfm:appData'
 const BACKUP_SUFFIX = ':corrupted-backup'
 
+// Records across all lists, to compare two saved copies.
+function recordCount(state: Record<string, unknown>): number {
+  return Object.values(state).reduce<number>((n, v) => n + (Array.isArray(v) ? v.length : 0), 0)
+}
+
+// Data that once failed validation was moved to the backup key and the app
+// started over. When the backup validates now (after a schema fix) and holds
+// more records than the current copy, bring it back.
+function restoreBackup(name: string, raw: string | null): string | null {
+  const backup = localStorage.getItem(`${name}${BACKUP_SUFFIX}`)
+  if (!backup) return raw
+  try {
+    const parsed = JSON.parse(backup)
+    const result = AppDataSchema.safeParse(parsed.state)
+    if (!result.success) return raw
+    const current = raw ? AppDataSchema.safeParse(JSON.parse(raw).state) : null
+    if (current?.success && recordCount(current.data) >= recordCount(result.data)) return raw
+    if (raw) localStorage.setItem(`${name}:before-restore`, raw)
+    localStorage.setItem(name, backup)
+    localStorage.removeItem(`${name}${BACKUP_SUFFIX}`)
+    console.warn('[appStore] 已從備份還原先前無法讀取的本機資料。')
+    return backup
+  } catch {
+    return raw
+  }
+}
+
 const validatingStorage: StateStorage = {
   getItem: (name) => {
-    const raw = localStorage.getItem(name)
+    const raw = restoreBackup(name, localStorage.getItem(name))
     if (!raw) return null
     try {
       const parsed = JSON.parse(raw)

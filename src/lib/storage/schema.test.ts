@@ -40,4 +40,16 @@ describe('AppDataSchema', () => {
     expect(parsed.verdict).toBeUndefined()
     expect(parsed.fiveForcesRated).toBeUndefined()
   })
+
+  it('loads ETF and financial cards saved without an F-score', () => {
+    const card = {
+      id: 'x', ticker: '00878', name: '國泰永續高股息', market: 'TW', sector: 'ETF', lynchCategory: 'stalwart',
+      inCircleOfCompetence: true, status: 'watch', thesis: '', drivers: '', killCriteria: '', sources: '', preMortem: '',
+      fiveForces: { rivalry: 3, newEntrants: 3, substitutes: 3, buyerPower: 3, supplierPower: 3 },
+      powers: { scaleEconomies: 0, networkEconomies: 0, counterPositioning: 0, switchingCosts: 0, branding: 0, corneredResource: 0, processPower: 0 },
+      hasUnexplainedRedFlags: false, fairValueBear: 0, fairValueBase: 0, fairValueBull: 0, currentPrice: 35,
+      kind: 'etf', updatedAt: '', createdAt: '',
+    }
+    expect(StockThesisSchema.parse(card).fScore).toBe(0)
+  })
 })
