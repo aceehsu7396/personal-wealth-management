@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyTradeToHoldings,
   buildPreTradeChecklist,
+  riskLimitOf,
   type ChecklistContext,
   type PendingTrade,
 } from './preTradeChecklist'
@@ -286,6 +287,15 @@ describe('strategy entries', () => {
     expect(keys(buildPreTradeChecklist(entry, c, {})).strategyLive).toBe(false)
     // 50 × (100 − 50) = 2,500 risk vs 1% of ~31.5k budget.
     expect(keys(buildPreTradeChecklist({ ...entry, stopLoss: 50 }, c, {})).riskPerTrade).toBe(false)
+  })
+
+  it('uses the stricter of the strategy card and the policy risk limit', () => {
+    // 50 × 5 = 250 risk ≈ 0.79% of the trading budget.
+    const strict = ctx({ holdings: [core, sat], strategies: [{ ...live, riskPerTradePercent: 0.5 }] })
+    const item = buildPreTradeChecklist(entry, strict, {}).find((i) => i.key === 'riskPerTrade')!
+    expect(item.passed).toBe(false)
+    expect(item.label).toContain('策略卡上限 0.5%')
+    expect(riskLimitOf({ riskPerTradePercent: 3 }, { riskPerTradePercent: 1 })).toEqual({ percent: 1, source: '投資政策' })
   })
 
   it('caps the number of open trading positions', () => {

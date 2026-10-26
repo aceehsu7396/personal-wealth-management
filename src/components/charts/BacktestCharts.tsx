@@ -82,3 +82,31 @@ function toDrawdown(points: EquityPoint[]): { date: string; strategy: number; be
     return { date: p.date, strategy: (p.strategy / ps - 1) * 100, benchmark: (p.benchmark / pb - 1) * 100 }
   })
 }
+
+export interface SweepChartPoint {
+  value: number
+  cagr: number
+  oosCagr: number | null
+}
+
+// Annual return (full period and out-of-sample) across one parameter's
+// values; the dashed line marks the current setting.
+export function SweepChart({ data, current, label }: { data: SweepChartPoint[]; current: number; label: string }) {
+  const rows = data.map((d) => ({ value: d.value, cagr: d.cagr * 100, oosCagr: d.oosCagr === null ? null : d.oosCagr * 100 }))
+  return (
+    <div className="h-56 w-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
+          {grid}
+          <XAxis dataKey="value" type="number" domain={['dataMin', 'dataMax']} tick={tick} label={{ value: label, position: 'insideBottom', offset: -2, fontSize: 11, fill: '#6b7280' }} height={36} />
+          <YAxis tick={tick} width={48} tickFormatter={(v: number) => `${v.toFixed(0)}%`} />
+          <Tooltip formatter={(v) => (v === null ? '—' : `${Number(v).toFixed(1)}%`)} labelFormatter={(v) => `${label} = ${v}`} />
+          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <ReferenceLine x={current} stroke="#6b7280" strokeDasharray="4 4" label={{ value: '目前', fontSize: 11, fill: '#6b7280' }} />
+          <Line type="monotone" dataKey="cagr" name="全期年化" stroke={STRATEGY_COLOR} strokeWidth={2} dot={{ r: 4 }} isAnimationActive={false} />
+          <Line type="monotone" dataKey="oosCagr" name="樣本外年化" stroke={BENCHMARK_COLOR} strokeWidth={2} dot={{ r: 4 }} connectNulls isAnimationActive={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}

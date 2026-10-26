@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import {
+  BACKTEST_SETTING_HELP,
   STRATEGY_TEMPLATES,
   defaultParams,
   formatSymbol,
@@ -12,6 +13,7 @@ import {
   benchmarkInput,
   coreTradingMix,
   marketCosts,
+  parameterSweep,
   runBacktest,
   sensitivityGrid,
   splitStats,
@@ -19,6 +21,7 @@ import {
   type BacktestInput,
   type BacktestResult,
   type MixRow,
+  type ParameterSweep,
   type SensitivityGrid,
   type SizingMode,
   type StatsSplit,
@@ -28,10 +31,11 @@ import { backtestPasses } from '../lib/calculations/strategyProgress'
 import { importCsvSeries, isoDaysAgo, loadSeries } from '../lib/market/priceHistory'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
-import { DrawdownChart, EquityChart, type EquityPoint } from '../components/charts/BacktestCharts'
+import { DrawdownChart, EquityChart, SweepChart, type EquityPoint } from '../components/charts/BacktestCharts'
+import { ParamHelp } from '../components/ParamHelp'
 import { Field, inputClass, labelClass } from '../components/forms/FormField'
 import type { BacktestStats, StrategyTemplate } from '../lib/storage/schema'
-import { interpretBacktest } from '../lib/backtest/interpret'
+import { INTERPRET_RULES, interpretBacktest } from '../lib/backtest/interpret'
 import { SimGuide } from '../components/SimGuide'
 import { Term } from '../components/Term'
 
@@ -111,7 +115,9 @@ export function BacktestPage() {
   const [discount, setDiscount] = useState(1)
   const [usFee, setUsFee] = useState(0)
   const [sizing, setSizing] = useState<SizingMode>('equal')
-  const [risk, setRisk] = useState(policy.riskPerTradePercent)
+  // A strategy card's own risk, never above the policy cap.
+  const riskOf = (s: { riskPerTradePercent: number } | undefined) => Math.min(s?.riskPerTradePercent ?? policy.riskPerTradePercent, policy.riskPerTradePercent)
+  const [risk, setRisk] = useState(riskOf(initialCard))
   const [oos, setOos] = useState(30)
   const [status, setStatus] = useState<{ kind: 'idle' | 'loading' | 'error'; message?: string }>({ kind: 'idle' })
   const [output, setOutput] = useState<RunOutput | null>(null)
@@ -119,6 +125,8 @@ export function BacktestPage() {
   const [mix, setMix] = useState<MixRow[] | null>(null)
   const [savedId, setSavedId] = useState<string | null>(null)
   const [csvVersion, setCsvVersion] = useState(0)
+  const [sweepKey, setSweepKey] = useState('')
+  const [sweep, setSweep] = useState<ParameterSweep | null>(null)
 
   const card = strategies.find((s) => s.id === strategyId)
   const def = STRATEGY_TEMPLATES[template]
@@ -133,6 +141,7 @@ export function BacktestPage() {
     setTemplate(s.template)
     setParams(resolveParams(s.template, s.params))
     setSymbolsText(s.symbols.join(', '))
+    setRisk(riskOf(s))
   }
 
   function pickTemplate(t: StrategyTemplate) {
@@ -150,6 +159,7 @@ export function BacktestPage() {
     if (start >= end) return setStatus({ kind: 'error', message: '開始日期須早於結束日期' })
     setStatus({ kind: 'loading', message: '準備資料…' })
     setMix(null)
+    setSweep(null)
     setSavedId(null)
     try {
       const data = await loadPriceData(symbols, start, end, progress)
@@ -188,6 +198,14 @@ export function BacktestPage() {
     } catch (e) {
       setStatus({ kind: 'error', message: describeAiError(e) })
     }
+  }
+
+  // Runs on the data already loaded for the last backtest.
+  function runSweep() {
+    if (!output) return
+    const key = sweepKey || STRATEGY_TEMPLATES[output.input.template].params[0]?.key
+    if (!key) return
+    setSweep(parameterSweep(output.input, key, oos / 100))
   }
 
   async function runMix() {
@@ -260,6 +278,7 @@ export function BacktestPage() {
       output.benchStats.outOfSample !== null &&
       output.stats.outOfSample.cagr > output.benchStats.outOfSample.cagr
     : false
+  const fewSweepTrades = sweep !== null && sweep.points.every((p) => p.trades < INTERPRET_RULES.minTrades)
   const best = mix ? [...mix].sort((a, b) => (b.sharpe ?? -Infinity) - (a.sharpe ?? -Infinity))[0] : null
 
   return (
@@ -304,47 +323,71 @@ export function BacktestPage() {
             <input className={inputClass} value={symbolsText} onChange={(e) => setSymbolsText(e.target.value)} />
           </Field>
           {def.params.map((p) => (
-            <Field key={p.key} label={p.label}>
-              <input
-                type="number"
-                className={inputClass}
-                min={p.min}
-                max={p.max}
-                step={p.step}
-                value={params[p.key] ?? p.default}
-                onChange={(e) => setParams({ ...params, [p.key]: Number(e.target.value) })}
-              />
-            </Field>
+            <div key={p.key}>
+              <Field label={p.label}>
+                <input
+                  type="number"
+                  className={inputClass}
+                  min={p.min}
+                  max={p.max}
+                  step={p.step}
+                  value={params[p.key] ?? p.default}
+                  onChange={(e) => setParams({ ...params, [p.key]: Number(e.target.value) })}
+                />
+              </Field>
+              <ParamHelp help={p.help} range={{ min: p.min, max: p.max, default: p.default }} />
+            </div>
           ))}
-          <Field label="開始日期">
-            <input type="date" className={inputClass} value={start} onChange={(e) => setStart(e.target.value)} />
-          </Field>
+          <div>
+            <Field label="開始日期">
+              <input type="date" className={inputClass} value={start} onChange={(e) => setStart(e.target.value)} />
+            </Field>
+            <ParamHelp help={BACKTEST_SETTING_HELP.period} />
+          </div>
           <Field label="結束日期">
             <input type="date" className={inputClass} value={end} onChange={(e) => setEnd(e.target.value)} />
           </Field>
-          <Field label={template === 'dca' ? '初始資金（定期定額不使用）' : '初始資金'}>
-            <input type="number" step="10000" className={inputClass} value={capital} onChange={(e) => setCapital(Number(e.target.value))} />
-          </Field>
-          <Field label="台股手續費折扣（1 = 無折扣，0.6 = 六折）">
-            <input type="number" step="0.05" min="0" max="1" className={inputClass} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} />
-          </Field>
+          <div>
+            <Field label={template === 'dca' ? '初始資金（定期定額不使用）' : '初始資金'}>
+              <input type="number" step="10000" className={inputClass} value={capital} onChange={(e) => setCapital(Number(e.target.value))} />
+            </Field>
+            <ParamHelp help={BACKTEST_SETTING_HELP.capital} />
+          </div>
+          <div>
+            <Field label="台股手續費折扣（1 = 無折扣，0.6 = 六折）">
+              <input type="number" step="0.05" min="0" max="1" className={inputClass} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} />
+            </Field>
+            <ParamHelp help={BACKTEST_SETTING_HELP.fees} />
+          </div>
           <Field label="美股手續費（%）">
             <input type="number" step="0.01" min="0" className={inputClass} value={usFee} onChange={(e) => setUsFee(Number(e.target.value))} />
           </Field>
-          <Field label="部位大小">
-            <select className={inputClass} value={sizing} onChange={(e) => setSizing(e.target.value as SizingMode)}>
-              <option value="equal">每個標的等額（全額投入）</option>
-              <option value="risk">風險部位法（依 ATR 停損）</option>
-            </select>
-          </Field>
-          {sizing === 'risk' && (
-            <Field label="每筆風險（%）">
-              <input type="number" step="0.1" min="0.1" max="5" className={inputClass} value={risk} onChange={(e) => setRisk(Number(e.target.value))} />
+          <div>
+            <Field label="部位大小">
+              <select className={inputClass} value={sizing} onChange={(e) => setSizing(e.target.value as SizingMode)}>
+                <option value="equal">每個標的等額（全額投入）</option>
+                <option value="risk">風險部位法（依 ATR 停損）</option>
+              </select>
             </Field>
+            <ParamHelp help={BACKTEST_SETTING_HELP.sizing} />
+          </div>
+          {sizing === 'risk' && (
+            <div>
+              <Field label={`每筆風險（%）${card ? '・帶入策略卡' : '・帶入投資政策'}`}>
+                <input type="number" step="0.1" min="0.1" max="5" className={inputClass} value={risk} onChange={(e) => setRisk(Number(e.target.value))} />
+              </Field>
+              {risk > policy.riskPerTradePercent && (
+                <p className="mt-1 text-xs text-orange-700 dark:text-orange-400">高於投資政策上限 {policy.riskPerTradePercent}%，實單的交易前檢核不會通過。</p>
+              )}
+              <ParamHelp help={BACKTEST_SETTING_HELP.risk} />
+            </div>
           )}
-          <Field label="樣本外比例（%）">
-            <input type="number" step="5" min="0" max="50" className={inputClass} value={oos} onChange={(e) => setOos(Number(e.target.value))} />
-          </Field>
+          <div>
+            <Field label="樣本外比例（%）">
+              <input type="number" step="5" min="0" max="50" className={inputClass} value={oos} onChange={(e) => setOos(Number(e.target.value))} />
+            </Field>
+            <ParamHelp help={BACKTEST_SETTING_HELP.oos} />
+          </div>
         </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">{def.summary}</p>
 
@@ -513,6 +556,92 @@ export function BacktestPage() {
                   </tbody>
                 </table>
               </div>
+            </>
+          )}
+
+          {STRATEGY_TEMPLATES[output.input.template].params.length > 0 && (
+            <>
+              <h3 className="mt-6 text-sm font-semibold text-gray-900 dark:text-gray-100">單一參數掃描</h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                其他參數固定，把一個參數在允許範圍內取約 7 個值各回測一次。好的設定落在一片「高原」上，前後數值都不差；只有一個值特別好，多半是過度最佳化。
+                選值時只看全期與樣本內，樣本外留作最後驗證（手冊{' '}
+                <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">10 §6.1</Link>）。
+              </p>
+              <div className="mt-2 flex flex-wrap items-end gap-2">
+                <select
+                  className={`${inputClass} w-auto`}
+                  value={sweepKey || STRATEGY_TEMPLATES[output.input.template].params[0].key}
+                  onChange={(e) => {
+                    setSweepKey(e.target.value)
+                    setSweep(null)
+                  }}
+                >
+                  {STRATEGY_TEMPLATES[output.input.template].params.map((p) => (
+                    <option key={p.key} value={p.key}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={runSweep}
+                  className="rounded-md border border-indigo-600 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
+                >
+                  掃描
+                </button>
+              </div>
+              {sweep && (
+                <div className="mt-3">
+                  <p
+                    className={`rounded-md border p-2 text-sm ${sweep.isolatedPeak || fewSweepTrades ? FINDING_STYLE.warning : sweep.cagrSpread > 0.08 ? FINDING_STYLE.caution : FINDING_STYLE.ok}`}
+                  >
+                    {fewSweepTrades
+                      ? `${FINDING_MARK.warning} 每個數值的交易次數都少於 ${INTERPRET_RULES.minTrades} 筆（最多 ${Math.max(...sweep.points.map((p) => p.trades))} 筆），差異多半是運氣，不能用來選參數。先延長回測期間（建議 5 年以上），再掃描。`
+                      : sweep.isolatedPeak
+                      ? `${FINDING_MARK.warning} 最佳值是孤立的高峰：前後數值都差 3 個百分點以上，換個期間很可能失效。改選高原中間的值。`
+                      : sweep.cagrSpread > 0.08
+                        ? `${FINDING_MARK.caution} 年化報酬在不同數值間相差 ${pct(sweep.cagrSpread)}，參數影響大；選結果相近的一段區間的中間值。`
+                        : `${FINDING_MARK.ok} 各數值的年化報酬相差 ${pct(sweep.cagrSpread)}，結果平滑，這個參數不敏感，照原理選即可。`}
+                  </p>
+                  <SweepChart data={sweep.points} current={sweep.points.find((p) => p.current)?.value ?? sweep.points[0].value} label={sweep.label} />
+                  <div className="overflow-x-auto">
+                    <table className="mt-2 text-sm">
+                      <thead>
+                        <tr>
+                          {[sweep.label, '全期年化', '最大回撤', '樣本外年化', '交易次數', ''].map((h) => (
+                            <th key={h} className={thClass}>
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sweep.points.map((p) => (
+                          <tr key={p.value} className={p.current ? 'font-semibold text-indigo-700 dark:text-indigo-400' : ''}>
+                            <td className={tdClass}>{p.value}{p.current ? '（目前）' : ''}</td>
+                            <td className={tdClass}>{pct(p.cagr)}</td>
+                            <td className={tdClass}>{pct(p.maxDrawdown)}</td>
+                            <td className={tdClass}>{pct(p.oosCagr)}</td>
+                            <td className={tdClass}>{p.trades}</td>
+                            <td className={tdClass}>
+                              {!p.current && (
+                                <button
+                                  type="button"
+                                  onClick={() => setParams({ ...params, [sweep.key]: p.value })}
+                                  className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
+                                >
+                                  套用
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">按「套用」只改上方設定，要再按「執行回測」才會重算；交易次數少於 20 筆的結果不具參考性。</p>
+                </div>
+              )}
             </>
           )}
 

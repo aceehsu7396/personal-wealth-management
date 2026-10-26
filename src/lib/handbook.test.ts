@@ -15,11 +15,12 @@ describe('buildHandbook', () => {
   it('orders the overview first, then numbered chapters, then appendices', () => {
     const docs = buildHandbook({
       'x/02-b.md': '# 02 B',
+      'x/附錄D1-y.md': '# 附錄D1 Y',
       'x/附錄A-z.md': '# 附錄A Z',
       'x/README.md': '# 總覽',
       'x/00-a.md': '# 00 A',
     })
-    expect(docs.map((d) => d.slug)).toEqual(['index', '00', '02', '附錄A'])
+    expect(docs.map((d) => d.slug)).toEqual(['index', '00', '02', '附錄A', '附錄D1'])
   })
 })
 
@@ -41,7 +42,8 @@ describe('resolveDocHref', () => {
 describe('HANDBOOK', () => {
   it('bundles every strategy document and every internal link resolves', () => {
     expect(HANDBOOK.map((d) => d.slug)).toEqual([
-      'index', '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '附錄A', '附錄B',
+      'index', '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '附錄A', '附錄B', '附錄C',
+      '附錄D1', '附錄D2', '附錄D3', '附錄D4', '附錄D5',
     ])
     for (const doc of HANDBOOK) {
       for (const [, href] of doc.content.matchAll(/\]\(([^)]+\.md[^)]*)\)/g)) {

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import ReactMarkdown, { type Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { ArchitectureMap } from './ArchitectureMap'
 
 // Plain text of a Markdown (hast) node, used to spot the「本章行動」box.
 interface TextNode {
@@ -65,11 +66,17 @@ function makeComponents(resolveLink?: (href: string) => string | null): Componen
       {children}
     </td>
   ),
-  pre: ({ children }) => (
-    <pre className="mt-4 overflow-x-auto rounded-md bg-gray-100 p-4 font-mono text-[13px] leading-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200 [&>code]:bg-transparent [&>code]:p-0">
-      {children}
-    </pre>
-  ),
+  // ```architecture-map renders the interactive system map instead of code.
+  pre: ({ node, children }) => {
+    const first = (node?.children?.[0] ?? null) as { properties?: { className?: unknown } } | null
+    const classes = first?.properties?.className
+    if (Array.isArray(classes) && classes.includes('language-architecture-map')) return <ArchitectureMap />
+    return (
+      <pre className="mt-4 overflow-x-auto rounded-md bg-gray-100 p-4 font-mono text-[13px] leading-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200 [&>code]:bg-transparent [&>code]:p-0">
+        {children}
+      </pre>
+    )
+  },
   code: ({ children }) => (
     <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[0.9em] dark:bg-gray-900">{children}</code>
   ),

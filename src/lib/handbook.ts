@@ -29,6 +29,8 @@ export const CHAPTER_PAGES: Record<string, { to: string; label: string }> = {
   '10': { to: '/sim/strategies', label: '模擬交易・策略卡' },
   '11': { to: '/goals', label: '目標與政策・全職準備度' },
   附錄B: { to: '/sim/screener', label: '模擬交易・選股' },
+  附錄C: { to: '/goals', label: '目標與政策' },
+  附錄D4: { to: '/sim/backtest', label: '模擬交易・回測' },
 }
 
 export function slugOf(fileName: string): string {
@@ -58,7 +60,7 @@ export function buildHandbook(files: Record<string, string>): HandbookDoc[] {
       const { number, title } = parseTitle(content, fileName)
       return { slug: slugOf(fileName), fileName, number, title, content }
     })
-    .sort((a, b) => orderKey(a.slug) - orderKey(b.slug))
+    .sort((a, b) => orderKey(a.slug) - orderKey(b.slug) || a.slug.localeCompare(b.slug))
 }
 
 // Maps a relative link between handbook files (e.g. "04-投資組合策略與風險.md")

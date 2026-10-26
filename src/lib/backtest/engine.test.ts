@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import type { Bar } from '../market/priceHistory'
+import { STRATEGY_TEMPLATES } from './templates'
 import {
   computeStats,
   coreTradingMix,
   marketCosts,
+  parameterSweep,
+  sweepValues,
   runBacktest,
   sensitivityGrid,
   splitStats,
@@ -203,5 +206,35 @@ describe('statistics', () => {
     expect(grid.aValues).toEqual([15, 20, 25])
     expect(grid.bValues).toEqual([45, 60, 75])
     expect(grid.cells).toHaveLength(9)
+  })
+})
+
+describe('parameter sweep', () => {
+  it('spreads values across the allowed range and keeps the current one', () => {
+    expect(sweepValues({ min: 5, max: 100, step: 1 }, 20)).toEqual([5, 20, 37, 53, 68, 84, 100])
+    expect(sweepValues({ min: 0, max: 10, step: 0.5 }, 3)).toEqual([0, 1.5, 3, 5, 6.5, 8.5, 10])
+    expect(sweepValues({ min: 0, max: 1, step: 1 }, 1)).toEqual([0, 1])
+  })
+
+  it('backtests each value with the other parameters fixed', () => {
+    const closes = Array.from({ length: 300 }, (_, i) => 100 + 10 * Math.sin(i / 10) + i * 0.1)
+    const sweep = parameterSweep(
+      input({ template: 'ma_cross', params: { fast: 20, slow: 60, atrStop: 0 }, data: { 'TW:0050': bars(closes) } }),
+      'fast',
+      0.3,
+    )!
+    expect(sweep.label).toBe('短期均線（日）')
+    expect(sweep.points.filter((p) => p.current).map((p) => p.value)).toEqual([20])
+    expect(sweep.points.every((p) => p.value >= 5 && p.value <= 100)).toBe(true)
+    expect(sweep.cagrSpread).toBeGreaterThanOrEqual(0)
+    expect(parameterSweep(input({ template: 'buy_hold' }), 'fast', 0.3)).toBeNull()
+  })
+
+  it('explains every template parameter', () => {
+    for (const t of Object.values(STRATEGY_TEMPLATES)) {
+      for (const p of t.params) {
+        for (const text of Object.values(p.help)) expect(text.length).toBeGreaterThan(10)
+      }
+    }
   })
 })

@@ -440,6 +440,69 @@ export function sensitivityGrid(input: BacktestInput, oosFraction: number): Sens
   return { aLabel: pa.label, bLabel: pb.label, aValues, bValues, cells }
 }
 
+export interface SweepPoint {
+  value: number
+  cagr: number
+  maxDrawdown: number
+  oosCagr: number | null
+  trades: number
+  current: boolean
+}
+
+export interface ParameterSweep {
+  key: string
+  label: string
+  points: SweepPoint[]
+  // Spread of the full-period annual return across the values tested.
+  cagrSpread: number
+  // The best value is an isolated peak: both neighbours are much worse.
+  isolatedPeak: boolean
+}
+
+// Values across a parameter's allowed range (about `count`, snapped to its
+// step) plus the current value.
+export function sweepValues(param: { min: number; max: number; step: number }, current: number, count = 7): number[] {
+  const snap = (v: number) => Math.round(Math.min(param.max, Math.max(param.min, Math.round(v / param.step) * param.step)) * 1e6) / 1e6
+  const now = snap(current)
+  // Grid points too close to the current value add nothing.
+  const gap = (param.max - param.min) / (count - 1) / 2
+  const values = new Set<number>([now])
+  for (let i = 0; i < count; i++) {
+    const v = snap(param.min + ((param.max - param.min) * i) / (count - 1))
+    if (Math.abs(v - now) >= gap || v === now) values.add(v)
+  }
+  return [...values].sort((a, b) => a - b)
+}
+
+// One parameter across its range with the others fixed: a robust setting
+// sits on a broad plateau, a fragile one on a lone peak.
+export function parameterSweep(input: BacktestInput, key: string, oosFraction: number, count = 7): ParameterSweep | null {
+  const def = STRATEGY_TEMPLATES[input.template].params.find((x) => x.key === key)
+  if (!def) return null
+  const params = resolveParams(input.template, input.params)
+  const points = sweepValues(def, params[key], count).map((value) => {
+    const r = runBacktest({ ...input, params: { ...params, [key]: value } })
+    const s = splitStats(r, oosFraction)
+    return {
+      value,
+      cagr: s.full.cagr,
+      maxDrawdown: s.full.maxDrawdown,
+      oosCagr: s.outOfSample?.cagr ?? null,
+      trades: s.full.trades,
+      current: value === Math.round(params[key] * 1e6) / 1e6,
+    }
+  })
+  const cagrs = points.map((x) => x.cagr)
+  const best = cagrs.indexOf(Math.max(...cagrs))
+  const neighbours = [points[best - 1], points[best + 1]].filter(Boolean)
+  const isolatedPeak =
+    neighbours.length > 0 && neighbours.every((n) => points[best].cagr - n.cagr > SWEEP_PEAK_GAP)
+  return { key, label: def.label, points, cagrSpread: Math.max(...cagrs) - Math.min(...cagrs), isolatedPeak }
+}
+
+// Annual-return gap to both neighbours that marks an isolated peak.
+export const SWEEP_PEAK_GAP = 0.03
+
 // ---------------------------------------------------------------------------
 // Core + trading mix
 // ---------------------------------------------------------------------------

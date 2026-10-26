@@ -3,6 +3,7 @@ import { STRATEGY_TEMPLATES, defaultParams, parseSymbolList, resolveParams } fro
 import { useAppStore } from '../../lib/storage/appStore'
 import type { StrategyTemplate, TradingStrategy } from '../../lib/storage/schema'
 import { Field, inputClass, labelClass } from './FormField'
+import { ParamHelp } from '../ParamHelp'
 
 export type StrategyFormValues = Omit<TradingStrategy, 'id' | 'createdAt' | 'updatedAt' | 'status'>
 
@@ -85,17 +86,20 @@ export function StrategyForm({ initial, defaultRiskPercent, onSubmit, onCancel }
       <p className="text-xs text-gray-500 sm:col-span-2 dark:text-gray-400">{def.summary}</p>
 
       {def.params.map((param) => (
-        <Field key={param.key} label={param.label}>
-          <input
-            type="number"
-            className={inputClass}
-            min={param.min}
-            max={param.max}
-            step={param.step}
-            value={params[param.key] ?? param.default}
-            onChange={(e) => setParams({ ...params, [param.key]: Number(e.target.value) })}
-          />
-        </Field>
+        <div key={param.key}>
+          <Field label={param.label}>
+            <input
+              type="number"
+              className={inputClass}
+              min={param.min}
+              max={param.max}
+              step={param.step}
+              value={params[param.key] ?? param.default}
+              onChange={(e) => setParams({ ...params, [param.key]: Number(e.target.value) })}
+            />
+          </Field>
+          <ParamHelp help={param.help} range={{ min: param.min, max: param.max, default: param.default }} />
+        </div>
       ))}
 
       <label className="block sm:col-span-2">
@@ -119,9 +123,14 @@ export function StrategyForm({ initial, defaultRiskPercent, onSubmit, onCancel }
         <span className={labelClass}>出場規則（含停損）</span>
         <textarea rows={3} className={inputClass} value={exitRules} onChange={(e) => setExitRules(e.target.value)} />
       </label>
-      <Field label="每筆停損風險（占交易部位 %）">
-        <input type="number" step="0.1" className={inputClass} value={risk} onChange={(e) => setRisk(e.target.value)} />
-      </Field>
+      <div>
+        <Field label="每筆停損風險（占交易部位 %）">
+          <input type="number" step="0.1" className={inputClass} value={risk} onChange={(e) => setRisk(e.target.value)} />
+        </Field>
+        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          投資政策上限 {defaultRiskPercent}%；策略卡可以設得更低（例如新策略 0.5%），高於上限時以上限為準。回測的風險部位法與實單的交易前檢核都會用這個值。
+        </p>
+      </div>
       <Field label="備註（適用的市場環境、已知弱點）">
         <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>

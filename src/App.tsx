@@ -1,3 +1,4 @@
+import { PageContext } from './components/PageContext'
 import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/layout/NavBar'
@@ -29,6 +30,7 @@ function App() {
       <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
         <NavBar />
         <PortfolioSnapshotRecorder />
+        <PageContext />
         <Routes>
           {/* 總覽 */}
           <Route path="/" element={<DashboardPage />} />

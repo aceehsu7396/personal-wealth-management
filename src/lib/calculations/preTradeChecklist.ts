@@ -325,6 +325,18 @@ export function tradeRiskPercent(
   return budget > 0 ? (risk / budget) * 100 : Infinity
 }
 
+// The per-trade risk limit: the strategy card's own setting, never above
+// the investment policy's cap.
+export function riskLimitOf(
+  strategy: Pick<TradingStrategy, 'riskPerTradePercent'> | undefined,
+  policy: Pick<InvestmentPolicy, 'riskPerTradePercent'>,
+): { percent: number; source: '策略卡' | '投資政策' } {
+  if (strategy && strategy.riskPerTradePercent > 0 && strategy.riskPerTradePercent < policy.riskPerTradePercent) {
+    return { percent: strategy.riskPerTradePercent, source: '策略卡' }
+  }
+  return { percent: policy.riskPerTradePercent, source: '投資政策' }
+}
+
 function strategyChecks(trade: PendingTrade, ctx: ChecklistContext, totalValueTwd: number): ChecklistEntry[] {
   const { policy } = ctx
   const strategy = trade.strategyId ? ctx.strategies?.find((s) => s.id === trade.strategyId) : undefined
@@ -340,11 +352,12 @@ function strategyChecks(trade: PendingTrade, ctx: ChecklistContext, totalValueTw
   if (policy.requireStopLoss) items.push(check('stopLoss', '已設定低於成交價的停損價', hasStop))
   const risk = tradeRiskPercent(trade, totalValueTwd, policy, ctx.meta.fxUsdTwd)
   if (risk !== null) {
+    const limit = riskLimitOf(strategy, policy)
     items.push(
       check(
         'riskPerTrade',
-        `本筆停損風險 ${Number.isFinite(risk) ? risk.toFixed(2) : '—'}% 交易部位 ≤ 上限 ${policy.riskPerTradePercent}%`,
-        risk <= policy.riskPerTradePercent,
+        `本筆停損風險 ${Number.isFinite(risk) ? risk.toFixed(2) : '—'}% 交易部位 ≤ ${limit.source}上限 ${limit.percent}%`,
+        risk <= limit.percent,
       ),
     )
   }
