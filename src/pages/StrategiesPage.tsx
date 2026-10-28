@@ -170,7 +170,7 @@ export function StrategiesPage() {
               </dl>
 
               <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-                {gate.backtestPassed ? '✓' : '☐'} 回測樣本外勝過買進持有（{ownRuns} 次回測）
+                {gate.backtestPassed ? '✓' : '☐'} 回測樣本外勝過買進持有（報酬或風險調整後；{ownRuns} 次回測）
                 {gate.paperProven ? '✓' : '☐'} 虛擬交易 {PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆（{ownAccounts} 個帳戶）
               </p>
 

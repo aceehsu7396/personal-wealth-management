@@ -237,7 +237,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
         },
         {
           id: '4.2',
-          title: '回測通過：樣本外勝過買進持有',
+          title: '回測通過：樣本外勝過買進持有（報酬或風險調整後）',
           done: passedBacktests.length > 0,
           detail:
             state.backtestRuns.length === 0

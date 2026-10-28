@@ -28,6 +28,7 @@ import {
 } from '../lib/backtest/engine'
 import { loadPriceData } from '../lib/backtest/data'
 import { backtestPasses } from '../lib/calculations/strategyProgress'
+import { outOfSampleVerdict } from '../lib/backtest/passRule'
 import { importCsvSeries, isoDaysAgo, loadSeries } from '../lib/market/priceHistory'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
@@ -273,11 +274,8 @@ export function BacktestPage() {
       .catch((e) => setStatus({ kind: 'error', message: describeAiError(e) }))
   }
 
-  const passed = output
-    ? output.stats.outOfSample !== null &&
-      output.benchStats.outOfSample !== null &&
-      output.stats.outOfSample.cagr > output.benchStats.outOfSample.cagr
-    : false
+  const verdict = output ? outOfSampleVerdict(output.stats.outOfSample, output.benchStats.outOfSample) : null
+  const passed = verdict?.passed ?? false
   const fewSweepTrades = sweep !== null && sweep.points.every((p) => p.trades < INTERPRET_RULES.minTrades)
   const best = mix ? [...mix].sort((a, b) => (b.sharpe ?? -Infinity) - (a.sharpe ?? -Infinity))[0] : null
 
@@ -286,7 +284,7 @@ export function BacktestPage() {
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">回測</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         用歷史日線檢驗策略：收盤判斷、隔日開盤成交，計入手續費與證交稅，台股自動還原除權息與分割。最後 {oos}% 期間保留為樣本外，
-        <strong>樣本外年化報酬勝過買進持有</strong>才算通過（行動路線 4.2）。說明見手冊{' '}
+        樣本外<strong>年化報酬勝過買進持有</strong>，或<strong>夏普比率不低於買進持有、且最大回撤不到它的 2/3</strong>，才算通過（行動路線 4.2）。說明見手冊{' '}
         <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
           10 §6
         </Link>
@@ -450,11 +448,14 @@ export function BacktestPage() {
             >
               {output.stats.outOfSample === null
                 ? '未設定樣本外，無法判定'
-                : passed
-                  ? '✓ 通過：樣本外勝過買進持有'
-                  : '✗ 未通過：樣本外沒有勝過買進持有'}
+                : verdict?.route === 'return'
+                  ? '✓ 通過：樣本外報酬勝過買進持有'
+                  : verdict?.route === 'risk'
+                    ? '✓ 通過：樣本外風險調整後勝出'
+                    : '✗ 未通過：報酬與風險調整後都沒有勝過買進持有'}
             </span>
           </div>
+          {verdict && output.stats.outOfSample !== null && <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{verdict.reason}</p>}
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {output.strategy.dates[0]}～{output.strategy.dates[output.strategy.dates.length - 1]}，{output.strategy.dates.length} 個交易日
             {output.oosStart && `；樣本外自 ${output.oosStart} 起`}。價格已還原除權息。

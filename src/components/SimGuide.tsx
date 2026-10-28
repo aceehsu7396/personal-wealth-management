@@ -30,7 +30,7 @@ export function SimGuide() {
       to: '/sim/screener',
     },
     { title: '選策略', detail: '套用範本庫，或自己寫策略卡', done: done('4.1'), to: '/sim/strategies' },
-    { title: '回測通過', detail: '樣本外勝過買進持有，看懂解讀', done: done('4.2'), to: '/sim/backtest' },
+    { title: '回測通過', detail: '樣本外報酬或風險調整後勝過買進持有，看懂解讀', done: done('4.2'), to: '/sim/backtest' },
     { title: '虛擬交易', detail: '照規則操作 3 個月、10 筆', done: done('4.3'), to: '/sim/paper' },
   ]
   const next = steps.find((s) => !s.done)

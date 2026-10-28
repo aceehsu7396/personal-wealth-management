@@ -30,7 +30,12 @@ describe('interpretBacktest', () => {
 
   it('flags an out-of-sample loss to buy-and-hold first', () => {
     const f = interpretBacktest(input({ outOfSample: stats({ cagr: 0.05 }) }))
-    expect(f[0]).toMatchObject({ level: 'warning', title: '樣本外沒有勝過買進持有' })
+    expect(f[0]).toMatchObject({ level: 'warning', title: '樣本外沒有勝過買進持有（報酬與風險調整後都沒有）' })
+  })
+
+  it('notes a pass earned by losing less rather than earning more', () => {
+    const f = interpretBacktest(input({ outOfSample: stats({ cagr: 0.05, sharpe: 1.2, maxDrawdown: -0.08 }) }))
+    expect(f[0]).toMatchObject({ level: 'caution', title: '以「少賠」通過：報酬低於買進持有' })
   })
 
   it('flags small samples, decay, drawdown, risk-driven returns, low exposure and thin edge', () => {

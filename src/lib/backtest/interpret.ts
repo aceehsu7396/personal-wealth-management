@@ -1,5 +1,6 @@
 import type { BacktestStats } from '../storage/schema'
 import type { SensitivityGrid } from './engine'
+import { outOfSampleVerdict } from './passRule'
 
 // Plain-language reading of a backtest (handbook chapter 10 §6): what to
 // worry about before trusting the result, most serious first.
@@ -37,11 +38,18 @@ export function interpretBacktest(input: InterpretInput): Finding[] {
   const { full, inSample, outOfSample, benchmarkFull, benchmarkOutOfSample, grid } = input
   const out: Finding[] = []
 
-  if (outOfSample && benchmarkOutOfSample && outOfSample.cagr <= benchmarkOutOfSample.cagr) {
+  const verdict = outOfSampleVerdict(outOfSample, benchmarkOutOfSample)
+  if (outOfSample && benchmarkOutOfSample && !verdict.passed) {
     out.push({
       level: 'warning',
-      title: '樣本外沒有勝過買進持有',
-      detail: `樣本外年化 ${pct(outOfSample.cagr)}，買進持有 ${pct(benchmarkOutOfSample.cagr)}。在沒用來調參數的期間輸給「什麼都不做」，目前沒有證據顯示這個策略有優勢。`,
+      title: '樣本外沒有勝過買進持有（報酬與風險調整後都沒有）',
+      detail: `${verdict.reason}。在沒用來調參數的期間，報酬沒有比較高，也沒有用明顯較小的回撤換到較好的夏普比率，目前沒有證據顯示這個策略有優勢。`,
+    })
+  } else if (verdict.route === 'risk') {
+    out.push({
+      level: 'caution',
+      title: '以「少賠」通過：報酬低於買進持有',
+      detail: `${verdict.reason}。擇時策略在強多頭中報酬落後是正常的，價值在於回撤較小；實單時要能接受「別人賺更多」的時期。可以用下方「核心＋交易組合」看搭配核心後的效果。`,
     })
   }
 
@@ -110,7 +118,7 @@ export function interpretBacktest(input: InterpretInput): Finding[] {
     out.push({
       level: 'ok',
       title: '沒有發現明顯問題',
-      detail: '樣本外勝過買進持有，交易數足夠，回撤在上限內。下一步：建立虛擬帳戶照規則操作 3 個月，確認自己做得到。',
+      detail: '樣本外勝過買進持有（報酬或風險調整後），交易數足夠，回撤在上限內。下一步：建立虛擬帳戶照規則操作 3 個月，確認自己做得到。',
     })
   } else if (!out.some((f) => f.level === 'warning')) {
     out.push({

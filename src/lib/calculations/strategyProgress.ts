@@ -1,5 +1,6 @@
 import type { BacktestRun, PaperAccount, PaperOrder, TradingStrategy } from '../storage/schema'
 import { monthsBetween } from './traderReadiness'
+import { outOfSampleVerdict } from '../backtest/passRule'
 
 // A strategy has proven itself on paper after this much forward practice.
 export const PAPER_RULES = { months: 3, fills: 10 } as const
@@ -16,11 +17,9 @@ export function paperProgress(account: PaperAccount, today: string): { months: n
   return { months, fills: fills.length, qualifies: months >= PAPER_RULES.months && fills.length >= PAPER_RULES.fills }
 }
 
-// Out-of-sample CAGR above buy-and-hold over the same held-out period.
+// Out of sample, beats buy-and-hold on return or on risk-adjusted terms.
 export function backtestPasses(run: BacktestRun): boolean {
-  const s = run.stats.outOfSample
-  const b = run.benchmark.outOfSample
-  return s !== null && b !== null && s.cagr > b.cagr
+  return outOfSampleVerdict(run.stats.outOfSample, run.benchmark.outOfSample).passed
 }
 
 // Strategies with a linked paper account that meets PAPER_RULES.
@@ -40,8 +39,8 @@ export interface LiveGate {
   allowed: boolean
 }
 
-// A strategy may trade real money once one of its own backtests beat
-// buy-and-hold out of sample and a linked paper account met PAPER_RULES.
+// A strategy may trade real money once one of its own backtests passed
+// out of sample and a linked paper account met PAPER_RULES.
 export function liveGate(
   strategy: TradingStrategy,
   runs: BacktestRun[],
