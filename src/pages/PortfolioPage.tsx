@@ -3,7 +3,7 @@ import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculations/portfolioRisk'
 import { todayIsoDate } from '../lib/market/twse'
-import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
+import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { FUND_TYPE_LABELS, isFund, isNavStale } from '../lib/calculations/fundRules'
 import { FundNavUpdater } from '../components/research/FundNavUpdater'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
@@ -32,7 +32,7 @@ export function PortfolioPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   // TWSE prices refresh automatically once a day; the button forces a refresh.
-  const twse = useTwseAutoRefresh()
+  const twse = usePriceAutoRefresh()
 
   const report = analyzePortfolio(holdings, theses, policy, guardrails, meta)
   const editing = editingId ? holdings.find((h) => h.id === editingId) : undefined
@@ -150,16 +150,26 @@ export function PortfolioPage() {
             disabled={twse.status === 'loading'}
             className="rounded-md border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
           >
-            {twse.status === 'loading' ? '更新中…' : '重新取得上市台股收盤價'}
+            {twse.status === 'loading' ? '更新中…' : '重新取得最新價格與淨值'}
           </button>
         </div>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
           {twse.message ??
             (twse.snapshot.fetchedOn
-              ? `上市台股價格已於 ${twse.snapshot.fetchedOn} 自動更新（每天第一次開啟時更新）。`
-              : '上市台股價格每天第一次開啟時自動從證交所更新。')}
+              ? `價格已於 ${twse.snapshot.fetchedOn} 自動更新（每天第一次開啟時更新）。`
+              : '每天第一次開啟時自動更新價格。')}
+          {' '}資料來源（免費、免金鑰）：上市台股／ETF 為證交所，上櫃與美股、美元匯率為 FinMind，基金淨值為鉅亨每日資料。
         </p>
-        <FundNavUpdater />
+        {twse.summary && twse.summary.skipped.length > 0 && (
+          <ul className="mt-1 list-disc pl-5 text-xs text-orange-700 dark:text-orange-400">
+            {twse.summary.skipped.map((x) => (
+              <li key={x.ticker + x.name}>
+                {x.ticker} {x.name}：{x.reason}
+              </li>
+            ))}
+          </ul>
+        )}
+        <FundNavUpdater pendingTickers={twse.summary?.skipped.map((x) => x.ticker)} />
         {report.holdings.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">還沒有持股。</p>
         ) : (

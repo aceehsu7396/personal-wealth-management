@@ -18,7 +18,7 @@ import { ActionBadge } from '../components/research/SignalPanel'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
-import { useTwseAutoRefresh } from '../lib/market/useTwseAutoRefresh'
+import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { StatCard } from '../components/StatCard'
 import type { ThesisStatus } from '../lib/storage/schema'
 
@@ -32,7 +32,7 @@ export function StocksPage() {
   const policy = useAppStore((s) => s.investmentPolicy)
   const { journey } = useJourney()
   // Daily TWSE price/valuation refresh for Taiwan research cards.
-  useTwseAutoRefresh()
+  usePriceAutoRefresh()
   const addStockThesis = useAppStore((s) => s.addStockThesis)
   const updateStockThesis = useAppStore((s) => s.updateStockThesis)
   const removeStockThesis = useAppStore((s) => s.removeStockThesis)

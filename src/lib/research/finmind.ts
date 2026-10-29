@@ -15,6 +15,8 @@ export type FinMindDataset =
   | 'TaiwanStockDividend'
   | 'TaiwanStockPER'
   | 'TaiwanStockPrice'
+  | 'USStockPrice'
+  | 'TaiwanExchangeRate'
 
 export class FinMindError extends Error {
   constructor(message: string) {

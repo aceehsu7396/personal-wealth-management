@@ -14,6 +14,8 @@ import { SLEEVE_LABELS } from '../../lib/calculations/portfolioRisk'
 import { FUND_TYPE_LABELS, suggestSleeve } from '../../lib/calculations/fundRules'
 import { todayIsoDate } from '../../lib/market/twse'
 import { errorClass, inputClass, labelClass } from './FormField'
+import { FundSearch } from './FundSearch'
+import { fundCurrency } from '../../lib/market/fundNav'
 
 const optionalNumber = z.preprocess(
   (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
@@ -173,6 +175,21 @@ export function HoldingForm({ theses, initialValues, onSubmit, onCancel }: Props
         ))}
       </div>
 
+      {isFundForm && (
+        <FundSearch
+          onPick={(f) => {
+            setValue('ticker', f.code)
+            setValue('name', f.name)
+            const currency = fundCurrency(f.currency)
+            if (currency) {
+              setValue('currency', currency)
+              setValue('currentPrice', f.nav)
+              setValue('navDate', f.date)
+              applySuggestion(String(getValues('fundType') ?? ''), currency)
+            }
+          }}
+        />
+      )}
       <label className="block">
         <span className={labelClass}>{label('代號', '基金代碼')}</span>
         <input type="text" className={inputClass} {...register('ticker')} />

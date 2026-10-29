@@ -3,7 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-  # Daily at 07:00 Taiwan time: refresh the macro data (public/data/macro.json).
+  # Daily at 07:00 Taiwan time: refresh the macro, stock and fund NAV data.
   schedule:
     - cron: '0 23 * * *'
   workflow_dispatch:
@@ -38,6 +38,10 @@ jobs:
       # Listed stocks and ETFs for the screener (TWSE open data, no key).
       - name: Fetch stock data
         run: npx tsx scripts/stocks-data.mts
+        continue-on-error: true
+      # Latest NAV of every fund sold in Taiwan (Anue fund list, no key).
+      - name: Fetch fund NAVs
+        run: npx tsx scripts/fund-nav.mts
         continue-on-error: true
       - run: npm run build
       - uses: actions/configure-pages@v5

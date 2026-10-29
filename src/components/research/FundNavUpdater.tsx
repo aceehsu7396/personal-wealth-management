@@ -7,9 +7,10 @@ import { todayIsoDate } from '../../lib/market/twse'
 import { AiActionButton } from './AiActionButton'
 import { ResearchReportCard } from './ResearchReportCard'
 
-// Looks up the latest NAV of every fund holding with AI web search, then lets
-// the user tick which values to apply. Nothing changes until "套用".
-export function FundNavUpdater() {
+// Fallback for funds the free daily NAV snapshot cannot price (unknown
+// code, or a currency other than TWD/USD): AI web search, then the user
+// ticks which values to apply. Nothing changes until "套用".
+export function FundNavUpdater({ pendingTickers }: { pendingTickers?: string[] }) {
   const holdings = useAppStore((s) => s.holdings)
   const updateHolding = useAppStore((s) => s.updateHolding)
   const addResearchReport = useAppStore((s) => s.addResearchReport)
@@ -22,7 +23,9 @@ export function FundNavUpdater() {
   const [appliedCount, setAppliedCount] = useState<number | null>(null)
   const [reportId, setReportId] = useState<string | null>(null)
 
-  const funds = holdings.filter((h) => isFund(h) && h.shares > 0)
+  // Until the automatic refresh has run, offer nothing; afterwards only the
+  // funds it could not price.
+  const funds = holdings.filter((h) => isFund(h) && h.shares > 0 && (pendingTickers?.includes(h.ticker) ?? false))
   if (funds.length === 0) return null
   const report = reports.find((r) => r.id === reportId)
 
@@ -66,7 +69,7 @@ export function FundNavUpdater() {
   return (
     <div className="mt-4 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
       <p className="mb-3 text-sm text-gray-600 dark:text-gray-300">
-        基金淨值無法自動取得。可手動編輯，或讓 AI 上網查詢 {funds.length} 檔基金的最新淨值，確認後再套用。
+        {funds.length} 檔基金無法自動取得淨值。可以編輯持股、用基金搜尋選到正確的代碼，或手動輸入；也可以讓 AI 上網查詢（需付費金鑰），確認後再套用。
       </p>
       <AiActionButton
         label="AI 取得最新淨值"

@@ -6,6 +6,7 @@ import { emergencyFundTarget } from '../lib/calculations/journey'
 import { StatCard } from '../components/StatCard'
 import { StrategyOverview } from '../components/StrategyOverview'
 import { useJourney } from '../lib/useJourney'
+import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { snapshotsAsCheckIns } from '../lib/calculations/netWorth'
 import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedChart'
@@ -14,6 +15,8 @@ import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 export function DashboardPage() {
   const profile = useAppStore((s) => s.profile)
   const snapshots = useAppStore((s) => s.portfolioSnapshots)
+  // Holdings get the day's prices on the first visit, so net worth is current.
+  usePriceAutoRefresh()
   // Net worth comes from the portfolio once holdings exist.
   const { assumptions, fromPortfolio } = usePlanningAssumptions()
 
