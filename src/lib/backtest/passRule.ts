@@ -39,3 +39,8 @@ export function outOfSampleVerdict(strategy: BacktestStats | null, benchmark: Ba
     reason: `樣本外年化 ${pct(strategy.cagr)} 未勝過買進持有 ${pct(benchmark.cagr)}，風險調整後也未勝出：${detail}`,
   }
 }
+
+// Calmar ratio: annual return per unit of maximum drawdown.
+export function calmarOf(s: Pick<BacktestStats, 'cagr' | 'maxDrawdown'>): number | null {
+  return s.maxDrawdown < 0 ? s.cagr / -s.maxDrawdown : null
+}

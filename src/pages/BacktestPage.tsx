@@ -28,7 +28,7 @@ import {
 } from '../lib/backtest/engine'
 import { loadPriceData } from '../lib/backtest/data'
 import { backtestPasses } from '../lib/calculations/strategyProgress'
-import { outOfSampleVerdict } from '../lib/backtest/passRule'
+import { calmarOf, outOfSampleVerdict } from '../lib/backtest/passRule'
 import { importCsvSeries, isoDaysAgo, loadSeries } from '../lib/market/priceHistory'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
@@ -69,6 +69,7 @@ const STAT_ROWS: { label: string; get: (s: BacktestStats) => string }[] = [
   { label: '年化報酬', get: (s) => pct(s.cagr) },
   { label: '最大回撤', get: (s) => pct(s.maxDrawdown) },
   { label: '夏普比率', get: (s) => num(s.sharpe) },
+  { label: '卡瑪比率', get: (s) => num(calmarOf(s)) },
   { label: '交易次數', get: (s) => String(s.trades) },
   { label: '勝率', get: (s) => pct(s.winRate, 0) },
   { label: '獲利因子', get: (s) => num(s.profitFactor) },

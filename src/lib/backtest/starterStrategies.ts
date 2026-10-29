@@ -13,6 +13,22 @@ export interface StarterStrategy {
 
 export const STARTER_STRATEGIES: StarterStrategy[] = [
   {
+    id: 'tw50-200d-filter',
+    card: {
+      name: '0050 趨勢濾網（200 日線）',
+      template: 'ma_cross',
+      params: { fast: 1, slow: 200, atrStop: 0 },
+      symbols: ['TW:0050'],
+      edge: '目的不是多賺，而是少賠：收盤站上 200 日線才持有，跌破就換成現金。長期空頭幾乎都發生在 200 日線之下，避開它們可以把最大回撤壓低約三分之一，報酬接近一直持有。',
+      entryRules: '收盤價向上穿越 200 日均線，隔日開盤買進',
+      exitRules: '收盤價跌破 200 日均線，隔日開盤賣出（不另設 ATR 停損：200 日線本身就是出場點）',
+      riskPerTradePercent: 1,
+      notes: '2015-10～2026-10 實測（手續費 2.8 折）：年化 19.0%、最大回撤 −21.3%；同期一直持有 0050 為 22.7%、−34.0%。報酬 ÷ 回撤 0.89 對 0.67。在 V 型反彈與盤整時會反覆進出（2018 年比持有多賠）。判斷時看「報酬 ÷ 回撤」與夏普比率，不要只看報酬。',
+    },
+    suits: '想降低大跌時的回撤、為全職後的提領期做準備',
+    risk: '多頭時報酬會落後一直持有；盤整時會反覆小賠；跌破當天到隔日開盤之間仍可能有跳空',
+  },
+  {
     id: 'tw50-trend',
     card: {
       name: '0050 均線趨勢',

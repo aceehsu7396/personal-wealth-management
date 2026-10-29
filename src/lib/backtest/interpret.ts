@@ -1,6 +1,6 @@
 import type { BacktestStats } from '../storage/schema'
 import type { SensitivityGrid } from './engine'
-import { outOfSampleVerdict } from './passRule'
+import { calmarOf, outOfSampleVerdict } from './passRule'
 
 // Plain-language reading of a backtest (handbook chapter 10 §6): what to
 // worry about before trusting the result, most serious first.
@@ -30,6 +30,8 @@ export const INTERPRET_RULES = {
   gridSpread: 0.08,
   lowExposure: 0.3,
   minProfitFactor: 1.2,
+  // Calmar ratio this much above buy-and-hold counts as losing less.
+  calmarEdge: 1.1,
 } as const
 
 const pct = (v: number) => `${(v * 100).toFixed(1)}%`
@@ -125,6 +127,16 @@ export function interpretBacktest(input: InterpretInput): Finding[] {
       level: 'ok',
       title: '主要條件通過',
       detail: '沒有嚴重問題，但上面的提醒值得在虛擬交易時特別留意。',
+    })
+  }
+  // Losing less: a lower return bought with a much shallower drawdown.
+  const own = calmarOf(full)
+  const bench = calmarOf(benchmarkFull)
+  if (full.cagr > 0 && full.cagr < benchmarkFull.cagr && own !== null && bench !== null && own > bench * INTERPRET_RULES.calmarEdge) {
+    out.push({
+      level: 'ok',
+      title: '報酬較低，但每承受一分回撤換到的報酬較多',
+      detail: `卡瑪比率（年化 ÷ 最大回撤）${own.toFixed(2)}，買進持有 ${bench.toFixed(2)}。最大回撤 ${pct(full.maxDrawdown)} 對 ${pct(benchmarkFull.maxDrawdown)}：同樣的回撤預算下效率較高，適合「少賠」的目標（手冊 10 §1.1、11 §1.1）。`,
     })
   }
   return out

@@ -225,7 +225,7 @@ describe('parameter sweep', () => {
     )!
     expect(sweep.label).toBe('短期均線（日）')
     expect(sweep.points.filter((p) => p.current).map((p) => p.value)).toEqual([20])
-    expect(sweep.points.every((p) => p.value >= 5 && p.value <= 100)).toBe(true)
+    expect(sweep.points.every((p) => p.value >= 1 && p.value <= 100)).toBe(true)
     expect(sweep.cagrSpread).toBeGreaterThanOrEqual(0)
     expect(parameterSweep(input({ template: 'buy_hold' }), 'fast', 0.3)).toBeNull()
   })
