@@ -58,7 +58,7 @@ type FormInput = z.input<typeof formSchema>
 type FormOutput = z.output<typeof formSchema>
 
 const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
-  { name: 'targetYears', label: '全職交易目標年限（年）', step: '1' },
+  { name: 'targetYears', label: '財務獨立目標年限（年）', step: '1' },
   { name: 'coreTwEquityPercent', label: '核心：台股大盤（%）', step: '1' },
   {
     name: 'coreGlobalEquityPercent',

@@ -152,7 +152,7 @@ export function AssumptionsForm({ netWorthFromPortfolio = null }: { netWorthFrom
       </Field>
 
       <Field
-        label="可持續提領率（%，全職交易建議 3.5）"
+        label="可持續提領率（%，提早財務獨立建議 3.5）"
         error={errors.safeWithdrawalRatePercent?.message}
       >
         <input

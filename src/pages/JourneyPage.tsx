@@ -22,7 +22,7 @@ export function JourneyPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">行動路線</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        目標是成為全職交易者：先打好財務地基、用核心 ETF 買下整個市場、看懂市場，再把交易策略回測、虛擬交易、小額實單逐關驗證。每一步都對應手冊的一章與工具的一頁。
+        目標是財務獨立，全職經營自有資產：先打好財務地基、用核心 ETF 買下整個市場、看懂市場，再把交易策略回測、虛擬交易、小額實單逐關驗證。每一步都對應手冊的一章與工具的一頁。
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -99,7 +99,7 @@ export function JourneyPage() {
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">緊急預備金／生活費緩衝</h3>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 放在活存、貨幣市場或短債等隨時可動用的地方，不計入投資組合。每月支出取「目標與政策」的數字：
-                {formatCurrency(baseline, state.profile.currency)}。上班期間先備足目標月數；轉為全職交易前要擴大到生活費緩衝月數。
+                {formatCurrency(baseline, state.profile.currency)}。上班期間先備足目標月數；離開本業前要擴大到生活費緩衝月數。
               </p>
               <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <label className="block">
@@ -168,7 +168,7 @@ export function JourneyPage() {
         {learning.nextCriteria.length > 0 ? (
           <>
             <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {learning.stage === 4 ? '轉為全職交易的條件' : '晉級下一階段的條件'}
+              {learning.stage === 4 ? '離開本業、全職經營的條件' : '晉級下一階段的條件'}
             </h3>
             <ul className="mt-2 space-y-1 text-sm">
               {learning.nextCriteria.map((c) => (

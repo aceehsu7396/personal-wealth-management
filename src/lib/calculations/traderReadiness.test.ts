@@ -4,6 +4,7 @@ import {
   computeTraderReadiness,
   fullTimeTarget,
   monthsBetween,
+  sleeveRecordQualifies,
   sleeveTrackRecord,
   type ReadinessInput,
 } from './traderReadiness'
@@ -97,6 +98,15 @@ describe('sleeveTrackRecord', () => {
     expect(r.annualReturn).toBeCloseTo(1.03 ** 4 - 1, 2)
     expect(r.benchmarkAnnualReturn).toBeCloseTo(1.02 ** 4 - 1, 2)
     expect(r.maxDrawdown).toBe(0)
+    expect(r.benchmarkMaxDrawdown).toBe(0)
+  })
+
+  it('accepts a sleeve that earns close to the benchmark with a much smaller drawdown', () => {
+    const base = { years: 2, maxDrawdown: -0.1, benchmarkMaxDrawdown: -0.3 }
+    expect(sleeveRecordQualifies({ ...base, annualReturn: 0.12, benchmarkAnnualReturn: 0.1 })).toBe('return')
+    expect(sleeveRecordQualifies({ ...base, annualReturn: 0.085, benchmarkAnnualReturn: 0.1 })).toBe('risk')
+    expect(sleeveRecordQualifies({ ...base, annualReturn: 0.07, benchmarkAnnualReturn: 0.1 })).toBeNull()
+    expect(sleeveRecordQualifies({ ...base, maxDrawdown: -0.25, annualReturn: 0.09, benchmarkAnnualReturn: 0.1 })).toBeNull()
   })
 
   it('ignores reviews older than the window', () => {

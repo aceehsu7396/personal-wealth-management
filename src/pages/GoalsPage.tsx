@@ -86,7 +86,7 @@ export function GoalsPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">目標與政策</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        目標是成為全職獨立交易者、以自有資產維生。先算出全職門檻與所需報酬，再把目標、風險與配置寫成投資政策並簽署。完整說明見手冊{' '}
+        目標是財務獨立，全職經營自有資產：生活費來自資產提領，不靠交易收入。先算出全職門檻與所需報酬，再把目標、風險與配置寫成投資政策並簽署。完整說明見手冊{' '}
         <Link to="/handbook/01" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
           01 第一步
         </Link>{' '}
@@ -96,7 +96,7 @@ export function GoalsPage() {
         </Link>
         、
         <Link to="/handbook/11" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          11 轉為全職交易
+          11 財務獨立與全職經營
         </Link>
         。
       </p>
@@ -151,7 +151,7 @@ export function GoalsPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">全職準備度</h2>
           <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
             {readiness.metCount}/{readiness.items.length}
-            {readiness.ready ? '　可以轉為全職' : '　尚未達標，維持本業'}
+            {readiness.ready ? '　可以離開本業、全職經營' : '　尚未達標，維持本業'}
           </span>
         </div>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
@@ -163,7 +163,7 @@ export function GoalsPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">全職交易門檻試算</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">財務獨立門檻試算</h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           填寫現況與假設（修改後自動儲存）。門檻 ＝ 年生活費 ÷ 可持續提領率；月生活費也用來計算緊急預備金與生活費緩衝。
         </p>

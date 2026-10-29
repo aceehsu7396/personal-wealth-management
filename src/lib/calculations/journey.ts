@@ -68,7 +68,7 @@ export interface LearningStage {
 // strategy proven by backtest and paper trading.
 export const SATELLITE_PREREQUISITES = ['1.1', '1.2', '1.4', '2.1', '2.3', '3.1', '4.2', '4.3']
 
-export const LEARNING_STAGE_TITLES = ['一 打地基', '二 實單驗證', '三 擴大部位', '四 全職交易'] as const
+export const LEARNING_STAGE_TITLES = ['一 打地基', '二 實單驗證', '三 擴大部位', '四 全職經營'] as const
 const STAGE_CAPS = [10, 20, 40, Infinity]
 
 const PAGES = {
@@ -261,7 +261,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
     {
       number: 5,
       title: '實單驗證與檢討',
-      summary: '小額實單照策略卡執行，每季歸因、每筆檢討，累積轉為全職需要的紀錄。',
+      summary: '小額實單照策略卡執行，每季歸因、每筆檢討，累積全職經營需要的紀錄。',
       steps: [
         {
           id: '5.1',

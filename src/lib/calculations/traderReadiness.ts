@@ -9,12 +9,16 @@ import type {
 import { attributePeriod } from './attribution'
 import { addMonths } from './disciplineScore'
 import { isSatellite } from './portfolioRisk'
+import { PASS_RULES } from '../backtest/passRule'
 
 // Thresholds for going full time (handbook chapter 11).
 export const READINESS_RULES = {
   trackRecordMonths: 24,
   closedTrades: 30,
   disciplineScore: 80,
+  // "Losing less": at least this share of the benchmark's annual return
+  // with at most PASS_RULES.maxDrawdownRatio of its drawdown.
+  closeReturnShare: 0.8,
 } as const
 
 export interface FullTimeTarget {
@@ -77,6 +81,7 @@ export interface SleeveTrackRecord {
   annualReturn: number
   benchmarkAnnualReturn: number
   maxDrawdown: number
+  benchmarkMaxDrawdown: number
 }
 
 // Trading-sleeve returns over the last `months` of quarterly reviews,
@@ -99,12 +104,16 @@ export function sleeveTrackRecord(
   let bench = 1
   let peak = 1
   let maxDrawdown = 0
+  let benchPeak = 1
+  let benchMaxDrawdown = 0
   let days = 0
   for (const p of periods) {
     index *= 1 + (p.satelliteReturn ?? 0)
     bench *= 1 + (p.satelliteBenchmarkReturn ?? 0)
     peak = Math.max(peak, index)
     maxDrawdown = Math.min(maxDrawdown, index / peak - 1)
+    benchPeak = Math.max(benchPeak, bench)
+    benchMaxDrawdown = Math.min(benchMaxDrawdown, bench / benchPeak - 1)
     days += Math.max((Date.parse(p.review.periodEnd) - Date.parse(p.review.periodStart)) / 86_400_000, 1)
   }
   const years = days / 365
@@ -113,7 +122,20 @@ export function sleeveTrackRecord(
     annualReturn: index ** (1 / years) - 1,
     benchmarkAnnualReturn: bench ** (1 / years) - 1,
     maxDrawdown,
+    benchmarkMaxDrawdown: benchMaxDrawdown,
   }
+}
+
+// The trading sleeve either earns more than its benchmark, or earns close
+// to it with a clearly smaller drawdown (handbook chapter 11 §3).
+export function sleeveRecordQualifies(record: SleeveTrackRecord): 'return' | 'risk' | null {
+  if (record.annualReturn > record.benchmarkAnnualReturn) return 'return'
+  const close =
+    record.benchmarkAnnualReturn > 0
+      ? record.annualReturn >= record.benchmarkAnnualReturn * READINESS_RULES.closeReturnShare
+      : record.annualReturn >= record.benchmarkAnnualReturn
+  const shallower = Math.abs(record.maxDrawdown) <= Math.abs(record.benchmarkMaxDrawdown) * PASS_RULES.maxDrawdownRatio + 1e-9
+  return close && shallower && record.benchmarkMaxDrawdown < 0 ? 'risk' : null
 }
 
 function pct(value: number): string {
@@ -124,8 +146,9 @@ function twd(value: number): string {
   return Number.isFinite(value) ? `${Math.round(value).toLocaleString('zh-TW')} 元` : '—'
 }
 
-// The five gates for leaving the day job (handbook chapter 11). All five
-// must hold before trading becomes the only income.
+// The five gates for leaving the day job to manage your own assets full
+// time (handbook chapter 11). Living costs come from withdrawals, never
+// from trading income.
 export function computeTraderReadiness(input: ReadinessInput): TraderReadiness {
   const { assumptions, foundation, policy, today } = input
   const target = fullTimeTarget(assumptions, foundation)
@@ -140,7 +163,7 @@ export function computeTraderReadiness(input: ReadinessInput): TraderReadiness {
 
   const record = sleeveTrackRecord(input.performanceReviews, policy, today)
   const coversPeriod = record !== null && record.years >= (READINESS_RULES.trackRecordMonths / 12) * 0.9
-  const beats = record !== null && record.annualReturn > record.benchmarkAnnualReturn
+  const route = record ? sleeveRecordQualifies(record) : null
   const withinDrawdown = record !== null && -record.maxDrawdown * 100 <= policy.maxDrawdownTolerancePercent
 
   const items: ReadinessItem[] = [
@@ -167,10 +190,12 @@ export function computeTraderReadiness(input: ReadinessInput): TraderReadiness {
     },
     {
       key: 'performance',
-      label: '交易部位勝過基準，回撤在上限內',
-      met: coversPeriod && beats && withinDrawdown,
+      label: '交易部位勝過基準，或報酬接近而回撤明顯較小',
+      met: coversPeriod && route !== null && withinDrawdown,
       detail: record
-        ? `近 ${record.years.toFixed(1)} 年年化 ${pct(record.annualReturn)} vs 基準 ${pct(record.benchmarkAnnualReturn)}，最大回撤 ${pct(record.maxDrawdown)}（上限 −${policy.maxDrawdownTolerancePercent}%）${coversPeriod ? '' : '；季度績效歸因需涵蓋 2 年'}`
+        ? `近 ${record.years.toFixed(1)} 年年化 ${pct(record.annualReturn)} vs 基準 ${pct(record.benchmarkAnnualReturn)}，最大回撤 ${pct(record.maxDrawdown)} vs 基準 ${pct(record.benchmarkMaxDrawdown)}（投資政策上限 −${policy.maxDrawdownTolerancePercent}%）${
+            route === 'return' ? '；報酬勝過基準' : route === 'risk' ? '；報酬達基準 8 成以上、回撤不到基準的 2/3（少賠）' : ''
+          }${coversPeriod ? '' : '；季度績效歸因需涵蓋 2 年'}`
         : '需要涵蓋近 2 年的季度績效歸因',
     },
     {

@@ -152,7 +152,7 @@ export const ARCH_NODES: Record<string, ArchNode> = {
     what: '資產門檻、生活費緩衝、實單績效、回撤控制、執行紀律五項全過。',
     why: '全職是終點，不是起點；每一關都用數據證明過才離開本業。',
     page: { to: '/goals', label: '目標與政策・全職準備度' },
-    handbook: { slug: '11', label: '11 轉為全職交易' },
+    handbook: { slug: '11', label: '11 財務獨立與全職經營' },
     steps: [],
   },
 }

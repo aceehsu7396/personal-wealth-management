@@ -36,6 +36,14 @@ export function StrategyOverview() {
   const risk = analyzePortfolio(holdings, theses, policy, guardrails, meta)
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
   const readiness = useTraderReadiness()
+  const foundation = useAppStore((s) => s.foundation)
+  // Months of living costs held outside the portfolio, and what share of
+  // the portfolio a year of living costs would take today.
+  const bufferMonths = assumptions.monthlyExpenses > 0 ? foundation.emergencyFundAmount / assumptions.monthlyExpenses : null
+  const withdrawalRate =
+    readiness.target.annualExpenses > 0 && assumptions.currentNetWorth > 0
+      ? (readiness.target.annualExpenses / assumptions.currentNetWorth) * 100
+      : null
   const signalsFor = useSignals()
   const exitAlerts = theses
     .filter((t) => t.auto && t.status !== 'exited')
@@ -79,7 +87,7 @@ export function StrategyOverview() {
   return (
     <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">投資策略紀律</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">資產經營與提領準備</h2>
         <Link
           to="/goals"
           className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
@@ -88,7 +96,7 @@ export function StrategyOverview() {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link to="/goals" className="block">
           <StatCard
             label="全職準備度"
@@ -102,18 +110,36 @@ export function StrategyOverview() {
             }
           />
         </Link>
+        <Link to="/journey" className="block">
+          <StatCard
+            label="生活費緩衝"
+            value={bufferMonths === null ? '—' : `${bufferMonths.toFixed(1)} 個月`}
+            hint={`全職前目標 ${foundation.livingBufferMonths} 個月（現金／短債）`}
+          />
+        </Link>
+        <Link to="/portfolio" className="block">
+          <StatCard
+            label="組合回撤"
+            value={holdings.length === 0 ? '—' : `${risk.drawdownPercent.toFixed(1)}%`}
+            hint={
+              risk.circuitBreakerActive
+                ? '回撤熔斷中'
+                : `熔斷 −${policy.drawdownCircuitBreakerPercent}%・上限 −${policy.maxDrawdownTolerancePercent}%${alerts.length > 0 ? `・${alerts.length} 項風控警示` : ''}`
+            }
+          />
+        </Link>
+        <Link to="/goals" className="block">
+          <StatCard
+            label="目前提領率"
+            value={withdrawalRate === null ? '—' : `${withdrawalRate.toFixed(1)}%`}
+            hint={`年生活費 ÷ 投資組合；可持續 ${assumptions.safeWithdrawalRatePercent}% 以下`}
+          />
+        </Link>
         <Link to="/research/market" className="block">
           <StatCard
             label="總經判斷"
             value={macro ? STANCE_LABELS[macro.stance] : '—'}
             hint={latestMacro ? `${latestMacro.date} 檢視` : '尚無總經檢視'}
-          />
-        </Link>
-        <Link to="/portfolio" className="block">
-          <StatCard
-            label="風控警示"
-            value={`${alerts.length}`}
-            hint={risk.circuitBreakerActive ? '回撤熔斷中' : holdings.length === 0 ? '尚無持股' : undefined}
           />
         </Link>
         <Link to="/portfolio/trades" className="block">
