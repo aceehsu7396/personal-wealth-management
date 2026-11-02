@@ -21,6 +21,7 @@ import { describeAiError } from '../lib/ai/client'
 import { EquityChart } from '../components/charts/BacktestCharts'
 import { StatCard } from '../components/StatCard'
 import { SimGuide } from '../components/SimGuide'
+import { PaperHowTo } from '../components/PaperHowTo'
 import { Field, inputClass } from '../components/forms/FormField'
 import type { PaperAccount, PaperOrder } from '../lib/storage/schema'
 
@@ -249,6 +250,7 @@ export function PaperPage() {
       </p>
 
       <SimGuide />
+      <PaperHowTo market={account?.market} />
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {accounts.map((a) => (
