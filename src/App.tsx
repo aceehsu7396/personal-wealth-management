@@ -1,3 +1,4 @@
+import { DemoBanner } from './components/DemoBanner'
 import { PageContext } from './components/PageContext'
 import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
@@ -8,7 +9,6 @@ import { DashboardPage } from './pages/DashboardPage'
 import { GoalsPage } from './pages/GoalsPage'
 import { JourneyPage } from './pages/JourneyPage'
 import { MarketPage } from './pages/MarketPage'
-import { IndustryPage } from './pages/IndustryPage'
 import { StocksPage } from './pages/StocksPage'
 import { PortfolioPage } from './pages/PortfolioPage'
 import { TradesPage } from './pages/TradesPage'
@@ -29,13 +29,14 @@ function App() {
     <HashRouter>
       <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
         <NavBar />
+        <DemoBanner />
         <PortfolioSnapshotRecorder />
         <PageContext />
         <Routes>
           {/* 總覽 */}
           <Route path="/" element={<DashboardPage />} />
           <Route path="/goals" element={<GoalsPage />} />
-          {/* 學習路線 */}
+          {/* 行動路線與手冊 */}
           <Route path="/journey" element={<JourneyPage />} />
           <Route
             path="/handbook/:slug?"
@@ -45,12 +46,11 @@ function App() {
               </Suspense>
             }
           />
-          {/* 研究分析 */}
+          {/* 研究 */}
           <Route path="/research/market" element={<MarketPage />} />
-          <Route path="/research/industry" element={<IndustryPage />} />
+          <Route path="/research/screener" element={<ScreenerPage />} />
           <Route path="/research/stocks" element={<StocksPage />} />
-          {/* 模擬交易 */}
-          <Route path="/sim/screener" element={<ScreenerPage />} />
+          {/* 策略 */}
           <Route path="/sim/strategies" element={<StrategiesPage />} />
           <Route path="/sim/backtest" element={<BacktestPage />} />
           <Route path="/sim/paper" element={<PaperPage />} />

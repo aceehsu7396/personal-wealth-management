@@ -9,6 +9,8 @@ export type StrategyFormValues = Omit<TradingStrategy, 'id' | 'createdAt' | 'upd
 
 interface Props {
   initial?: TradingStrategy
+  // Starting values for a new card (e.g. from a research card link).
+  draft?: Partial<StrategyFormValues>
   defaultRiskPercent: number
   onSubmit: (values: StrategyFormValues) => void
   onCancel: () => void
@@ -16,18 +18,19 @@ interface Props {
 
 // The written trading plan: template + parameters, symbols, the edge it
 // claims, entry/exit rules and risk per trade.
-export function StrategyForm({ initial, defaultRiskPercent, onSubmit, onCancel }: Props) {
-  const [name, setName] = useState(initial?.name ?? '')
-  const [template, setTemplate] = useState<StrategyTemplate>(initial?.template ?? 'ma_cross')
+export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onCancel }: Props) {
+  const start = initial ?? draft
+  const [name, setName] = useState(start?.name ?? '')
+  const [template, setTemplate] = useState<StrategyTemplate>(start?.template ?? 'ma_cross')
   const [params, setParams] = useState<Record<string, number>>(
-    initial ? resolveParams(initial.template, initial.params) : defaultParams('ma_cross'),
+    start?.template ? resolveParams(start.template, start.params ?? {}) : defaultParams('ma_cross'),
   )
-  const [symbols, setSymbols] = useState(initial?.symbols.join(', ') ?? '0050')
-  const [edge, setEdge] = useState(initial?.edge ?? '')
-  const [entryRules, setEntryRules] = useState(initial?.entryRules ?? STRATEGY_TEMPLATES.ma_cross.entry)
-  const [exitRules, setExitRules] = useState(initial?.exitRules ?? STRATEGY_TEMPLATES.ma_cross.exit)
-  const [risk, setRisk] = useState(String(initial?.riskPerTradePercent ?? defaultRiskPercent))
-  const [notes, setNotes] = useState(initial?.notes ?? '')
+  const [symbols, setSymbols] = useState(start?.symbols?.map((x) => (x.startsWith('TW:') ? x.slice(3) : x)).join(', ') ?? '0050')
+  const [edge, setEdge] = useState(start?.edge ?? '')
+  const [entryRules, setEntryRules] = useState(start?.entryRules ?? STRATEGY_TEMPLATES[start?.template ?? 'ma_cross'].entry)
+  const [exitRules, setExitRules] = useState(start?.exitRules ?? STRATEGY_TEMPLATES[start?.template ?? 'ma_cross'].exit)
+  const [risk, setRisk] = useState(String(start?.riskPerTradePercent ?? defaultRiskPercent))
+  const [notes, setNotes] = useState(start?.notes ?? '')
   const [error, setError] = useState<string | null>(null)
 
   const def = STRATEGY_TEMPLATES[template]

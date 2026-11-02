@@ -75,7 +75,8 @@ export function StrategyOverview() {
         .slice(0, 3)
         .map(({ thesis, report }) => `${thesis.ticker} ${ACTION_LABELS[report.action]}`)
         .join('、')}${exitAlerts.length > 3 ? '…' : ''}）`,
-      to: '/research/stocks',
+      // One alert opens that card directly.
+      to: exitAlerts.length === 1 ? `/research/stocks?new=${encodeURIComponent(exitAlerts[0].thesis.ticker)}` : '/research/stocks',
     })
   }
   if (discipline.pendingReviews.length > 0) {

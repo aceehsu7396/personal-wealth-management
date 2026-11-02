@@ -27,11 +27,18 @@ export function NavBar() {
             <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-orange-500" />
             個人財富管理工具
           </span>
-          {NAV_GROUPS.map((g) => (
+          {NAV_GROUPS.filter((g) => !g.utility).map((g) => (
             <Link key={g.id} to={g.to} className={itemClass(current?.id === g.id)}>
               {g.label}
             </Link>
           ))}
+          <span className="ml-auto flex shrink-0 gap-1">
+            {NAV_GROUPS.filter((g) => g.utility).map((g) => (
+              <Link key={g.id} to={g.to} className={itemClass(current?.id === g.id)}>
+                {g.label}
+              </Link>
+            ))}
+          </span>
         </div>
       </nav>
       {current && current.tabs.length > 1 && (

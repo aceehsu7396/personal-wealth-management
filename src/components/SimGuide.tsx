@@ -27,7 +27,7 @@ export function SimGuide() {
       title: '找標的',
       detail: '用選股篩選器找候選，加入觀察名單',
       done: watchlist.length > 0 || done('4.1'),
-      to: '/sim/screener',
+      to: '/research/screener',
     },
     { title: '選策略', detail: '套用範本庫，或自己寫策略卡', done: done('4.1'), to: '/sim/strategies' },
     { title: '回測通過', detail: '樣本外報酬或風險調整後勝過買進持有，看懂解讀', done: done('4.2'), to: '/sim/backtest' },

@@ -20,6 +20,7 @@ import {
 } from '../../lib/calculations/preTradeChecklist'
 import { SLEEVE_LABELS } from '../../lib/calculations/portfolioRisk'
 import { errorClass, inputClass, labelClass } from './FormField'
+import type { TradePrefill } from '../../lib/trades/tradeLink'
 
 const schema = z.object({
   date: z.string().min(1, '請選擇日期'),
@@ -105,9 +106,11 @@ const STRATEGY_REASONS: TradeReason[] = ['strategy_entry', 'strategy_exit', 'sto
 interface Props {
   ctx: ChecklistContext
   onSubmit: (submission: TradeSubmission) => void
+  // Values carried over from a research card or strategy card link.
+  prefill?: TradePrefill | null
 }
 
-export function TradeForm({ ctx, onSubmit }: Props) {
+export function TradeForm({ ctx, onSubmit, prefill }: Props) {
   const {
     register,
     handleSubmit,
@@ -118,7 +121,7 @@ export function TradeForm({ ctx, onSubmit }: Props) {
     formState: { errors },
   } = useForm<FormInput, unknown, FormOutput>({
     resolver: zodResolver(schema),
-    defaultValues: blankDefaults(),
+    defaultValues: prefill ? { ...blankDefaults(), ...prefill } : blankDefaults(),
   })
 
   const side = watch('side')

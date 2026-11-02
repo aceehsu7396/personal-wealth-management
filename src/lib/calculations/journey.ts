@@ -77,11 +77,11 @@ const PAGES = {
   portfolio: { to: '/portfolio', label: '持股與風控' },
   trades: { to: '/portfolio/trades', label: '交易日誌' },
   review: { to: '/portfolio/review', label: '績效歸因' },
-  market: { to: '/research/market', label: '研究分析・市場' },
-  stocks: { to: '/research/stocks', label: '研究分析・個股' },
-  strategies: { to: '/sim/strategies', label: '模擬交易・策略卡' },
-  backtest: { to: '/sim/backtest', label: '模擬交易・回測' },
-  paper: { to: '/sim/paper', label: '模擬交易・虛擬帳戶' },
+  market: { to: '/research/market', label: '研究・市場' },
+  stocks: { to: '/research/stocks', label: '研究・研究卡' },
+  strategies: { to: '/sim/strategies', label: '策略・策略卡' },
+  backtest: { to: '/sim/backtest', label: '策略・回測' },
+  paper: { to: '/sim/paper', label: '策略・虛擬帳戶' },
 }
 
 function distinctMonths(dates: string[]): number {
@@ -208,7 +208,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
           id: '3.1',
           title: '完成第一次總經檢視',
           done: macroMonths >= 1,
-          detail: '打開「研究分析 → 市場」，本月檢視每天自動判斷（免 API 金鑰）',
+          detail: '打開「研究 → 市場」，本月檢視每天自動判斷（免 API 金鑰）',
           page: PAGES.market,
           handbookSlug: '05',
         },

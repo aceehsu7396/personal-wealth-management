@@ -1,4 +1,6 @@
-// Top-level navigation: six groups, each with its own sub-tabs.
+// Top-level navigation, ordered by the workflow: today and goals,
+// research, strategy validation, then the real portfolio. The handbook and
+// settings sit at the right of the top bar instead of being groups.
 
 export interface NavTab {
   label: string
@@ -9,10 +11,12 @@ export interface NavTab {
 }
 
 export interface NavGroup {
-  id: 'overview' | 'learn' | 'research' | 'sim' | 'portfolio' | 'settings'
+  id: 'overview' | 'research' | 'strategy' | 'portfolio' | 'handbook' | 'settings'
   label: string
   to: string
   tabs: NavTab[]
+  // Shown as a small link at the right of the top bar.
+  utility?: boolean
 }
 
 export const NAV_GROUPS: NavGroup[] = [
@@ -21,35 +25,26 @@ export const NAV_GROUPS: NavGroup[] = [
     label: '總覽',
     to: '/',
     tabs: [
-      { label: '概況', to: '/', exact: true },
+      { label: '今日', to: '/', exact: true },
+      { label: '行動路線', to: '/journey' },
       { label: '目標與政策', to: '/goals' },
     ],
   },
   {
-    id: 'learn',
-    label: '學習路線',
-    to: '/journey',
-    tabs: [
-      { label: '行動路線', to: '/journey' },
-      { label: '策略手冊', to: '/handbook' },
-    ],
-  },
-  {
     id: 'research',
-    label: '研究分析',
+    label: '研究',
     to: '/research/market',
     tabs: [
       { label: '市場', to: '/research/market' },
-      { label: '產業', to: '/research/industry' },
-      { label: '個股', to: '/research/stocks' },
+      { label: '選股', to: '/research/screener' },
+      { label: '研究卡', to: '/research/stocks' },
     ],
   },
   {
-    id: 'sim',
-    label: '模擬交易',
-    to: '/sim/screener',
+    id: 'strategy',
+    label: '策略',
+    to: '/sim/strategies',
     tabs: [
-      { label: '選股', to: '/sim/screener' },
       { label: '策略卡', to: '/sim/strategies' },
       { label: '回測', to: '/sim/backtest' },
       { label: '虛擬帳戶', to: '/sim/paper' },
@@ -65,7 +60,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: '績效歸因', to: '/portfolio/review' },
     ],
   },
-  { id: 'settings', label: '設定', to: '/settings', tabs: [{ label: '設定', to: '/settings' }] },
+  { id: 'handbook', label: '手冊', to: '/handbook', tabs: [{ label: '手冊', to: '/handbook' }], utility: true },
+  { id: 'settings', label: '⚙ 設定', to: '/settings', tabs: [{ label: '設定', to: '/settings' }], utility: true },
 ]
 
 export function tabMatches(tab: NavTab, pathname: string): boolean {
@@ -87,4 +83,6 @@ export const LEGACY_REDIRECTS: Record<string, string> = {
   '/market': '/research/market',
   '/research': '/research/stocks',
   '/trades': '/portfolio/trades',
+  '/sim/screener': '/research/screener',
+  '/research/industry': '/research/stocks',
 }

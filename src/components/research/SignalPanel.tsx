@@ -1,4 +1,7 @@
+import { Link } from 'react-router-dom'
 import { ACTION_LABELS, type SignalAction, type SignalReport, type SignalTone } from '../../lib/research/signals'
+import { signalTradeLink } from '../../lib/trades/tradeLink'
+import type { StockThesis } from '../../lib/storage/schema'
 
 const ACTION_STYLE: Record<SignalAction, string> = {
   buy: 'bg-indigo-600 text-white',
@@ -46,7 +49,19 @@ function SignalList({ signals }: { signals: SignalReport['signals'] }) {
   )
 }
 
-export function SignalPanel({ report, price, chipsDate }: { report: SignalReport; price: number; chipsDate?: string }) {
+export function SignalPanel({
+  report,
+  price,
+  chipsDate,
+  thesis,
+}: {
+  report: SignalReport
+  price: number
+  chipsDate?: string
+  // A saved card: shows "next step" links into the trade log and strategy cards.
+  thesis?: Pick<StockThesis, 'id' | 'ticker' | 'name' | 'verdict' | 'currentPrice' | 'kind'>
+}) {
+  const trade = thesis ? signalTradeLink(report, thesis) : null
   // Today's price slots in between the levels (sorted high → low).
   const at = report.levels.findIndex((l) => l.price < price)
   const ladder = [...report.levels]
@@ -69,6 +84,21 @@ export function SignalPanel({ report, price, chipsDate }: { report: SignalReport
             <li key={r}>{r}</li>
           ))}
         </ul>
+      )}
+      {thesis && (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {trade && (
+            <Link to={trade.to} className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700">
+              {trade.label} →
+            </Link>
+          )}
+          <Link
+            to={`/sim/strategies?new=discretionary&symbols=${encodeURIComponent(`TW:${thesis.ticker}`)}&name=${encodeURIComponent(`${thesis.ticker} ${thesis.name}`)}`}
+            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
+          >
+            用這檔建立策略卡
+          </Link>
+        </div>
       )}
       {report.suggestedShares !== null && (
         <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">

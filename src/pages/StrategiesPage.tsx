@@ -1,13 +1,14 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { tradeLink } from '../lib/trades/tradeLink'
 import { STARTER_STRATEGIES, type StarterStrategy } from '../lib/backtest/starterStrategies'
 import { SimGuide } from '../components/SimGuide'
 import { useAppStore } from '../lib/storage/appStore'
-import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, resolveParams } from '../lib/backtest/templates'
+import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, parseSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
 import { liveGate, PAPER_RULES } from '../lib/calculations/strategyProgress'
 import { todayIsoDate } from '../lib/market/twse'
 import { StrategyForm, type StrategyFormValues } from '../components/forms/StrategyForm'
-import type { StrategyStatus } from '../lib/storage/schema'
+import { StrategyTemplateSchema, type StrategyStatus } from '../lib/storage/schema'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -31,7 +32,25 @@ export function StrategiesPage() {
 
   // null = form closed, 'new' = creating, otherwise the id being edited
   const navigate = useNavigate()
-  const [editing, setEditing] = useState<string | null>(null)
+  // From a research card: ?new=discretionary&symbols=TW:2317&name=…
+  const [search, setSearch] = useSearchParams()
+  const newTemplate = StrategyTemplateSchema.safeParse(search.get('new'))
+  const [draft] = useState<Partial<StrategyFormValues> | undefined>(() =>
+    newTemplate.success
+      ? {
+          template: newTemplate.data,
+          name: search.get('name') ?? '',
+          symbols: parseSymbolList(search.get('symbols') ?? ''),
+          entryRules:
+            newTemplate.data === 'discretionary'
+              ? '研究卡結論為「值得投資」、現價進入買進區時，依進出場建議分 3 批建倉（每批受每筆風險限制）'
+              : undefined,
+          exitRules:
+            newTemplate.data === 'discretionary' ? '研究卡建議減碼或出清、論點失效，或觸及建議停損' : undefined,
+        }
+      : undefined,
+  )
+  const [editing, setEditing] = useState<string | null>(draft ? 'new' : null)
   const [libraryOpen, setLibraryOpen] = useState(strategies.length === 0)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const today = todayIsoDate()
@@ -46,6 +65,7 @@ export function StrategiesPage() {
     if (editingStrategy) updateTradingStrategy(editingStrategy.id, values)
     else addTradingStrategy({ ...values, status: 'dev' })
     setEditing(null)
+    if (draft) setSearch({}, { replace: true })
   }
 
   return (
@@ -117,6 +137,7 @@ export function StrategiesPage() {
             <StrategyForm
               key={editing}
               initial={editingStrategy}
+              draft={editing === 'new' ? draft : undefined}
               defaultRiskPercent={policy.riskPerTradePercent}
               onSubmit={handleSubmit}
               onCancel={() => setEditing(null)}
@@ -175,6 +196,40 @@ export function StrategiesPage() {
               </p>
 
               <div className="mt-3 flex flex-wrap items-center gap-3">
+                {(() => {
+                  // The one step this card needs next.
+                  const btn = 'rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700'
+                  if (s.status === 'retired') return null
+                  if (s.status === 'live') {
+                    const first = s.symbols[0]
+                    return (
+                      <Link
+                        to={tradeLink({ ticker: first ? parseSymbol(first).code : '', side: 'buy', reason: 'strategy_entry', strategyId: s.id })}
+                        className={btn}
+                      >
+                        下一步：記錄實單 →
+                      </Link>
+                    )
+                  }
+                  if (def.backtestable && !gate.backtestPassed)
+                    return (
+                      <Link to={`/sim/backtest?strategy=${s.id}`} className={btn}>
+                        下一步：回測 →
+                      </Link>
+                    )
+                  if (!gate.paperProven)
+                    return (
+                      <Link to={`/sim/paper?strategy=${s.id}`} className={btn}>
+                        下一步：虛擬交易 →
+                      </Link>
+                    )
+                  if (!gate.allowed) return null
+                  return (
+                    <button type="button" onClick={() => updateTradingStrategy(s.id, { status: 'live' })} className={btn}>
+                      下一步：改為實單
+                    </button>
+                  )
+                })()}
                 {def.backtestable && (
                   <Link to={`/sim/backtest?strategy=${s.id}`} className={linkClass}>
                     回測

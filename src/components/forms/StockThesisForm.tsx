@@ -162,7 +162,14 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, pre
 
       {auto && <ResearchReportPanel auto={auto} fair={fair} price={auto.price} policy={policy} />}
 
-      {signals && <SignalPanel report={signals} price={values.currentPrice || auto?.technical?.close || 0} chipsDate={auto?.chips?.date} />}
+      {signals && (
+        <SignalPanel
+          report={signals}
+          price={values.currentPrice || auto?.technical?.close || 0}
+          chipsDate={auto?.chips?.date}
+          thesis={initialValues && 'id' in initialValues ? (initialValues as StockThesis) : undefined}
+        />
+      )}
 
       {(auto || legacy) && (
         <div className="rounded-md border-2 border-indigo-200 p-4 dark:border-indigo-900">

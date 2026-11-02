@@ -55,6 +55,7 @@ export interface SignalReport {
   suggestedShares: number | null
   sizingNote: string | null
   held: boolean
+  heldShares: number | null
   asOf: string | null
 }
 
@@ -408,6 +409,7 @@ export function buildSignals(input: SignalInput): SignalReport {
     suggestedShares: sizing?.shares ?? null,
     sizingNote: sizing?.note ?? null,
     held: holding !== null,
+    heldShares: holding?.shares ?? null,
     asOf: t?.date ?? null,
   }
 }

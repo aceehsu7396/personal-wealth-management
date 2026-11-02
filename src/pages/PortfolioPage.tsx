@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculations/portfolioRisk'
@@ -7,6 +8,7 @@ import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { FUND_TYPE_LABELS, isFund, isNavStale } from '../lib/calculations/fundRules'
 import { FundNavUpdater } from '../components/research/FundNavUpdater'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
+import { tradeLink } from '../lib/trades/tradeLink'
 import { RiskViolationList } from '../components/RiskViolationList'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
 import { StatCard } from '../components/StatCard'
@@ -62,7 +64,11 @@ export function PortfolioPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">持股與風控</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        組合建構與風險：配置偏離、單檔與產業集中度、匯率曝險、回撤熔斷與出場規則提醒。
+        組合建構與風險：配置偏離、單檔與產業集中度、匯率曝險、回撤熔斷與出場規則提醒。每季到{' '}
+        <Link to="/portfolio/review" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+          績效歸因
+        </Link>{' '}
+        檢討一次。
       </p>
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -215,6 +221,31 @@ export function PortfolioPage() {
                           ) : (
                             v.holding.priceUpdatedAt && `・價格 ${v.holding.priceUpdatedAt}`
                           )}
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap gap-2 text-xs">
+                          {v.holding.thesisId && theses.some((t) => t.id === v.holding.thesisId) && (
+                            <Link to={`/research/stocks?new=${encodeURIComponent(v.holding.ticker)}`} className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+                              研究卡 →
+                            </Link>
+                          )}
+                          {v.holding.strategyId && (
+                            <Link to="/sim/strategies" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+                              策略卡 →
+                            </Link>
+                          )}
+                          <Link
+                            to={tradeLink({
+                              ticker: v.holding.ticker,
+                              side: 'buy',
+                              reason: isSatellite(v.holding.sleeve) ? (v.holding.strategyId ? 'strategy_entry' : 'tranche_2') : 'core_dca',
+                              thesisId: v.holding.thesisId,
+                              strategyId: v.holding.strategyId,
+                              price: v.holding.currentPrice,
+                            })}
+                            className="font-medium text-indigo-700 hover:underline dark:text-indigo-400"
+                          >
+                            記錄交易 →
+                          </Link>
                         </div>
                       </td>
                       <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">

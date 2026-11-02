@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
+import { signalTradeLink } from '../lib/trades/tradeLink'
 import { fetchStockData } from '../lib/screener/stockData'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
@@ -20,6 +21,7 @@ import { describeAiError } from '../lib/ai/client'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
 import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { StatCard } from '../components/StatCard'
+import { IndustryAnalysisPanel } from '../components/research/IndustryAnalysisPanel'
 import type { ThesisStatus } from '../lib/storage/schema'
 
 const cardClass =
@@ -148,7 +150,7 @@ export function StocksPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">個股</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">研究卡</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         輸入台股或 ETF 代號，研究卡會自動體檢（免費公開資料、不用 AI）並給出觀察評等；你只要選結論。結論為「值得投資」且通過檢核，才進入交易部位建倉。
       </p>
@@ -296,6 +298,14 @@ export function StocksPage() {
                         <>
                           <ActionBadge action={signals.action} title={signals.headline} />
                           <div className="mt-1 max-w-48 text-xs text-gray-500 dark:text-gray-400">{signals.headline}</div>
+                          {(() => {
+                            const link = signalTradeLink(signals, t)
+                            return link ? (
+                              <Link to={link.to} className="mt-1 inline-block text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+                                {link.label} →
+                              </Link>
+                            ) : null
+                          })()}
                         </>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
@@ -355,6 +365,16 @@ export function StocksPage() {
           紀律：每季財報後 2 週內更新研究卡並逐條檢查失效條件；合理價只能因基本面事實調整，不能因股價上漲而上調。
         </p>
       </div>
+
+      <details className={cardClass}>
+        <summary className="cursor-pointer text-lg font-semibold text-gray-900 dark:text-gray-100">產業分析（AI，選用）</summary>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          先看懂產業，再挑公司：AI 上網整理產業生命週期、五力、供應鏈、趨勢與代表公司，作為判斷研究卡的素材。需要付費的 API 金鑰；報告不是買進名單，結論仍由你判斷（手冊 06 章）。
+        </p>
+        <div className="mt-4">
+          <IndustryAnalysisPanel />
+        </div>
+      </details>
     </div>
   )
 }

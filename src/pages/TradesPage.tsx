@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { prefillFromSearch } from '../lib/trades/tradeLink'
 import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { JourneyNotice } from '../components/JourneyNotice'
@@ -37,6 +39,9 @@ export function TradesPage() {
   const updateHolding = useAppStore((s) => s.updateHolding)
   const updateStockThesis = useAppStore((s) => s.updateStockThesis)
 
+  const [search, setSearch] = useSearchParams()
+  // A research card or strategy card link opens the form pre-filled once.
+  const [prefill] = useState(() => prefillFromSearch(search, holdings, theses, strategies))
   const [reviewing, setReviewing] = useState<string | null>(null)
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
@@ -174,7 +179,19 @@ export function TradesPage() {
           檢核依目前的投資政策、總經判斷、研究卡與持股即時計算。交易會同步更新持股的股數與平均成本。
         </p>
         <div className="mt-4">
-          <TradeForm ctx={ctx} onSubmit={handleSubmit} />
+          {prefill && (
+            <p className="mb-3 rounded-md bg-indigo-50 px-3 py-2 text-xs text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">
+              已帶入 {prefill.ticker} 的{prefill.side === 'buy' ? '買進' : '賣出'}資料（理由：{TRADE_REASON_LABELS[prefill.reason]}）。請確認成交價、股數與日期，並回答偏誤自問；檢核未通過時要寫例外理由。
+            </p>
+          )}
+          <TradeForm
+            ctx={ctx}
+            prefill={prefill}
+            onSubmit={(submission) => {
+              handleSubmit(submission)
+              if (prefill) setSearch({}, { replace: true })
+            }}
+          />
         </div>
       </div>
 

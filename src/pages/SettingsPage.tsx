@@ -1,6 +1,7 @@
 import { ProfileForm } from '../components/forms/ProfileForm'
 import { GuardrailsForm } from '../components/forms/GuardrailsForm'
 import { DataManagement } from '../components/DataManagement'
+import { DemoControl } from '../components/DemoBanner'
 import { AiKeySettings } from '../components/AiKeySettings'
 
 export function SettingsPage() {
@@ -39,6 +40,13 @@ export function SettingsPage() {
         </p>
         <div className="mt-4">
           <AiKeySettings />
+        </div>
+      </div>
+
+      <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">示範資料</h2>
+        <div className="mt-4">
+          <DemoControl />
         </div>
       </div>
 
