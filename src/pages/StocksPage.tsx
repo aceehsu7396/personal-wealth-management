@@ -122,12 +122,12 @@ export function StocksPage() {
         }
         for (const t of pricesOnly) {
           if (cancelled || !t.auto) return
-          const { technical, technicalAt, price, priceDate } = await refreshTechnical(t.ticker, today)
+          const { technical, technicalAt, chips, price, priceDate } = await refreshTechnical(t.ticker, today)
           if (cancelled) return
           const current = useAppStore.getState().stockTheses.find((x) => x.id === t.id)
           if (!current?.auto) continue
           updateStockThesis(t.id, {
-            auto: { ...current.auto, technical, technicalAt, price: price ?? current.auto.price, priceDate: priceDate ?? current.auto.priceDate },
+            auto: { ...current.auto, technical, technicalAt, chips: chips ?? current.auto.chips, price: price ?? current.auto.price, priceDate: priceDate ?? current.auto.priceDate },
             currentPrice: price ?? current.currentPrice,
           })
         }

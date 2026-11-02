@@ -26,7 +26,7 @@ import {
   type SizingMode,
   type StatsSplit,
 } from '../lib/backtest/engine'
-import { loadPriceData } from '../lib/backtest/data'
+import { loadChipData, loadPriceData } from '../lib/backtest/data'
 import { backtestPasses } from '../lib/calculations/strategyProgress'
 import { calmarOf, outOfSampleVerdict } from '../lib/backtest/passRule'
 import { importCsvSeries, isoDaysAgo, loadSeries } from '../lib/market/priceHistory'
@@ -165,6 +165,9 @@ export function BacktestPage() {
     setSavedId(null)
     try {
       const data = await loadPriceData(symbols, start, end, progress)
+      const chips = def.chipData
+        ? await loadChipData(symbols, start, (p) => setStatus({ kind: 'loading', message: `下載 ${formatSymbol(p.symbol)} 法人買賣超 ${p.done + 1}/${p.total}（FinMind）` }))
+        : undefined
       setStatus({ kind: 'loading', message: '計算中…' })
       const input: BacktestInput = {
         template,
@@ -175,6 +178,7 @@ export function BacktestPage() {
         initialCapital: capital,
         costs: marketCosts(discount, usFee),
         sizing: { mode: sizing, riskPercent: risk },
+        chips,
       }
       const strategy = runBacktest(input)
       if (strategy.dates.length < 2) throw new Error('這段期間沒有足夠的價格資料')

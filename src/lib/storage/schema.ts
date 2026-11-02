@@ -620,6 +620,7 @@ export const StrategyTemplateSchema = z.enum([
   'donchian',
   'rsi_reversion',
   'momentum_rotation',
+  'chip_flow',
   'discretionary',
 ])
 export type StrategyTemplate = z.infer<typeof StrategyTemplateSchema>

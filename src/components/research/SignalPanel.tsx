@@ -31,7 +31,22 @@ const fmt = (v: number) => (v >= 100 ? v.toFixed(1) : v.toFixed(2))
 
 // Entry/exit advice under the health check: the action, the price ladder
 // with today's price in place, and the observed signals.
-export function SignalPanel({ report, price }: { report: SignalReport; price: number }) {
+function SignalList({ signals }: { signals: SignalReport['signals'] }) {
+  return (
+    <ul className="space-y-1 text-sm">
+      {signals.map((s) => (
+        <li key={s.key + s.label}>
+          <span className={`font-medium ${TONE_STYLE[s.tone]}`} title={TONE_LABEL[s.tone]}>
+            {TONE_MARK[s.tone]} {s.label}
+          </span>
+          <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">{s.detail}</span>
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+export function SignalPanel({ report, price, chipsDate }: { report: SignalReport; price: number; chipsDate?: string }) {
   // Today's price slots in between the levels (sorted high → low).
   const at = report.levels.findIndex((l) => l.price < price)
   const ladder = [...report.levels]
@@ -93,16 +108,15 @@ export function SignalPanel({ report, price }: { report: SignalReport; price: nu
         )}
         <div>
           <p className="mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">觀察到的訊號</p>
-          <ul className="space-y-1 text-sm">
-            {report.signals.map((s) => (
-              <li key={s.key + s.label}>
-                <span className={`font-medium ${TONE_STYLE[s.tone]}`} title={TONE_LABEL[s.tone]}>
-                  {TONE_MARK[s.tone]} {s.label}
-                </span>
-                <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">{s.detail}</span>
-              </li>
-            ))}
-          </ul>
+          <SignalList signals={report.signals.filter((s) => s.group !== 'chips')} />
+          {report.signals.some((s) => s.group === 'chips') && (
+            <>
+              <p className="mt-3 mb-1 text-xs font-medium text-gray-500 dark:text-gray-400">
+                籌碼面{chipsDate ? `（${chipsDate}）` : ''}・只供參考，不影響建議動作
+              </p>
+              <SignalList signals={report.signals.filter((s) => s.group === 'chips')} />
+            </>
+          )}
           {!report.asOf && <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">尚無技術資料，按「更新體檢」後會帶入。</p>}
         </div>
       </div>

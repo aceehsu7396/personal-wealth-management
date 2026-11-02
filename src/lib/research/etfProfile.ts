@@ -12,6 +12,8 @@ export interface PriceRow {
   min: number
   close: number
   Trading_money: number
+  // Traded shares (FinMind TaiwanStockPrice); absent in older fixtures.
+  Trading_Volume?: number
 }
 
 export interface EtfProfile {

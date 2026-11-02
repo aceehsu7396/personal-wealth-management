@@ -15,6 +15,7 @@ import {
 } from './fundamentals'
 import { analyzeEtf, type EtfProfile, type PriceRow } from './etfProfile'
 import { technicalSnapshot, type TechnicalSnapshot } from './technical'
+import { fetchChipSnapshot, type ChipSnapshot } from './chips'
 
 // The research card's automatic data: one fetch from FinMind, computed
 // into a small snapshot stored on the card (no AI, no key).
@@ -32,11 +33,25 @@ export interface AutoResearch {
   technical?: TechnicalSnapshot | null
   // When the technical snapshot was last checked (YYYY-MM-DD).
   technicalAt?: string
+  // Institutional flows, margin and foreign ownership (absent on older snapshots).
+  chips?: ChipSnapshot | null
 }
 
 // About 14 months of daily prices: enough for a 200-day average and the
 // 12-month momentum.
 const PRICE_DAYS = 420
+// About four months of chip data: 60 trading days plus room.
+const CHIP_DAYS = 130
+
+// Chip data is an extra; a failure (e.g. the free quota) leaves it out.
+async function chipsFor(code: string, today: string, prices: PriceRow[], fetcher?: Fetcher): Promise<ChipSnapshot | null> {
+  try {
+    const volumes = [...prices].sort((a, b) => a.date.localeCompare(b.date)).map((p) => p.Trading_Volume ?? 0)
+    return await fetchChipSnapshot(code, shiftDays(today, CHIP_DAYS), volumes, fetcher)
+  } catch {
+    return null
+  }
+}
 
 // Refresh the snapshot when it is older than this.
 export const AUTO_REFRESH_DAYS = 7
@@ -92,6 +107,7 @@ export async function buildAutoResearch(code: string, today: string, fetcher?: F
       etf: analyzeEtf({ prices, dividends, benchmark, today }),
       technical: technicalSnapshot(prices),
       technicalAt: today,
+      chips: await chipsFor(code, today, prices, fetcher),
     }
   }
 
@@ -115,6 +131,7 @@ export async function buildAutoResearch(code: string, today: string, fetcher?: F
     etf: null,
     technical: technicalSnapshot(recent),
     technicalAt: today,
+    chips: await chipsFor(code, today, recent, fetcher),
   }
 }
 
@@ -171,7 +188,8 @@ export async function refreshedFields(
 export async function refreshTechnical(code: string, today: string, fetcher?: Fetcher) {
   const prices = await fetchDataset<PriceRow>('TaiwanStockPrice', code, shiftDays(today, PRICE_DAYS), fetcher)
   const technical = technicalSnapshot(prices)
-  return { technical, technicalAt: today, price: technical?.close ?? null, priceDate: technical?.date ?? null }
+  const chips = await chipsFor(code, today, prices, fetcher)
+  return { technical, technicalAt: today, chips, price: technical?.close ?? null, priceDate: technical?.date ?? null }
 }
 
 // Whether the card's technical snapshot was last checked before today.

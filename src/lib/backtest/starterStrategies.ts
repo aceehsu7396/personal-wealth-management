@@ -93,6 +93,22 @@ export const STARTER_STRATEGIES: StarterStrategy[] = [
     risk: '多頭結束時第一次回檔可能就是崩跌的開始，停損一定要設',
   },
   {
+    id: 'bluechip-chip-flow',
+    card: {
+      name: '權值股外資籌碼濾網',
+      template: 'chip_flow',
+      params: { flowDays: 20, trendDays: 0, atrStop: 0 },
+      symbols: ['TW:2330', 'TW:2317', 'TW:2454'],
+      edge: '外資是台股最大的資金來源；外資連續賣出的期間，個股常有較深的回檔。外資近 20 日淨買超才持有，目的是少賠，不是預測漲跌；實測效果因個股而異，一定要先回測自己的標的。',
+      entryRules: '外資近 20 日累計淨買超 > 0，隔日開盤買進',
+      exitRules: '外資近 20 日累計轉為淨賣超，隔日開盤賣出',
+      riskPerTradePercent: 1,
+      notes: '實測 2016～2026 年（隔日開盤成交、還原除權息）：2330、2317、2881 的最大回撤變小約 15～24 個百分點，但報酬都低於一直持有；卡瑪比率只有 2317 優於一直持有。10 年約 50～60 次來回，手續費折扣影響很大（手冊 10 §1.2）。籌碼資料只支援台股。',
+    },
+    suits: '持有個股、想在法人持續賣出時先避開',
+    risk: '換手頻繁、成本高；外資買賣超和股價同步，轉折時會晚一步',
+  },
+  {
     id: 'tsmc-trend',
     card: {
       name: '半導體龍頭趨勢',

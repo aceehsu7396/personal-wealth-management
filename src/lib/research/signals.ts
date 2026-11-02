@@ -3,6 +3,7 @@ import type { ThesisEvaluation } from '../calculations/thesisScoring'
 import type { MacroAssessment } from '../calculations/macroRegime'
 import { STANCE_LABELS } from '../calculations/macroRegime'
 import type { TechnicalSnapshot } from './technical'
+import type { ChipSnapshot } from './chips'
 
 // Entry and exit advice for a research card (handbook chapter 07 §2.6):
 // price levels from the fair values (chapter 08 §2.3 tranches), trend and
@@ -31,6 +32,8 @@ export interface ObservedSignal {
   tone: SignalTone
   label: string
   detail: string
+  // Chip (籌碼) signals are listed under their own heading.
+  group?: 'chips'
 }
 
 export interface PriceLevel {
@@ -148,6 +151,60 @@ export function technicalSignals(t: TechnicalSnapshot): ObservedSignal[] {
       tone: main > 0 && (t.ret6m ?? 0) >= 0 ? 'bull' : main < 0 && (t.ret6m ?? 0) <= 0 ? 'bear' : 'neutral',
       label: main >= 0 ? '動能向上' : '動能向下',
       detail: parts.filter(Boolean).join('，'),
+    })
+  }
+  return out
+}
+
+// Foreign ownership moving by at least this many points over 60 days.
+const RATIO_MOVE_POINTS = 0.5
+// Margin balance moving by at least this much over 20 days (%).
+const MARGIN_MOVE_PERCENT = 10
+
+const lotsText = (n: number) => `${n > 0 ? '買超' : '賣超'} ${Math.abs(n).toLocaleString('zh-TW')} 張`
+
+// Observed chip signals (handbook chapter 10 §1.2). They barely predict
+// returns, so they never change the action, only inform it.
+export function chipSignals(c: ChipSnapshot): ObservedSignal[] {
+  const out: ObservedSignal[] = []
+  if (c.foreign20 !== 0) {
+    const share = c.foreign20OfVolume !== null ? `，占成交量 ${Math.abs(c.foreign20OfVolume)}%` : ''
+    const streak = Math.abs(c.foreignStreak) >= 3 ? `，連續 ${Math.abs(c.foreignStreak)} 日${c.foreignStreak > 0 ? '買超' : '賣超'}` : ''
+    out.push({
+      key: 'foreign',
+      group: 'chips',
+      tone: c.foreign20 > 0 ? 'bull' : 'bear',
+      label: `外資近 20 日${c.foreign20 > 0 ? '買超' : '賣超'}`,
+      detail: `${lotsText(c.foreign20)}${share}${streak}；近 60 日${lotsText(c.foreign60)}`,
+    })
+  }
+  if (c.trust20 !== 0) {
+    out.push({
+      key: 'trust',
+      group: 'chips',
+      tone: c.trust20 > 0 ? 'bull' : 'bear',
+      label: `投信近 20 日${c.trust20 > 0 ? '買超' : '賣超'}`,
+      detail: `${lotsText(c.trust20)}；近 60 日${lotsText(c.trust60)}`,
+    })
+  }
+  if (c.foreignRatio !== null && c.foreignRatioChange60 !== null) {
+    const move = c.foreignRatioChange60
+    out.push({
+      key: 'foreignRatio',
+      group: 'chips',
+      tone: move >= RATIO_MOVE_POINTS ? 'bull' : move <= -RATIO_MOVE_POINTS ? 'bear' : 'neutral',
+      label: `外資持股 ${c.foreignRatio.toFixed(1)}%`,
+      detail: `近 60 日${move >= 0 ? '增加' : '減少'} ${Math.abs(move).toFixed(2)} 個百分點`,
+    })
+  }
+  if (c.marginChange20 !== null) {
+    const big = Math.abs(c.marginChange20) >= MARGIN_MOVE_PERCENT
+    out.push({
+      key: 'margin',
+      group: 'chips',
+      tone: 'neutral',
+      label: big ? `融資 20 日${c.marginChange20 > 0 ? '大增' : '大減'} ${Math.abs(c.marginChange20)}%` : `融資 20 日 ${c.marginChange20 > 0 ? '+' : ''}${c.marginChange20}%`,
+      detail: `${c.shortMarginRatio !== null && c.shortMarginRatio >= 0.1 ? `券資比 ${c.shortMarginRatio}%；` : ''}實測融資增加並不偏空，只用來看散戶參與程度`,
     })
   }
   return out
@@ -326,7 +383,13 @@ export function buildSignals(input: SignalInput): SignalReport {
   const price = thesis.currentPrice > 0 ? thesis.currentPrice : (t?.close ?? 0)
   const stop = stopLossOf(t)
   const isEtf = thesis.kind === 'etf'
-  const signals = [...(t ? technicalSignals(t) : []), macroSignal(macro), ...fundamentalSignals(thesis, evaluation)]
+  const chips = thesis.auto?.chips
+  const signals = [
+    ...(t ? technicalSignals(t) : []),
+    macroSignal(macro),
+    ...fundamentalSignals(thesis, evaluation),
+    ...(chips ? chipSignals(chips) : []),
+  ]
   const decision = isEtf ? decideEtf(input, t) : decideStock(input, price, t)
 
   let sizing: { shares: number; note: string } | null = null

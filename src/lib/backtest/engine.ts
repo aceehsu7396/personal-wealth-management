@@ -43,7 +43,12 @@ export interface BacktestInput {
   initialCapital: number
   costs: BacktestCosts
   sizing: { mode: SizingMode; riskPercent: number }
+  // Daily foreign net buying (shares) per symbol, for the chip template.
+  chips?: Record<string, ChipSeries>
 }
+
+// date → foreign net shares bought that day.
+export type ChipSeries = Record<string, number>
 
 export type ExitReason = 'signal' | 'stop' | 'rotation' | 'end'
 
@@ -96,7 +101,34 @@ interface SymbolData {
 
 type Pending = { side: 'buy' | 'sell'; reason: ExitReason; atrAtSignal?: number }
 
-function prepare(template: StrategyTemplate, params: Record<string, number>, bars: Bar[]): SymbolData {
+// Rolling N-day sum of foreign net buying on each bar; NaN until N days of
+// chip data exist (bars without data count as missing, not zero).
+function rollingFlow(bars: Bar[], chips: ChipSeries | undefined, days: number): number[] {
+  const out = new Array<number>(bars.length).fill(NaN)
+  if (!chips) return out
+  let sum = 0
+  let count = 0
+  const window: (number | undefined)[] = []
+  for (let i = 0; i < bars.length; i++) {
+    const v = chips[bars[i].date]
+    window.push(v)
+    if (v !== undefined) {
+      sum += v
+      count += 1
+    }
+    if (window.length > days) {
+      const old = window.shift()
+      if (old !== undefined) {
+        sum -= old
+        count -= 1
+      }
+    }
+    if (window.length === days && count === days) out[i] = sum
+  }
+  return out
+}
+
+function prepare(template: StrategyTemplate, params: Record<string, number>, bars: Bar[], chips?: ChipSeries): SymbolData {
   const closes = bars.map((b) => b.close)
   const ind: Record<string, number[]> = {}
   if (template === 'ma_cross') {
@@ -108,6 +140,9 @@ function prepare(template: StrategyTemplate, params: Record<string, number>, bar
   } else if (template === 'rsi_reversion') {
     ind.rsi = rsi(closes, params.rsiDays)
     ind.trend = sma(closes, params.trendDays)
+  } else if (template === 'chip_flow') {
+    ind.flow = rollingFlow(bars, chips, params.flowDays)
+    if (params.trendDays > 0) ind.trend = sma(closes, params.trendDays)
   }
   return { bars, at: new Map(bars.map((b, i) => [b.date, i])), closes, atr: atr(bars), ind }
 }
@@ -136,6 +171,13 @@ function signal(
       return { side: 'buy', reason: 'signal', atrAtSignal: d.atr[i] }
     }
     if (pos && (r > params.exitAbove || i - pos.entryBar >= params.maxHoldDays)) return { side: 'sell', reason: 'signal' }
+  } else if (template === 'chip_flow') {
+    const flow = ind.flow[i]
+    if (Number.isNaN(flow)) return null
+    const trendOk = !ind.trend || (!Number.isNaN(ind.trend[i]) && closes[i] > ind.trend[i])
+    const hold = flow > 0 && trendOk
+    if (!pos && hold) return { side: 'buy', reason: 'signal', atrAtSignal: d.atr[i] }
+    if (pos && !hold) return { side: 'sell', reason: 'signal' }
   }
   return null
 }
@@ -148,7 +190,7 @@ export function runBacktest(input: BacktestInput): BacktestResult {
   const { template, costs } = input
   const params = resolveParams(template, input.params)
   const symbols = Object.keys(input.data).filter((s) => input.data[s].length > 0)
-  const data = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, input.data[s])]))
+  const data = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, input.data[s], input.chips?.[s])]))
   const dates = [...new Set(symbols.flatMap((s) => input.data[s].map((b) => b.date)))]
     .filter((d) => d >= input.start && d <= input.end)
     .sort()
@@ -583,11 +625,12 @@ export function latestSignals(
   data: Record<string, Bar[]>,
   held: Record<string, { shares: number; openedAt: string }>,
   equity: number,
+  chips?: Record<string, ChipSeries>,
 ): SignalSuggestion[] {
   const params = resolveParams(template, rawParams)
   const symbols = Object.keys(data).filter((s) => data[s].length > 0)
   if (symbols.length === 0) return []
-  const prepared = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, data[s])]))
+  const prepared = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, data[s], chips?.[s])]))
   const out: SignalSuggestion[] = []
   const last = (s: string) => prepared[s].bars[prepared[s].bars.length - 1]
   const stopFor = (s: string) => {

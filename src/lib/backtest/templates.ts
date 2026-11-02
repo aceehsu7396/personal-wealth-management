@@ -41,6 +41,8 @@ export interface TemplateDefinition {
   multiSymbol: boolean
   // Templates the backtester can run (discretionary is a written plan only).
   backtestable: boolean
+  // Needs daily institutional flows (Taiwan symbols only).
+  chipData?: boolean
 }
 
 const p = (key: string, label: string, def: number, min: number, max: number, step: number, help: ParamHelp): TemplateParam => ({
@@ -221,6 +223,33 @@ export const STRATEGY_TEMPLATES: Record<StrategyTemplate, TemplateDefinition> = 
     ],
     multiSymbol: true,
     backtestable: true,
+  },
+  chip_flow: {
+    label: '外資籌碼濾網',
+    origin: '籌碼面（法人資金流）',
+    summary: '外資近 N 日累計買超才持有，轉為賣超就出場，可選擇再搭配均線。目的不是多賺，而是在法人持續賣出時避開（手冊 10 §1.2）。只支援台股。',
+    entry: '收盤時外資近 N 日累計淨買超 > 0（有設均線時並站上均線），隔日開盤買進',
+    exit: '外資近 N 日累計轉為淨賣超（或跌破均線），隔日開盤賣出；可另設 ATR 停損',
+    params: [
+      p('flowDays', '外資累計天數（日）', 20, 1, 120, 1, {
+        meaning: '把外資（含外資自營商）最近 N 個交易日的買賣超加總，大於 0 代表這段期間外資淨買進。',
+        higher: '天數越多，訊號越穩定、進出越少，但轉向越慢，大跌初期可能還在持有。',
+        lower: '天數越少，反應越快，但外資每天的買賣很雜，進出會非常頻繁，成本與稅吃掉報酬。',
+        typical: '常見 5、10、20、60 日；預設 20 日（約一個月）。實測 2016～2026 年，20 日在 10 年約 50～60 次來回；改成 60 日進出較少，但 4 檔權值股的報酬與回撤都比 20 日差。',
+        pitfall: '外資買賣超大多和股價同步，不是領先指標；不要期待它預測漲跌，它的作用是在法人持續賣出時讓你先離場。',
+      }),
+      p('trendDays', '搭配均線（日，0 不用）', 0, 0, 300, 1, {
+        meaning: '設定後，除了外資買超，還要收盤站上這條均線才持有。',
+        higher: '均線越長，只排除長期空頭；搭配後持有時間更短。',
+        lower: '設 0 表示只看外資籌碼。',
+        typical: '0 或 200。實測兩個條件同時成立才持有，報酬與回撤都沒有比單用外資濾網更好。',
+        pitfall: '條件疊越多，持有時間越短，很容易錯過多頭；每加一個條件都要重新看樣本外結果。',
+      }),
+      p('atrStop', '停損：ATR 倍數（0 不設）', 0, 0, 10, 0.5, atrStopHelp('預設 0：外資轉為賣超本身就是出場訊號；需要固定停損時常用 2～3 倍。')),
+    ],
+    multiSymbol: false,
+    backtestable: true,
+    chipData: true,
   },
   discretionary: {
     label: '自訂（文字規則）',

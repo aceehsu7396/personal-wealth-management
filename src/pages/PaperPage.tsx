@@ -12,7 +12,7 @@ import {
   type Quote,
 } from '../lib/paper/paperAccount'
 import { latestSignals, type SignalSuggestion } from '../lib/backtest/engine'
-import { loadPriceData } from '../lib/backtest/data'
+import { loadChipData, loadPriceData } from '../lib/backtest/data'
 import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList } from '../lib/backtest/templates'
 import { PAPER_RULES } from '../lib/calculations/strategyProgress'
 import { fetchLatestTwseBar, isoDaysAgo, loadSeries, seriesForBacktest, TWSE_REQUEST_GAP_MS } from '../lib/market/priceHistory'
@@ -214,7 +214,10 @@ export function PaperPage() {
       const symbols = strategy.symbols
       const data = await loadPriceData(symbols, isoDaysAgo(today, 1), today, (p) => setBusy(`下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}`))
       const held = Object.fromEntries(account.positions.map((p) => [p.symbol, { shares: p.shares, openedAt: p.openedAt }]))
-      setSignals(latestSignals(strategy.template, strategy.params, data, held, equityOf(account)))
+      const chips = STRATEGY_TEMPLATES[strategy.template].chipData
+        ? await loadChipData(symbols, isoDaysAgo(today, 1), (p) => setBusy(`下載 ${formatSymbol(p.symbol)} 法人買賣超 ${p.done + 1}/${p.total}`))
+        : undefined
+      setSignals(latestSignals(strategy.template, strategy.params, data, held, equityOf(account), chips))
     })
   }
 
