@@ -89,14 +89,25 @@ async function fredLatest(id: string): Promise<IndexPoint> {
 }
 
 // Yahoo Finance's public chart endpoint (no key), dated in exchange time.
+// The last bar is the session in progress until the regular close.
 async function yahooLatest(symbol: string): Promise<IndexPoint> {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`
   const json = (await (await get(url)).json()) as {
-    chart: { result: { meta: { gmtoffset: number }; timestamp: number[]; indicators: { quote: { close: (number | null)[] }[] } }[] }
+    chart: {
+      result: {
+        meta: { gmtoffset: number; currentTradingPeriod?: { regular: { start: number; end: number } } }
+        timestamp: number[]
+        indicators: { quote: { close: (number | null)[] }[] }
+      }[]
+    }
   }
   const r = json.chart.result[0]
+  const session = r.meta.currentTradingPeriod?.regular
+  const open = session && Date.now() / 1000 < session.end ? session.start : Infinity
   const points = r.timestamp
-    .map((t, i) => ({ date: new Date((t + r.meta.gmtoffset) * 1000).toISOString().slice(0, 10), close: r.indicators.quote[0].close[i] }))
+    .map((t, i) => ({ t, date: new Date((t + r.meta.gmtoffset) * 1000).toISOString().slice(0, 10), close: r.indicators.quote[0].close[i] }))
+    .filter((p) => p.t < open)
+    .map(({ date, close }) => ({ date, close }))
     .filter((p): p is IndexPoint => p.close !== null && p.close > 0)
   if (points.length === 0) throw new Error(`Yahoo ${symbol} 沒有資料`)
   return points[points.length - 1]
