@@ -31,6 +31,16 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run test
+      # Start from the data the live site serves now: a source that fails
+      # below then keeps yesterday's file instead of leaving the page empty.
+      - name: Restore last published data
+        run: |
+          mkdir -p public/data
+          for f in macro stocks funds indices; do
+            curl -sf -o "public/data/$f.json" "https://aceehsu7396.github.io/personal-wealth-management/data/$f.json" \
+              || rm -f "public/data/$f.json"
+          done
+        continue-on-error: true
       # Public macro data (FRED, 國發會, 主計總處, 證交所, 富邦) needs no API key
       # but blocks browsers, so it is fetched here and served with the site.
       # A failed fetch must not block the deploy; the page then says so.

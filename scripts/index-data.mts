@@ -174,6 +174,8 @@ async function main() {
   const flows = (await attempt('FinMind 三大法人', errors, () => fetchFlows(flowStart))) ?? []
   const margin = (await attempt('FinMind 融資餘額', errors, () => fetchMargin(flowStart))) ?? []
 
+  // Nothing fetched: keep the previous file rather than overwrite it.
+  if (!series.TAIEX?.length && !series.GSPC?.length) throw new Error(`沒有讀到任何指數：${errors.join('；')}`)
   const data: IndicesData = { generatedAt: new Date().toISOString(), errors, series, checks, breadth, flows, margin }
   mkdirSync('public/data', { recursive: true })
   writeFileSync(OUT, JSON.stringify(data))

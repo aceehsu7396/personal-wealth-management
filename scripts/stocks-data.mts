@@ -14,11 +14,55 @@ const GAP_MS = 2000
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// The open API sometimes answers with CSV (seen while TWSE refreshes the
+// day's data), so a non-JSON body is read as CSV rows keyed by header.
 async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { headers: { 'User-Agent': UA } })
-  if (!response.ok) throw new Error(`${response.status} ${url}`)
-  return (await response.json()) as T
+  let lastError: Error | null = null
+  for (let tryNo = 0; tryNo < 3; tryNo++) {
+    if (tryNo > 0) await sleep(5000)
+    const response = await fetch(url, { headers: { 'User-Agent': UA, Accept: 'application/json' } })
+    if (!response.ok) {
+      lastError = new Error(`${response.status} ${url}`)
+      continue
+    }
+    const text = (await response.text()).replace(/^\uFEFF/, '')
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      const rows = csvRows(text)
+      if (rows.length > 0) return rows as T
+      lastError = new Error(`不是 JSON 也不是 CSV：${url}`)
+    }
+  }
+  throw lastError!
 }
+
+function csvLine(line: string): string[] {
+  const cells: string[] = []
+  let cell = ''
+  let quoted = false
+  for (const ch of line) {
+    if (ch === '"') quoted = !quoted
+    else if (ch === ',' && !quoted) {
+      cells.push(cell)
+      cell = ''
+    } else cell += ch
+  }
+  cells.push(cell)
+  return cells.map((c) => c.trim())
+}
+
+function csvRows(text: string): Record<string, string>[] {
+  const [header, ...lines] = text.trim().split(/\r?\n/)
+  if (!header?.includes(',')) return []
+  const names = csvLine(header)
+  return lines.map((l) => Object.fromEntries(csvLine(l).map((v, i) => [names[i], v])))
+}
+
+// STOCK_DAY_ALL's CSV uses Chinese headers for the JSON fields.
+const DAY_ALL_CSV: Record<string, string> = { 日期: 'Date', 證券代號: 'Code', 證券名稱: 'Name', 成交金額: 'TradeValue', 收盤價: 'ClosingPrice' }
+const dayAllRow = (r: Record<string, string>) =>
+  'Code' in r ? r : Object.fromEntries(Object.entries(r).map(([k, v]) => [DAY_ALL_CSV[k] ?? k, v]))
 
 function num(text: string | undefined): number | null {
   if (text === undefined) return null
@@ -26,8 +70,9 @@ function num(text: string | undefined): number | null {
   return text.trim() !== '' && Number.isFinite(v) ? v : null
 }
 
-// "1151014" (ROC) → "2026-10-14"
-function rocDate(roc: string): string {
+// "1151014" or "115/10/14" (ROC) → "2026-10-14"
+function rocDate(text: string): string {
+  const roc = text.replace(/\D/g, '')
   return `${Number(roc.slice(0, 3)) + 1911}-${roc.slice(3, 5)}-${roc.slice(5, 7)}`
 }
 
@@ -67,7 +112,7 @@ function monthsAgo(date: string, months: number): string {
 async function main() {
   const errors: string[] = []
   type Daily = { Date: string; Code: string; Name: string; TradeValue: string; ClosingPrice: string }
-  const daily = await getJson<Daily[]>(`${OPENAPI}/exchangeReport/STOCK_DAY_ALL`)
+  const daily = (await getJson<Record<string, string>[]>(`${OPENAPI}/exchangeReport/STOCK_DAY_ALL`)).map(dayAllRow) as Daily[]
   const date = rocDate(daily[0].Date)
 
   const attempt = async <T,>(label: string, task: () => Promise<T>): Promise<T | null> => {
