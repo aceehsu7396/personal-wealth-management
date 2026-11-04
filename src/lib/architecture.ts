@@ -49,9 +49,9 @@ export const ARCH_NODES: Record<string, ArchNode> = {
   },
   macro: {
     id: 'macro',
-    title: '總經三支柱',
-    what: '每月依成長、通膨、流動性、情緒判斷景氣體制與順逆風。',
-    why: '總經只調「多少」（股債比例、交易部位能否新建倉），不決定「買什麼」。',
+    title: '總經與大盤',
+    what: '每月依成長、通膨、流動性、情緒判斷景氣體制與順逆風；每天依均線與回檔判讀台股、美股大盤的趨勢狀態。',
+    why: '總經與大盤只調「多少」（股債比例、交易部位能否新建倉），不決定「買什麼」；核心部位不因每日走勢調整。',
     page: { to: '/research/market', label: '研究・市場' },
     handbook: { slug: '05', label: '05 總體經濟與政策' },
     steps: ['3.1', '3.2'],

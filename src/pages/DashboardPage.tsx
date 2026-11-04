@@ -5,6 +5,7 @@ import { computeProgressPercent } from '../lib/calculations/progress'
 import { emergencyFundTarget } from '../lib/calculations/journey'
 import { StatCard } from '../components/StatCard'
 import { StrategyOverview } from '../components/StrategyOverview'
+import { MarketGlance } from '../components/market/DailyMarketPanel'
 import { useJourney } from '../lib/useJourney'
 import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
@@ -110,6 +111,8 @@ export function DashboardPage() {
           />
         </Link>
       </div>
+
+      <MarketGlance />
 
       <StrategyOverview />
 

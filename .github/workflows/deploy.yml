@@ -3,9 +3,11 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-  # Daily at 07:00 Taiwan time: refresh the macro, stock and fund NAV data.
+  # Daily at 07:00 Taiwan time (after the US close) and weekdays at 14:30
+  # (after the Taiwan close): refresh the index, macro, stock and fund data.
   schedule:
     - cron: '0 23 * * *'
+    - cron: '30 6 * * 1-5'
   workflow_dispatch:
 
 permissions:
@@ -34,6 +36,11 @@ jobs:
       # A failed fetch must not block the deploy; the page then says so.
       - name: Fetch macro data
         run: npx tsx scripts/macro-data.mts
+        continue-on-error: true
+      # Taiwan and US benchmark indexes (FinMind, checked against 證交所,
+      # 櫃買中心, FRED and Yahoo; no key).
+      - name: Fetch index data
+        run: npx tsx scripts/index-data.mts
         continue-on-error: true
       # Listed stocks and ETFs for the screener (TWSE open data, no key).
       - name: Fetch stock data
