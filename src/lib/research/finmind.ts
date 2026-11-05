@@ -3,9 +3,11 @@
 // and allows browser requests, within an hourly quota, so responses are
 // cached for a day.
 
+import { CACHE_MAX_AGE_MS, purgeCaches } from '../storage/cacheCleanup'
+
 const API = 'https://api.finmindtrade.com/api/v4/data'
 export const CACHE_PREFIX = 'pfm:finmind:'
-const CACHE_MS = 24 * 3600 * 1000
+const CACHE_MS = CACHE_MAX_AGE_MS
 
 export type FinMindDataset =
   | 'TaiwanStockInfo'
@@ -44,9 +46,18 @@ export function readCache<T>(key: string): T[] | null {
   }
 }
 
+let lastPurge = 0
+
 export function writeCache<T>(key: string, data: T[]): void {
+  const now = Date.now()
+  // Dated keys (start dates move every day) would otherwise pile up.
+  if (now - lastPurge > 60_000) {
+    purgeCaches('expired', now)
+    lastPurge = now
+  }
   try {
-    localStorage.setItem(key, JSON.stringify({ at: Date.now(), data }))
+    // `at` first: cacheCleanup reads it without parsing the data.
+    localStorage.setItem(key, JSON.stringify({ at: now, data }))
   } catch {
     // Storage full or blocked: the data still works this time.
   }

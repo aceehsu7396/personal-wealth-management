@@ -1,4 +1,5 @@
 import { DemoBanner } from './components/DemoBanner'
+import { StorageWarning } from './components/StorageWarning'
 import { PageContext } from './components/PageContext'
 import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
@@ -30,6 +31,7 @@ function App() {
       <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
         <NavBar />
         <DemoBanner />
+        <StorageWarning />
         <PortfolioSnapshotRecorder />
         <PageContext />
         <Routes>

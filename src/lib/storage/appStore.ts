@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { upsertSnapshot } from '../calculations/netWorth'
+import { purgeCaches, setItemMakingRoom } from './cacheCleanup'
 import {
   AppDataSchema,
   SCHEMA_VERSION,
@@ -35,6 +36,10 @@ export const MAX_RESEARCH_REPORTS = 30
 
 export const STORAGE_KEY = 'pfm:appData'
 const BACKUP_SUFFIX = ':corrupted-backup'
+
+// Expired download caches go before the app data loads, so they never
+// take the space it needs.
+if (typeof localStorage !== 'undefined') purgeCaches('expired')
 
 // Records across all lists, to compare two saved copies.
 function recordCount(state: Record<string, unknown>): number {
@@ -91,7 +96,7 @@ const validatingStorage: StateStorage = {
       return null
     }
   },
-  setItem: (name, value) => localStorage.setItem(name, value),
+  setItem: (name, value) => setItemMakingRoom(name, value),
   removeItem: (name) => localStorage.removeItem(name),
 }
 
