@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useAppStore } from '../../lib/storage/appStore'
+import { useJourney } from '../../lib/useJourney'
 import { Field, inputClass } from './FormField'
 
 const percent = z.coerce.number().min(0, '不可為負數').max(100, '不可超過 100')
@@ -57,16 +58,23 @@ const formSchema = z
 type FormInput = z.input<typeof formSchema>
 type FormOutput = z.output<typeof formSchema>
 
-const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
+// Allocation fields carry tool examples, so the page needs no separate table.
+const FIELDS: { name: keyof FormOutput; label: string; step: string; hint?: string }[] = [
   { name: 'targetYears', label: '財務獨立目標年限（年）', step: '1' },
-  { name: 'coreTwEquityPercent', label: '核心：台股大盤（%）', step: '1' },
+  { name: 'coreTwEquityPercent', label: '核心：台股大盤（%）', step: '1', hint: '例：0050、006208 或台股指數型基金' },
   {
     name: 'coreGlobalEquityPercent',
     label: '核心：美股/全球（%）',
     step: '1',
+    hint: '例：VT、VOO、VTI 或全球指數型基金',
   },
-  { name: 'coreBondCashPercent', label: '核心：債券/現金（%）', step: '1' },
-  { name: 'satellitePercent', label: '交易部位（衛星）上限（%）', step: '1' },
+  { name: 'coreBondCashPercent', label: '核心：債券/現金（%）', step: '1', hint: '例：BND、短期美債' },
+  {
+    name: 'satellitePercent',
+    label: '交易部位（衛星）上限（%）',
+    step: '1',
+    hint: '依策略卡交易；實際上限再受學習階段限制，未使用的額度按比例留在核心',
+  },
   {
     name: 'maxSinglePositionPercent',
     label: '單檔個股上限（占總資產 %）',
@@ -105,6 +113,7 @@ const FIELDS: { name: keyof FormOutput; label: string; step: string }[] = [
 
 export function InvestmentPolicyForm() {
   const policy = useAppStore((s) => s.investmentPolicy)
+  const { learning } = useJourney()
   const setInvestmentPolicy = useAppStore((s) => s.setInvestmentPolicy)
 
   const {
@@ -138,6 +147,12 @@ export function InvestmentPolicyForm() {
             className={inputClass}
             {...register(f.name)}
           />
+          {f.hint && (
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {f.hint}
+              {f.name === 'satellitePercent' && `（目前階段${learning.title}，上限 ${learning.satelliteCapPercent}%）`}
+            </p>
+          )}
         </Field>
       ))}
     </form>

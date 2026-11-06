@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { groupOf, NAV_GROUPS, tabMatches } from './navigation'
+import { groupOf, HOME_PATH, NAV_GROUPS, tabMatches } from './navigation'
 
 function itemClass(active: boolean): string {
   return `whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
@@ -23,10 +23,10 @@ export function NavBar() {
     <>
       <nav className="border-b border-black bg-gray-950">
         <div className="mx-auto flex max-w-4xl items-center gap-2 overflow-x-auto px-4 py-3">
-          <span className="mr-2 flex shrink-0 items-center gap-2 text-sm font-semibold text-white">
+          <Link to={HOME_PATH} className="mr-2 flex shrink-0 items-center gap-2 text-sm font-semibold text-white">
             <span aria-hidden className="h-2.5 w-2.5 rounded-full bg-orange-500" />
             個人財富管理工具
-          </span>
+          </Link>
           {NAV_GROUPS.filter((g) => !g.utility).map((g) => (
             <Link key={g.id} to={g.to} className={itemClass(current?.id === g.id)}>
               {g.label}

@@ -41,4 +41,17 @@ describe('appStore storage', () => {
     await useAppStore.persist.rehydrate()
     expect(store.has('pfm:appData:corrupted-backup')).toBe(true)
   })
+
+  it('adds, updates and removes idea notes, stamping when one is done', async () => {
+    const { useAppStore } = await import('./appStore')
+    const s = () => useAppStore.getState()
+    const id = s().addIdeaNote({ nodeId: 'screener', title: '依產業分組', page: '/research/screener' })
+    expect(s().ideaNotes[0]).toMatchObject({ id, status: 'idea', priority: 'medium', detail: '', page: '/research/screener' })
+    s().updateIdeaNote(id, { status: 'done' })
+    expect(s().ideaNotes[0].doneAt).toBeDefined()
+    s().updateIdeaNote(id, { status: 'planned', priority: 'high' })
+    expect(s().ideaNotes[0]).toMatchObject({ status: 'planned', priority: 'high', doneAt: undefined })
+    s().removeIdeaNote(id)
+    expect(s().ideaNotes).toEqual([])
+  })
 })

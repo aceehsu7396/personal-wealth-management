@@ -5,7 +5,7 @@ import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/layout/NavBar'
 import { PortfolioSnapshotRecorder } from './components/PortfolioSnapshotRecorder'
-import { LEGACY_REDIRECTS } from './components/layout/navigation'
+import { HOME_PATH, LEGACY_REDIRECTS } from './components/layout/navigation'
 import { DashboardPage } from './pages/DashboardPage'
 import { GoalsPage } from './pages/GoalsPage'
 import { JourneyPage } from './pages/JourneyPage'
@@ -19,6 +19,7 @@ import { StrategiesPage } from './pages/StrategiesPage'
 import { PaperPage } from './pages/PaperPage'
 import { ScreenerPage } from './pages/ScreenerPage'
 import { BacktestPage } from './pages/BacktestPage'
+import { IdeaNotesPage } from './pages/IdeaNotesPage'
 
 // The handbook bundles the Markdown renderer; load it only when opened.
 const HandbookPage = lazy(() =>
@@ -35,11 +36,23 @@ function App() {
         <PortfolioSnapshotRecorder />
         <PageContext />
         <Routes>
-          {/* 總覽 */}
-          <Route path="/" element={<DashboardPage />} />
+          <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
+          {/* 研究分析 */}
+          <Route path="/research/market" element={<MarketPage />} />
+          <Route path="/research/screener" element={<ScreenerPage />} />
+          <Route path="/research/stocks" element={<StocksPage />} />
+          {/* 模擬交易 */}
+          <Route path="/sim/strategies" element={<StrategiesPage />} />
+          <Route path="/sim/backtest" element={<BacktestPage />} />
+          <Route path="/sim/paper" element={<PaperPage />} />
+          {/* 投資持有與檢討回顧 */}
+          <Route path="/today" element={<DashboardPage />} />
           <Route path="/goals" element={<GoalsPage />} />
-          {/* 行動路線與手冊 */}
-          <Route path="/journey" element={<JourneyPage />} />
+          <Route path="/portfolio" element={<PortfolioPage />} />
+          <Route path="/portfolio/trades" element={<TradesPage />} />
+          <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
+          {/* 筆記、手冊與行動路線、設定 */}
+          <Route path="/notes" element={<IdeaNotesPage />} />
           <Route
             path="/handbook/:slug?"
             element={
@@ -48,23 +61,12 @@ function App() {
               </Suspense>
             }
           />
-          {/* 研究 */}
-          <Route path="/research/market" element={<MarketPage />} />
-          <Route path="/research/screener" element={<ScreenerPage />} />
-          <Route path="/research/stocks" element={<StocksPage />} />
-          {/* 策略 */}
-          <Route path="/sim/strategies" element={<StrategiesPage />} />
-          <Route path="/sim/backtest" element={<BacktestPage />} />
-          <Route path="/sim/paper" element={<PaperPage />} />
-          {/* 投資組合 */}
-          <Route path="/portfolio" element={<PortfolioPage />} />
-          <Route path="/portfolio/trades" element={<TradesPage />} />
-          <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
+          <Route path="/journey" element={<JourneyPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
             <Route key={from} path={from} element={<Navigate to={to} replace />} />
           ))}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={HOME_PATH} replace />} />
         </Routes>
       </div>
     </HashRouter>

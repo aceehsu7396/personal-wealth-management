@@ -26,6 +26,13 @@ describe('AppDataSchema', () => {
     expect(result.data?.watchlist).toEqual([])
   })
 
+  it('gives older saves an empty idea notebook', () => {
+    const { ideaNotes: _n, ...older } = createDefaultAppData()
+    const result = AppDataSchema.safeParse(older)
+    expect(result.success).toBe(true)
+    expect(result.data?.ideaNotes).toEqual([])
+  })
+
   it('loads research cards saved before the automatic health check', () => {
     const card = {
       id: 'x', ticker: '2330', name: '台積電', market: 'TW', sector: '半導體', lynchCategory: 'stalwart',

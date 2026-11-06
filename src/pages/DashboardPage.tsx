@@ -1,17 +1,12 @@
 import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
-import { computeProgressPercent } from '../lib/calculations/progress'
-import { emergencyFundTarget } from '../lib/calculations/journey'
-import { StatCard } from '../components/StatCard'
 import { StrategyOverview } from '../components/StrategyOverview'
-import { MarketGlance } from '../components/market/DailyMarketPanel'
 import { useJourney } from '../lib/useJourney'
 import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { snapshotsAsCheckIns } from '../lib/calculations/netWorth'
 import { ActualVsProjectedChart } from '../components/charts/ActualVsProjectedChart'
-import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 
 export function DashboardPage() {
   const profile = useAppStore((s) => s.profile)
@@ -19,27 +14,11 @@ export function DashboardPage() {
   // Holdings get the day's prices on the first visit, so net worth is current.
   usePriceAutoRefresh()
   // Net worth comes from the portfolio once holdings exist.
-  const { assumptions, fromPortfolio } = usePlanningAssumptions()
+  const { assumptions } = usePlanningAssumptions()
 
   const result = computeFireProjection(profile, assumptions)
-  const latestNetWorth = assumptions.currentNetWorth
-  const progressPercent = computeProgressPercent(latestNetWorth, result.fireNumber)
-
-  // With no expenses entered the FIRE number is 0, which would read as
-  // "already free"; show that the goal is not set yet instead.
-  const goalSet = assumptions.monthlyExpenses > 0 || assumptions.targetAnnualExpensesOverride !== undefined
-  const progressStat = !goalSet
-    ? '尚未設定目標'
-    : result.alreadyFire
-    ? '已達成財富自由'
-    : result.yearsToFire === null
-      ? '50 年內無法達成'
-      : `約 ${formatYearsToFire(result.yearsToFire)}`
-
-  const { journey, state } = useJourney()
+  const { journey } = useJourney()
   const nextStep = journey.nextStep
-  const fundTarget = emergencyFundTarget(state)
-  const fundPercent = fundTarget > 0 ? (state.foundation.emergencyFundAmount / fundTarget) * 100 : null
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -79,41 +58,6 @@ export function DashboardPage() {
         </div>
       )}
 
-      <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="淨資產（投資組合市值）"
-          value={formatCurrency(latestNetWorth, profile.currency)}
-          hint={fromPortfolio ? '依持股即時計算，每月自動記錄' : '尚未建立持股，暫用目標與政策的輸入'}
-        />
-        <StatCard
-          label="達成進度"
-          value={progressPercent !== null ? `${progressPercent.toFixed(1)}%` : '—'}
-          hint={
-            Number.isFinite(result.fireNumber)
-              ? `目標 ${formatCurrency(result.fireNumber, profile.currency)}`
-              : undefined
-          }
-        />
-        <StatCard
-          label="預估達成時間"
-          value={progressStat}
-          hint={result.targetDate ? formatDate(result.targetDate) : undefined}
-        />
-        <Link to="/journey" className="block">
-          <StatCard
-            label="緊急預備金"
-            value={fundPercent === null ? '—' : `${Math.min(fundPercent, 100).toFixed(0)}%`}
-            hint={
-              fundPercent === null
-                ? '先設定每月支出'
-                : `${formatCurrency(state.foundation.emergencyFundAmount, profile.currency)} / ${formatCurrency(fundTarget, profile.currency)}`
-            }
-          />
-        </Link>
-      </div>
-
-      <MarketGlance />
-
       <StrategyOverview />
 
       <div className="mt-8 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
@@ -125,7 +69,7 @@ export function DashboardPage() {
             to="/portfolio"
             className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
           >
-            前往投資組合
+            前往持股與風控
           </Link>
         </div>
         <ActualVsProjectedChart

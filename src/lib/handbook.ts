@@ -17,21 +17,21 @@ export interface HandbookDoc {
 // App page that puts each chapter into practice.
 export const CHAPTER_PAGES: Record<string, { to: string; label: string }> = {
   '00': { to: '/journey', label: '行動路線' },
-  '01': { to: '/journey', label: '行動路線' },
+  '01': { to: '/goals', label: '目標與政策' },
   '02': { to: '/goals', label: '目標與政策' },
   '03': { to: '/portfolio', label: '持股與風控' },
   '04': { to: '/portfolio/trades', label: '交易日誌' },
-  '05': { to: '/research/market', label: '研究・市場' },
-  '06': { to: '/research/stocks', label: '研究・研究卡（產業分析）' },
-  '07': { to: '/research/stocks', label: '研究・研究卡' },
+  '05': { to: '/research/market', label: '研究分析・市場' },
+  '06': { to: '/research/stocks', label: '研究分析・研究卡（產業分析）' },
+  '07': { to: '/research/stocks', label: '研究分析・研究卡' },
   '08': { to: '/portfolio/review', label: '績效歸因' },
   '09': { to: '/journey', label: '行動路線' },
-  '10': { to: '/sim/strategies', label: '策略・策略卡' },
+  '10': { to: '/sim/strategies', label: '模擬交易・策略卡' },
   '11': { to: '/goals', label: '目標與政策・全職準備度' },
   '12': { to: '/settings', label: '設定・載入示範資料' },
-  附錄B: { to: '/research/screener', label: '研究・選股' },
+  附錄B: { to: '/research/screener', label: '研究分析・選股' },
   附錄C: { to: '/goals', label: '目標與政策' },
-  附錄D4: { to: '/sim/backtest', label: '策略・回測' },
+  附錄D4: { to: '/sim/backtest', label: '模擬交易・回測' },
 }
 
 export function slugOf(fileName: string): string {

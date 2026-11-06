@@ -132,7 +132,7 @@ export const STARTER_STRATEGIES: StarterStrategy[] = [
       params: {},
       symbols: [],
       edge: '個股的 12 個月動能效應在台股與美股都有研究支持；每月更新名單，持有最強的幾檔。',
-      entryRules: '每月第一週，用「研究 → 選股」的「動能」篩選，買進前 5 名（每檔等額，排除流動性不足）',
+      entryRules: '每月第一週，用「研究分析 → 選股」的「動能」篩選，買進前 5 名（每檔等額，排除流動性不足）',
       exitRules: '每月檢查：跌出前 20 名就賣出；觸及 2.5 倍 ATR 停損立即出場',
       riskPerTradePercent: 1,
       notes: '無法自動回測：先在虛擬帳戶照規則操作，每月記錄名單變化。',

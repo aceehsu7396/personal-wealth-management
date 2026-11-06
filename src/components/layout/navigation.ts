@@ -1,17 +1,16 @@
-// Top-level navigation, ordered by the workflow: today and goals,
-// research, strategy validation, then the real portfolio. The handbook and
-// settings sit at the right of the top bar instead of being groups.
+// Top-level navigation: the three areas of the site, then the notes, the
+// handbook (with the action roadmap) and settings at the right of the top bar.
 
 export interface NavTab {
   label: string
   to: string
-  // Exact tabs match only their own path (e.g. "/" or "/portfolio");
+  // Exact tabs match only their own path (e.g. "/portfolio");
   // others also match sub-paths (e.g. "/handbook/03").
   exact?: boolean
 }
 
 export interface NavGroup {
-  id: 'overview' | 'research' | 'strategy' | 'portfolio' | 'handbook' | 'settings'
+  id: 'research' | 'strategy' | 'portfolio' | 'notes' | 'handbook' | 'settings'
   label: string
   to: string
   tabs: NavTab[]
@@ -19,20 +18,13 @@ export interface NavGroup {
   utility?: boolean
 }
 
+// Opening the site lands on the first area.
+export const HOME_PATH = '/research/market'
+
 export const NAV_GROUPS: NavGroup[] = [
   {
-    id: 'overview',
-    label: '總覽',
-    to: '/',
-    tabs: [
-      { label: '今日', to: '/', exact: true },
-      { label: '行動路線', to: '/journey' },
-      { label: '目標與政策', to: '/goals' },
-    ],
-  },
-  {
     id: 'research',
-    label: '研究',
+    label: '研究分析',
     to: '/research/market',
     tabs: [
       { label: '市場', to: '/research/market' },
@@ -42,7 +34,7 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'strategy',
-    label: '策略',
+    label: '模擬交易',
     to: '/sim/strategies',
     tabs: [
       { label: '策略卡', to: '/sim/strategies' },
@@ -52,15 +44,27 @@ export const NAV_GROUPS: NavGroup[] = [
   },
   {
     id: 'portfolio',
-    label: '投資組合',
-    to: '/portfolio',
+    label: '投資持有與檢討回顧',
+    to: '/today',
     tabs: [
+      { label: '今日', to: '/today' },
+      { label: '目標與政策', to: '/goals' },
       { label: '持股與風控', to: '/portfolio', exact: true },
       { label: '交易日誌', to: '/portfolio/trades' },
       { label: '績效歸因', to: '/portfolio/review' },
     ],
   },
-  { id: 'handbook', label: '手冊', to: '/handbook', tabs: [{ label: '手冊', to: '/handbook' }], utility: true },
+  { id: 'notes', label: '筆記', to: '/notes', tabs: [{ label: '精進筆記', to: '/notes' }], utility: true },
+  {
+    id: 'handbook',
+    label: '手冊',
+    to: '/handbook',
+    tabs: [
+      { label: '手冊', to: '/handbook' },
+      { label: '行動路線', to: '/journey' },
+    ],
+    utility: true,
+  },
   { id: 'settings', label: '⚙ 設定', to: '/settings', tabs: [{ label: '設定', to: '/settings' }], utility: true },
 ]
 
@@ -77,9 +81,9 @@ export function groupOf(pathname: string): NavGroup | undefined {
 export const LEGACY_REDIRECTS: Record<string, string> = {
   '/fire': '/goals',
   '/strategy': '/goals',
-  '/progress': '/',
-  '/networth': '/',
-  '/records': '/',
+  '/progress': '/today',
+  '/networth': '/today',
+  '/records': '/today',
   '/market': '/research/market',
   '/research': '/research/stocks',
   '/trades': '/portfolio/trades',

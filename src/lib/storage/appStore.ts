@@ -29,6 +29,7 @@ import {
   type BacktestRun,
   type PaperAccount,
   type WatchItem,
+  type IdeaNote,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -167,6 +168,10 @@ interface AppStore extends AppData {
   addWatchItem: (entry: Omit<WatchItem, 'addedAt'>) => void
   updateWatchItem: (symbol: string, entry: Partial<Omit<WatchItem, 'symbol' | 'addedAt'>>) => void
   removeWatchItem: (symbol: string) => void
+  addIdeaNote: (entry: Pick<IdeaNote, 'nodeId' | 'title'> & Partial<Pick<IdeaNote, 'detail' | 'priority' | 'page'>>) => string
+  // Marking an idea done stamps doneAt; reopening it clears it.
+  updateIdeaNote: (id: string, entry: Partial<Omit<IdeaNote, 'id' | 'createdAt' | 'updatedAt' | 'doneAt'>>) => void
+  removeIdeaNote: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -202,6 +207,7 @@ function toAppData(state: AppData): AppData {
     backtestRuns: state.backtestRuns,
     paperAccounts: state.paperAccounts,
     watchlist: state.watchlist,
+    ideaNotes: state.ideaNotes,
   }
 }
 
@@ -504,6 +510,31 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ watchlist: state.watchlist.map((w) => (w.symbol === symbol ? { ...w, ...entry } : w)) })),
 
       removeWatchItem: (symbol) => set((state) => ({ watchlist: state.watchlist.filter((w) => w.symbol !== symbol) })),
+
+      addIdeaNote: (entry) => {
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+        set((state) => ({
+          ideaNotes: [
+            ...state.ideaNotes,
+            { detail: '', priority: 'medium', ...entry, id, status: 'idea', createdAt: now, updatedAt: now },
+          ],
+        }))
+        return id
+      },
+
+      updateIdeaNote: (id, entry) =>
+        set((state) => ({
+          ideaNotes: state.ideaNotes.map((n) => {
+            if (n.id !== id) return n
+            const now = new Date().toISOString()
+            const next = { ...n, ...entry, updatedAt: now }
+            if (entry.status && entry.status !== n.status) next.doneAt = entry.status === 'done' ? now : undefined
+            return next
+          }),
+        })),
+
+      removeIdeaNote: (id) => set((state) => ({ ideaNotes: state.ideaNotes.filter((n) => n.id !== id) })),
 
       removePaperAccount: (id) =>
         set((state) => ({ paperAccounts: state.paperAccounts.filter((a) => a.id !== id) })),

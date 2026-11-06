@@ -3,7 +3,6 @@ import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { computeRequiredReturn, FEASIBILITY_LABELS } from '../lib/calculations/requiredReturn'
-import { assessMacro, STANCE_LABELS } from '../lib/calculations/macroRegime'
 import { analyzePortfolio } from '../lib/calculations/portfolioRisk'
 import { addMonths, computeDiscipline } from '../lib/calculations/disciplineScore'
 import { todayIsoDate } from '../lib/market/twse'
@@ -13,6 +12,7 @@ import { useSignals } from '../lib/research/useSignals'
 import { ACTION_LABELS, EXIT_ALERT_ACTIONS } from '../lib/research/signals'
 import { StatCard } from './StatCard'
 import { RiskViolationList } from './RiskViolationList'
+import { formatCurrency } from '../lib/format'
 
 const MAX_ALERTS = 5
 // Research cards should be refreshed after every quarterly report.
@@ -20,7 +20,7 @@ const THESIS_STALE_MONTHS = 4
 
 export function StrategyOverview() {
   const profile = useAppStore((s) => s.profile)
-  const { assumptions } = usePlanningAssumptions()
+  const { assumptions, fromPortfolio } = usePlanningAssumptions()
   const { policy, journey } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
   const macroCheckIns = useAppStore((s) => s.macroCheckIns)
@@ -32,7 +32,6 @@ export function StrategyOverview() {
   const today = todayIsoDate()
   const required = computeRequiredReturn(profile, assumptions, policy.targetYears)
   const latestMacro = [...macroCheckIns].sort((a, b) => b.date.localeCompare(a.date))[0]
-  const macro = latestMacro ? assessMacro(latestMacro, guardrails) : null
   const risk = analyzePortfolio(holdings, theses, policy, guardrails, meta)
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
   const readiness = useTraderReadiness()
@@ -98,6 +97,11 @@ export function StrategyOverview() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <StatCard
+          label="淨資產（投資組合市值）"
+          value={formatCurrency(assumptions.currentNetWorth, profile.currency)}
+          hint={fromPortfolio ? '依持股即時計算，每月自動記錄' : '尚未建立持股，暫用目標與政策的輸入'}
+        />
         <Link to="/goals" className="block">
           <StatCard
             label="全職準備度"
@@ -111,7 +115,7 @@ export function StrategyOverview() {
             }
           />
         </Link>
-        <Link to="/journey" className="block">
+        <Link to="/goals" className="block">
           <StatCard
             label="生活費緩衝"
             value={bufferMonths === null ? '—' : `${bufferMonths.toFixed(1)} 個月`}
@@ -134,13 +138,6 @@ export function StrategyOverview() {
             label="目前提領率"
             value={withdrawalRate === null ? '—' : `${withdrawalRate.toFixed(1)}%`}
             hint={`年生活費 ÷ 投資組合；可持續 ${assumptions.safeWithdrawalRatePercent}% 以下`}
-          />
-        </Link>
-        <Link to="/research/market" className="block">
-          <StatCard
-            label="總經判斷"
-            value={macro ? STANCE_LABELS[macro.stance] : '—'}
-            hint={latestMacro ? `${latestMacro.date} 檢視` : '尚無總經檢視'}
           />
         </Link>
         <Link to="/portfolio/trades" className="block">

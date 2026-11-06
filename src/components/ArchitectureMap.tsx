@@ -51,7 +51,7 @@ function connector(a: DOMRect, b: DOMRect, box: DOMRect, kind: ArchEdge['kind'])
   return `M ${ax} ${ay} C ${ax} ${mid}, ${bx} ${mid}, ${bx} ${by}`
 }
 
-// The whole process as an interactive map (handbook chapter 00 §2): layers
+// The whole process as an interactive map (handbook chapter 00 §2): areas
 // top to bottom, what each part hands on, and where you are on the roadmap.
 export function ArchitectureMap() {
   const { journey } = useJourney()

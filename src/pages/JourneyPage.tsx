@@ -1,22 +1,14 @@
 import { Link } from 'react-router-dom'
-import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
-import { emergencyFundTarget, monthlyExpenseBaseline } from '../lib/calculations/journey'
 import { StatCard } from '../components/StatCard'
-import { inputClass, labelClass } from '../components/forms/FormField'
-import { formatCurrency } from '../lib/format'
+import { EmergencyFundBar } from '../components/forms/EmergencyFundForm'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400'
 
 export function JourneyPage() {
-  const setFoundation = useAppStore((s) => s.setFoundation)
-  const { state, journey, learning } = useJourney()
-
-  const target = emergencyFundTarget(state)
-  const baseline = monthlyExpenseBaseline(state)
-  const fundPercent = target > 0 ? Math.min((state.foundation.emergencyFundAmount / target) * 100, 100) : 0
+  const { journey, learning } = useJourney()
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -97,63 +89,10 @@ export function JourneyPage() {
           {stage.number === 1 && (
             <div className="mt-4 rounded-md bg-gray-50 p-4 dark:bg-gray-900/40">
               <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">緊急預備金／生活費緩衝</h3>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                放在活存、貨幣市場或短債等隨時可動用的地方，不計入投資組合。每月支出取「目標與政策」的數字：
-                {formatCurrency(baseline, state.profile.currency)}。上班期間先備足目標月數；離開本業前要擴大到生活費緩衝月數。
-              </p>
-              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <label className="block">
-                  <span className={labelClass}>目前預備金金額</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1000"
-                    className={inputClass}
-                    defaultValue={state.foundation.emergencyFundAmount}
-                    onChange={(e) => {
-                      const v = Number(e.target.value)
-                      if (Number.isFinite(v) && v >= 0) setFoundation({ emergencyFundAmount: v })
-                    }}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelClass}>目標月數</span>
-                  <input
-                    type="number"
-                    min="1"
-                    max="24"
-                    step="1"
-                    className={inputClass}
-                    defaultValue={state.foundation.emergencyFundTargetMonths}
-                    onChange={(e) => {
-                      const v = Number(e.target.value)
-                      if (Number.isFinite(v) && v >= 1) setFoundation({ emergencyFundTargetMonths: v })
-                    }}
-                  />
-                </label>
-                <label className="block">
-                  <span className={labelClass}>全職前的生活費緩衝（月）</span>
-                  <input
-                    type="number"
-                    min="6"
-                    max="60"
-                    step="1"
-                    className={inputClass}
-                    defaultValue={state.foundation.livingBufferMonths}
-                    onChange={(e) => {
-                      const v = Number(e.target.value)
-                      if (Number.isFinite(v) && v >= 6) setFoundation({ livingBufferMonths: v })
-                    }}
-                  />
-                </label>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                <div className="h-full bg-indigo-600" style={{ width: `${fundPercent}%` }} />
-              </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                {formatCurrency(state.foundation.emergencyFundAmount, state.profile.currency)} /{' '}
-                {formatCurrency(target, state.profile.currency)}（{fundPercent.toFixed(0)}%）
-              </p>
+              <EmergencyFundBar />
+              <Link to="/goals" className={`${linkClass} mt-2 inline-block`}>
+                到目標與政策填寫預備金與緩衝月數
+              </Link>
             </div>
           )}
         </div>
@@ -165,11 +104,17 @@ export function JourneyPage() {
           交易部位上限依學習階段自動調整，目前為 {learning.satelliteCapPercent}%。
           {learning.demoted && '交易部位連續 3 年落後基準，已降回上一階段。'}
         </p>
-        {learning.nextCriteria.length > 0 ? (
+        {learning.stage === 4 ? (
+          <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+            離開本業、全職經營的條件見{' '}
+            <Link to="/goals" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              目標與政策的全職準備度
+            </Link>
+            。
+          </p>
+        ) : learning.nextCriteria.length > 0 ? (
           <>
-            <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">
-              {learning.stage === 4 ? '離開本業、全職經營的條件' : '晉級下一階段的條件'}
-            </h3>
+            <h3 className="mt-4 text-sm font-semibold text-gray-900 dark:text-gray-100">晉級下一階段的條件</h3>
             <ul className="mt-2 space-y-1 text-sm">
               {learning.nextCriteria.map((c) => (
                 <li

@@ -12,7 +12,6 @@ import {
   type RangeFilter,
   type Screen,
 } from '../lib/screener/screens'
-import { SimGuide } from '../components/SimGuide'
 import { Term } from '../components/Term'
 import { inputClass, labelClass } from '../components/forms/FormField'
 
@@ -118,7 +117,6 @@ export function ScreenerPage() {
         從台股上市公司與 ETF 中找候選：先套用一個篩選組合，把有興趣的加入觀察名單，再寫研究卡或直接回測。資料每天由 GitHub 從證交所開放資料更新（免 API 金鑰）。
       </p>
 
-      <SimGuide />
 
       <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">篩選組合</h2>

@@ -748,6 +748,28 @@ export const WatchItemSchema = z.object({
 })
 export type WatchItem = z.infer<typeof WatchItemSchema>
 
+// An idea for improving the tool, filed under a part of the system map
+// (architecture.ts node id, or "general" for the whole site).
+export const IdeaNoteStatusSchema = z.enum(['idea', 'planned', 'done', 'dropped'])
+export type IdeaNoteStatus = z.infer<typeof IdeaNoteStatusSchema>
+export const IdeaNotePrioritySchema = z.enum(['high', 'medium', 'low'])
+export type IdeaNotePriority = z.infer<typeof IdeaNotePrioritySchema>
+
+export const IdeaNoteSchema = z.object({
+  id: z.string(),
+  nodeId: z.string(),
+  title: z.string(),
+  detail: z.string().default(''),
+  status: IdeaNoteStatusSchema,
+  priority: IdeaNotePrioritySchema.default('medium'),
+  // The page it was written on.
+  page: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  doneAt: z.string().optional(),
+})
+export type IdeaNote = z.infer<typeof IdeaNoteSchema>
+
 export const AppDataSchema = z.object({
   schemaVersion: z.number(),
   profile: UserProfileSchema,
@@ -773,6 +795,7 @@ export const AppDataSchema = z.object({
   backtestRuns: z.array(BacktestRunSchema).default([]),
   paperAccounts: z.array(PaperAccountSchema).default([]),
   watchlist: z.array(WatchItemSchema).default([]),
+  ideaNotes: z.array(IdeaNoteSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -826,5 +849,6 @@ export function createDefaultAppData(): AppData {
     backtestRuns: [],
     paperAccounts: [],
     watchlist: [],
+    ideaNotes: [],
   }
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupOf, LEGACY_REDIRECTS, NAV_GROUPS } from './navigation'
+import { groupOf, HOME_PATH, LEGACY_REDIRECTS, NAV_GROUPS } from './navigation'
 
 const sources = import.meta.glob(['../../**/*.{ts,tsx}', '!../../**/*.test.ts', '../../../docs/strategy/*.md'], {
   query: '?raw',
@@ -8,11 +8,19 @@ const sources = import.meta.glob(['../../**/*.{ts,tsx}', '!../../**/*.test.ts', 
 }) as Record<string, string>
 
 describe('navigation', () => {
-  it('groups pages by workflow, with the handbook and settings at the side', () => {
-    expect(NAV_GROUPS.filter((g) => !g.utility).map((g) => g.label)).toEqual(['總覽', '研究', '策略', '投資組合'])
+  it('groups pages into the three areas, with notes, the handbook and settings at the side', () => {
+    expect(NAV_GROUPS.filter((g) => !g.utility).map((g) => g.label)).toEqual(['研究分析', '模擬交易', '投資持有與檢討回顧'])
+    expect(NAV_GROUPS.filter((g) => g.utility).map((g) => g.id)).toEqual(['notes', 'handbook', 'settings'])
     expect(groupOf('/research/screener')?.id).toBe('research')
-    expect(groupOf('/journey')?.id).toBe('overview')
+    expect(groupOf('/today')?.id).toBe('portfolio')
+    expect(groupOf('/goals')?.id).toBe('portfolio')
+    expect(groupOf('/journey')?.id).toBe('handbook')
     expect(groupOf('/handbook/12')?.id).toBe('handbook')
+    expect(groupOf('/notes')?.id).toBe('notes')
+  })
+
+  it('opens on the first area', () => {
+    expect(HOME_PATH).toBe(NAV_GROUPS[0].to)
   })
 
   it('redirects old pages to tabs that exist', () => {
@@ -22,7 +30,7 @@ describe('navigation', () => {
 
   it('leaves no old page names in the app or the handbook', () => {
     expect(Object.keys(sources).length).toBeGreaterThan(80)
-    const old = /研究分析 ?(→|・)|模擬交易 ?(→|・)|學習路線 ?(→|・)|\/sim\/screener|\/research\/industry/
+    const old = /(?<!\p{Script=Han})(總覽|研究|策略|投資組合) ?(→|・) ?(今日|行動路線|目標與政策|市場|選股|研究卡|策略卡|回測|虛擬帳戶|持股與風控|交易日誌|績效歸因)|學習路線 ?(→|・)|\/sim\/screener|\/research\/industry/u
     const hits = Object.entries(sources)
       .filter(([path]) => !path.endsWith('navigation.ts'))
       .flatMap(([path, text]) => text.split('\n').filter((l) => old.test(l)).map((l) => `${path}: ${l.trim()}`))

@@ -1,6 +1,5 @@
 import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
-import { useJourney } from '../lib/useJourney'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { todayIsoDate } from '../lib/market/twse'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
@@ -15,25 +14,16 @@ import { NetWorthProjectionChart } from '../components/charts/NetWorthProjection
 import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 import { useTraderReadiness } from '../lib/useTraderReadiness'
 import { ReadinessChecklist } from '../components/ReadinessChecklist'
+import { EmergencyFundForm } from '../components/forms/EmergencyFundForm'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
-
-const PRINCIPLES = [
-  '投資政策定框架：只在每年 1 月或人生重大事件時修改，市場大漲大跌時不改。',
-  '核心 ETF 拿市場報酬，交易部位用自有策略追求超額報酬；交易部位必須用績效證明自己。',
-  '先證明、再用真錢：策略要先通過回測與虛擬交易，才能小額實單。',
-  '風控優先於看法：每筆停損風險、持有檔數、部位上限與回撤熔斷不因個別觀點而放寬。',
-  '生活費不靠當月交易損益：從整體資產依提領率提領，另備生活費緩衝。',
-  '評估流程而非結果：每筆交易留下理由，事後以歸因區分運氣與能力。',
-]
 
 export function GoalsPage() {
   const profile = useAppStore((s) => s.profile)
   const { assumptions, fromPortfolio } = usePlanningAssumptions()
   const policy = useAppStore((s) => s.investmentPolicy)
   const setInvestmentPolicy = useAppStore((s) => s.setInvestmentPolicy)
-  const { learning } = useJourney()
   const readiness = useTraderReadiness()
 
   const projection = computeFireProjection(profile, assumptions)
@@ -50,37 +40,6 @@ export function GoalsPage() {
     required.requiredNominalReturnPercent !== null &&
     assumptions.expectedAnnualReturnPercent >=
       required.requiredNominalReturnPercent
-
-  const coreTotal =
-    policy.coreTwEquityPercent +
-    policy.coreGlobalEquityPercent +
-    policy.coreBondCashPercent
-  const allocationRows = [
-    {
-      layer: '核心',
-      name: '台股大盤',
-      percent: policy.coreTwEquityPercent,
-      example: '0050、006208 或台股指數型基金',
-    },
-    {
-      layer: '核心',
-      name: '美股/全球',
-      percent: policy.coreGlobalEquityPercent,
-      example: 'VT、VOO、VTI 或全球指數型基金',
-    },
-    {
-      layer: '核心',
-      name: '債券/現金',
-      percent: policy.coreBondCashPercent,
-      example: 'BND、短期美債',
-    },
-    {
-      layer: '交易部位',
-      name: '自有交易策略（ETF、個股）',
-      percent: policy.satellitePercent,
-      example: `依策略卡交易；目前學習階段上限 ${learning.satelliteCapPercent}%`,
-    },
-  ]
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -180,46 +139,8 @@ export function GoalsPage() {
       </div>
 
       <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          策略資產配置
-        </h2>
-        <div className="mt-4 overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                <th className="py-2 pr-4">層級</th>
-                <th className="py-2 pr-4">類別</th>
-                <th className="py-2 pr-4">目標</th>
-                <th className="py-2 pr-4">工具範例</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allocationRows.map((row) => (
-                <tr
-                  key={row.name}
-                  className="border-b border-gray-100 last:border-0 dark:border-gray-700"
-                >
-                  <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">
-                    {row.layer}
-                  </td>
-                  <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                    {row.name}
-                  </td>
-                  <td className="py-2 pr-4 font-medium text-gray-900 dark:text-gray-100">
-                    {row.percent}%
-                  </td>
-                  <td className="py-2 pr-4 text-gray-500 dark:text-gray-400">
-                    {row.example}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          核心合計 {coreTotal}%。交易部位上限依學習階段自動調整：目前是階段
-          {learning.title}，上限 {learning.satelliteCapPercent}%；未使用的額度按比例留在核心。
-        </p>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">緊急預備金／生活費緩衝</h2>
+        <EmergencyFundForm />
       </div>
 
       <div className={cardClass}>
@@ -255,16 +176,17 @@ export function GoalsPage() {
         </div>
       </div>
 
-      <div className={cardClass}>
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          策略原則
-        </h2>
-        <ol className="mt-4 list-decimal space-y-2 pl-5 text-sm text-gray-700 dark:text-gray-300">
-          {PRINCIPLES.map((p) => (
-            <li key={p}>{p}</li>
-          ))}
-        </ol>
-      </div>
+      <p className="mt-8 text-sm text-gray-600 dark:text-gray-400">
+        策略原則見手冊{' '}
+        <Link to="/handbook/00" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+          00 §3 五項設計原則
+        </Link>{' '}
+        與{' '}
+        <Link to="/handbook/02" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+          02 投資政策聲明
+        </Link>
+        。
+      </p>
     </div>
   )
 }

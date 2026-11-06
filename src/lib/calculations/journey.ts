@@ -73,15 +73,14 @@ const STAGE_CAPS = [10, 20, 40, Infinity]
 
 const PAGES = {
   goals: { to: '/goals', label: '目標與政策' },
-  journey: { to: '/journey', label: '行動路線' },
   portfolio: { to: '/portfolio', label: '持股與風控' },
   trades: { to: '/portfolio/trades', label: '交易日誌' },
   review: { to: '/portfolio/review', label: '績效歸因' },
-  market: { to: '/research/market', label: '研究・市場' },
-  stocks: { to: '/research/stocks', label: '研究・研究卡' },
-  strategies: { to: '/sim/strategies', label: '策略・策略卡' },
-  backtest: { to: '/sim/backtest', label: '策略・回測' },
-  paper: { to: '/sim/paper', label: '策略・虛擬帳戶' },
+  market: { to: '/research/market', label: '研究分析・市場' },
+  stocks: { to: '/research/stocks', label: '研究分析・研究卡' },
+  strategies: { to: '/sim/strategies', label: '模擬交易・策略卡' },
+  backtest: { to: '/sim/backtest', label: '模擬交易・回測' },
+  paper: { to: '/sim/paper', label: '模擬交易・虛擬帳戶' },
 }
 
 function distinctMonths(dates: string[]): number {
@@ -141,7 +140,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
             fundTarget > 0
               ? `目前 ${formatTwd(foundation.emergencyFundAmount)}，目標 ${formatTwd(fundTarget)}（${foundation.emergencyFundTargetMonths} 個月支出）`
               : '先填寫每月支出，才能算出預備金目標',
-          page: PAGES.journey,
+          page: PAGES.goals,
           handbookSlug: '01',
         },
         {
@@ -208,7 +207,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
           id: '3.1',
           title: '完成第一次總經檢視',
           done: macroMonths >= 1,
-          detail: '打開「研究 → 市場」，本月檢視每天自動判斷（免 API 金鑰）',
+          detail: '打開「研究分析 → 市場」，本月檢視每天自動判斷（免 API 金鑰）',
           page: PAGES.market,
           handbookSlug: '05',
         },
@@ -275,7 +274,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
           id: '5.2',
           title: '完成第一次季度績效歸因',
           done: state.performanceReviews.length > 0,
-          detail: '在「投資組合 → 績效歸因」新增季度檢討',
+          detail: '在「投資持有與檢討回顧 → 績效歸因」新增季度檢討',
           page: PAGES.review,
           handbookSlug: '08',
         },
