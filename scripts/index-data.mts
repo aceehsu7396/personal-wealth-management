@@ -20,6 +20,14 @@ import {
   type IndexPoint,
   type IndicesData,
 } from '../src/lib/market/indices.ts'
+import {
+  FUTURES_ID,
+  applyFuturesCheck,
+  fetchFuturesBars,
+  futuresStart,
+  type FuturesBar,
+  type FuturesCheck,
+} from '../src/lib/market/futures.ts'
 
 const OUT = 'public/data/indices.json'
 const UA = 'Mozilla/5.0 (personal-wealth-management data job)'
@@ -123,6 +131,31 @@ const OFFICIAL: Partial<Record<IndexKey, () => Promise<IndexPoint>>> = {
   SOX: () => yahooLatest('^SOX'),
 }
 
+// 期交所 daily market report (the web page; its OpenAPI only adds a night
+// session with that day's full report): the latest session FinMind has.
+async function taifexCheck(bars: FuturesBar[]): Promise<FuturesCheck> {
+  const last = bars[bars.length - 1]
+  const body = new URLSearchParams({
+    queryType: '2',
+    marketCode: last.session === 'night' ? '1' : '0',
+    commodity_id: FUTURES_ID,
+    queryDate: last.date.replace(/-/g, '/'),
+  })
+  const response = await fetch('https://www.taifex.com.tw/cht/3/futDailyMarketReport', {
+    method: 'POST',
+    headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  })
+  if (!response.ok) throw new Error(`${response.status} 期交所行情表`)
+  const text = (await response.text()).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ')
+  if (!text.includes(last.session === 'night' ? '盤後交易時段行情表' : '一般交易時段行情表')) throw new Error(`期交所沒有 ${last.date} 的行情表`)
+  // Outright rows read: TX, month, open, high, low, last.
+  const row = [...text.matchAll(/TX (\d{6}) (\S+) (\S+) (\S+) (\S+)/g)].find((m) => m[1] === last.contract)
+  const official = Number(row?.[5])
+  if (!row || !(official > 0)) throw new Error(`期交所 ${last.date} 沒有 ${last.contract} 收盤`)
+  return { source: '期交所', date: last.date, session: last.session, official, primary: last.close }
+}
+
 // --- TWSE breadth ----------------------------------------------------------
 
 async function twseBreadth(): Promise<Breadth> {
@@ -184,10 +217,13 @@ async function main() {
   const flowStart = daysAgo(Math.round(FLOW_DAYS * 1.5))
   const flows = (await attempt('FinMind 三大法人', errors, () => fetchFlows(flowStart))) ?? []
   const margin = (await attempt('FinMind 融資餘額', errors, () => fetchMargin(flowStart))) ?? []
+  const futuresRaw = (await attempt('FinMind 台指期', errors, () => fetchFuturesBars(futuresStart(today)))) ?? []
+  const futuresCheck = futuresRaw.length > 0 ? await attempt('期交所 台指期', errors, () => taifexCheck(futuresRaw)) : null
+  const futures = applyFuturesCheck(futuresRaw, futuresCheck)
 
   // Nothing fetched: keep the previous file rather than overwrite it.
   if (!series.TAIEX?.length && !series.GSPC?.length) throw new Error(`沒有讀到任何指數：${errors.join('；')}`)
-  const data: IndicesData = { generatedAt: new Date().toISOString(), errors, series, checks, breadth, flows, margin }
+  const data: IndicesData = { generatedAt: new Date().toISOString(), errors, series, checks, breadth, flows, margin, futures, futuresCheck }
   mkdirSync('public/data', { recursive: true })
   writeFileSync(OUT, JSON.stringify(data))
   const summary = INDEX_DEFS.map((d) => {
@@ -195,6 +231,8 @@ async function main() {
     const gap = c && c.primary !== null ? ` 差 ${((c.primary / c.official - 1) * 100).toFixed(3)}%` : ''
     return `${d.key} ${series[d.key]?.length ?? 0} 筆${series[d.key]?.at(-1)?.date ?? ''}${gap}`
   })
+  const fc = futuresCheck && futuresCheck.primary !== null ? ` 差 ${((futuresCheck.primary / futuresCheck.official - 1) * 100).toFixed(3)}%` : ''
+  summary.push(`台指期 ${futures.length} 盤至 ${futures.at(-1)?.date ?? ''} ${futures.at(-1)?.session ?? ''}${fc}`)
   console.log(`[index-data] ${OUT}：${summary.join('；')}；${errors.length} 個錯誤`)
 }
 

@@ -4,6 +4,11 @@ import { INDEX_DEFS, indexDef, type IndexKey, type IndexMarket, type Reliability
 import { TREND_LABELS, TREND_TONE, flowSums, marginChange, marketSummary, vixBand, type IndexTrend, type Tone } from '../../lib/market/trend'
 import { useDailyMarket, type DailyMarket } from '../../lib/market/useDailyMarket'
 import { IndexChart } from './IndexChart'
+import { FuturesChart } from './FuturesChart'
+import { FUTURES_NAME, nightLine, nightReading, type NightReading } from '../../lib/market/futures'
+
+// The chart shows an index, or 台指期 day and night sessions.
+type ChartKey = IndexKey | 'FUTURES'
 
 const TONE_CLASS: Record<Tone, string> = {
   good: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/50 dark:text-indigo-200',
@@ -77,14 +82,49 @@ function IndexTile({ k, t, selected, onSelect }: { k: IndexKey; t: IndexTrend; s
   )
 }
 
+function FuturesTile({ r, selected, onSelect }: { r: NightReading; selected: boolean; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`rounded-md border p-3 text-left transition-colors ${
+        selected
+          ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30'
+          : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/40'
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400">{FUTURES_NAME}夜盤</span>
+        <Badge tone="info" title={`${r.span}，近月 ${r.bar.contract}`}>
+          {r.bar.date.slice(5)}
+        </Badge>
+      </div>
+      <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{num.format(r.bar.close)}</p>
+      <p className="text-xs">
+        <span className={changeClass(r.changePct)}>{signedPct(Math.round(r.changePct * 100) / 100)}</span>
+        {r.vsSpot !== null && (
+          <span className="ml-2 text-gray-500 dark:text-gray-400">
+            較現貨 {r.vsSpot >= 0 ? '+' : '−'}
+            {num.format(Math.round(Math.abs(r.vsSpot)))}
+          </span>
+        )}
+      </p>
+    </button>
+  )
+}
+
 const MARKET_KEYS: Record<IndexMarket, IndexKey[]> = {
   TW: ['TAIEX', 'TAIEX_TR', 'TPEx'],
   US: ['GSPC', 'IXIC', 'DJI', 'SOX', 'VIX'],
 }
 
-function MarketColumn({ market, m, selected, onSelect }: { market: IndexMarket; m: DailyMarket; selected: IndexKey; onSelect: (k: IndexKey) => void }) {
+function MarketColumn({ market, m, selected, onSelect }: { market: IndexMarket; m: DailyMarket; selected: ChartKey; onSelect: (k: ChartKey) => void }) {
   const data = m.data!
   const lines = marketSummary(market, { trends: m.trends, breadth: data.breadth, flows: data.flows, margin: data.margin, usBreadth: m.usBreadth })
+  const night = market === 'TW' ? nightReading(data.futures, data.series.TAIEX ?? []) : null
+  // The night session reads right after the index line.
+  if (night) lines.splice(1, 0, nightLine(night))
   return (
     <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
       <div className="flex items-baseline justify-between">
@@ -101,6 +141,7 @@ function MarketColumn({ market, m, selected, onSelect }: { market: IndexMarket; 
           const t = m.trends[k]
           return t ? <IndexTile key={k} k={k} t={t} selected={selected === k} onSelect={() => onSelect(k)} /> : null
         })}
+        {night && <FuturesTile r={night} selected={selected === 'FUTURES'} onSelect={() => onSelect('FUTURES')} />}
       </div>
     </div>
   )
@@ -196,10 +237,21 @@ function SourcesTable({ m }: { m: DailyMarket }) {
                 </tr>
               )
             })}
+            <tr className="border-t border-gray-100 dark:border-gray-700">
+              <td className="py-1 pr-3">{FUTURES_NAME}（日盤＋夜盤）</td>
+              <td className="py-1 pr-3">
+                {data.futures.at(-1) ? `${data.futures.at(-1)!.date} ${data.futures.at(-1)!.session === 'night' ? '夜盤' : '日盤'}` : '—'}
+              </td>
+              <td className="py-1 pr-3">FinMind＋期交所</td>
+              <td className="py-1 pr-3">
+                <Badge tone={RELIABILITY_TONE[data.futuresReliability.status]}>{data.futuresReliability.label}</Badge>
+              </td>
+              <td className="py-1">{data.futuresReliability.detail}</td>
+            </tr>
           </tbody>
         </table>
         <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-          每天由 GitHub 自動抓取並與官方來源比對（台股 14:30、美股收盤後的 07:00），差異超過 0.5% 時改用官方數字。網頁開啟時若有更新的收盤，會再向 FinMind 補抓。全部是免費公開資料，不需要金鑰。
+          每天由 GitHub 自動抓取並與官方來源比對（台股 14:30；美股與台指期夜盤在收盤後的 07:00），差異超過 0.5% 時改用官方數字。網頁開啟時若有更新的收盤，會再向 FinMind 補抓。全部是免費公開資料，不需要金鑰。
         </p>
         {data.errors.length > 0 && (
           <ul className="mt-2 list-disc pl-5 text-xs text-red-600 dark:text-red-400">
@@ -215,7 +267,7 @@ function SourcesTable({ m }: { m: DailyMarket }) {
 
 export function DailyMarketPanel() {
   const m = useDailyMarket()
-  const [selected, setSelected] = useState<IndexKey>('TAIEX')
+  const [selected, setSelected] = useState<ChartKey>('TAIEX')
 
   return (
     <section className="mt-6 rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
@@ -247,7 +299,11 @@ export function DailyMarketPanel() {
             <MarketColumn market="US" m={m} selected={selected} onSelect={setSelected} />
           </div>
           <div className="mt-4 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-            <IndexChart name={indexDef(selected).name} points={m.data.series[selected] ?? []} />
+            {selected === 'FUTURES' ? (
+              <FuturesChart bars={m.data.futures} taiex={m.data.series.TAIEX ?? []} />
+            ) : (
+              <IndexChart name={indexDef(selected).name} points={m.data.series[selected] ?? []} />
+            )}
           </div>
           <div className="mt-4 rounded-lg border border-gray-200 p-4 dark:border-gray-700">
             <FlowsTable m={m} />

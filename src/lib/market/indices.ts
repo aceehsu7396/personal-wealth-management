@@ -1,4 +1,15 @@
 import { readCache, requestDataset, writeCache, type FinMindDataset, type Fetcher } from '../research/finmind'
+import {
+  applyFuturesCheck,
+  catchUpFutures,
+  expectedSessions,
+  futuresReliability,
+  futuresStart,
+  type FuturesBar,
+  type FuturesCheck,
+  type FuturesReliability,
+  type FuturesSession,
+} from './futures'
 
 // Daily closes of the Taiwan and US benchmark indexes (handbook chapter 05
 // §6). FinMind serves them without a key and allows browser requests; the
@@ -78,6 +89,9 @@ export interface IndicesData {
   breadth: Breadth | null
   flows: FlowDay[]
   margin: MarginDay[]
+  // 台指期 day and night sessions; missing in snapshots before they existed.
+  futures?: FuturesBar[]
+  futuresCheck?: FuturesCheck | null
 }
 
 export const INDICES_DATA_PATH = 'data/indices.json'
@@ -288,6 +302,9 @@ async function catchUp<T extends { date: string }>(
 export interface LoadedIndices extends IndicesData {
   expected: Record<IndexMarket, string>
   reliability: Partial<Record<IndexKey, Reliability>>
+  futures: FuturesBar[]
+  futuresExpected: Record<FuturesSession, string>
+  futuresReliability: FuturesReliability
 }
 
 export async function fetchIndicesSnapshot(base: string = import.meta.env.BASE_URL): Promise<IndicesData | null> {
@@ -333,6 +350,11 @@ export async function loadIndices(
     }),
   )
   const flowStart = addDays(isoDay(now), -Math.round(FLOW_DAYS * 1.5))
+  const futuresExpected = expectedSessions(now)
+  const knownFutures = snapshot?.futures ?? []
+  const futuresBars = await attempt('FinMind 台指期', knownFutures, () =>
+    catchUpFutures(knownFutures, futuresExpected, futuresStart(isoDay(now)), options.fetcher),
+  )
   const [flows, margin] = await Promise.all([
     attempt('FinMind 三大法人', snapshot?.flows ?? [], () =>
       catchUp('flows', snapshot?.flows ?? [], expected.TW, flowStart, (start) => fetchFlows(start, options.fetcher)),
@@ -352,5 +374,9 @@ export async function loadIndices(
     margin,
     expected,
     reliability,
+    futures: applyFuturesCheck(futuresBars, snapshot?.futuresCheck),
+    futuresCheck: snapshot?.futuresCheck ?? null,
+    futuresExpected,
+    futuresReliability: futuresReliability(futuresBars, snapshot?.futuresCheck, futuresExpected),
   }
 }
