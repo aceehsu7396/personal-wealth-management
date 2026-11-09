@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { GENERAL_NODE, groupByArea, nodeForPath, notesToMarkdown, pageLabel, sortNotes } from './ideaNotes'
+import { GENERAL_NODE, groupByArea, isOpen, nodeForPath, notesToMarkdown, pageLabel, sortNotes } from './ideaNotes'
 import type { IdeaNote } from './storage/schema'
 
 const note = (over: Partial<IdeaNote>): IdeaNote => ({
   id: over.title ?? 'n',
   nodeId: 'screener',
+  kind: 'improve',
   title: 'n',
   detail: '',
   status: 'idea',
@@ -32,6 +33,19 @@ describe('ideaNotes', () => {
     expect(sorted.map((n) => n.title)).toEqual(['new high', 'old high', 'low', 'done'])
   })
 
+  it('keeps insights open, between open and finished improvements', () => {
+    const sorted = sortNotes([
+      note({ title: 'done', status: 'done' }),
+      note({ title: 'insight', kind: 'insight', updatedAt: '2026-11-09T00:00:00Z' }),
+      note({ title: 'low', priority: 'low' }),
+    ])
+    expect(sorted.map((n) => n.title)).toEqual(['low', 'insight', 'done'])
+    expect(isOpen(note({ kind: 'insight', status: 'done' }))).toBe(true)
+    expect(notesToMarkdown([note({ title: '停損要先寫好', kind: 'insight', detail: '這次猶豫了' })], '2026-11-09')).toContain(
+      '- 〔心得〕停損要先寫好 — 這次猶豫了（2026-11-01）',
+    )
+  })
+
   it('exports Markdown by area and part, only parts with notes', () => {
     const md = notesToMarkdown(
       [
@@ -41,7 +55,7 @@ describe('ideaNotes', () => {
       ],
       '2026-11-06',
     )
-    expect(md).toContain('# 精進筆記（2026-11-06，共 3 則）')
+    expect(md).toContain('# 筆記（2026-11-06，共 3 則）')
     expect(md).toContain('## 整體／跨項目\n\n### 整體／跨項目\n- [ ] 〔中〕〔規劃中〕改成三大項目（2026-11-01）')
     expect(md).toContain('### 選股與觀察名單（頁面 /research/screener；手冊 附錄 B 名詞解釋）')
     expect(md).toContain('- [ ] 〔高〕依產業分組 — 觀察名單 太長（記於 研究分析・選股（/research/screener），2026-11-01）')

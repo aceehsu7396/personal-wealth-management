@@ -5,6 +5,8 @@ import { ARCH_LAYERS, ARCH_NODES } from '../../lib/architecture'
 import {
   GENERAL_NODE,
   GENERAL_TITLE,
+  IDEA_KINDS,
+  IDEA_KIND_LABELS,
   IDEA_PRIORITIES,
   IDEA_PRIORITY_LABELS,
   IDEA_STATUSES,
@@ -13,7 +15,7 @@ import {
   nodeOf,
   pageLabel,
 } from '../../lib/ideaNotes'
-import type { IdeaNote, IdeaNotePriority, IdeaNoteStatus } from '../../lib/storage/schema'
+import type { IdeaNote, IdeaNoteKind, IdeaNotePriority, IdeaNoteStatus } from '../../lib/storage/schema'
 import { inputClass, labelClass } from '../forms/FormField'
 
 // Pieces shared by the notes page and the notes drawer.
@@ -28,6 +30,31 @@ const STATUS_TONE: Record<IdeaNoteStatus, string> = {
   planned: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
   done: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300',
   dropped: 'bg-gray-100 text-gray-500 line-through dark:bg-gray-800 dark:text-gray-500',
+}
+
+const INSIGHT_TONE = 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200'
+
+// Improvement or insight, as two toggle buttons.
+export function KindPicker({ value, onChange }: { value: IdeaNoteKind; onChange: (kind: IdeaNoteKind) => void }) {
+  return (
+    <div className="flex gap-1" role="group" aria-label="類型">
+      {IDEA_KINDS.map((k) => (
+        <button
+          key={k}
+          type="button"
+          aria-pressed={value === k}
+          onClick={() => onChange(k)}
+          className={`rounded-md px-3 py-1 text-sm ${
+            value === k
+              ? 'bg-indigo-600 text-white'
+              : 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+          }`}
+        >
+          {IDEA_KIND_LABELS[k]}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 // Node choices grouped by area, the general group first.
@@ -55,19 +82,23 @@ export function NoteRow({ note }: { note: IdeaNote }) {
   const [title, setTitle] = useState(note.title)
   const [detail, setDetail] = useState(note.detail)
   const [nodeId, setNodeId] = useState(nodeOf(note))
+  const [kind, setKind] = useState(note.kind)
   const [pendingDelete, setPendingDelete] = useState(false)
 
   const save = () => {
     if (!title.trim()) return
-    updateIdeaNote(note.id, { title: title.trim(), detail: detail.trim(), nodeId })
+    updateIdeaNote(note.id, { title: title.trim(), detail: detail.trim(), nodeId, kind })
     setEditing(false)
   }
 
   return (
     <li className="py-3">
       <div className="flex flex-wrap items-start gap-2">
-        <span className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${STATUS_TONE[note.status]}`}>
-          {IDEA_STATUS_LABELS[note.status]}
+        {/* Insights have no status to move through: the badge names the kind. */}
+        <span
+          className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-medium ${note.kind === 'insight' ? INSIGHT_TONE : STATUS_TONE[note.status]}`}
+        >
+          {note.kind === 'insight' ? '心得' : IDEA_STATUS_LABELS[note.status]}
         </span>
         <button
           type="button"
@@ -79,32 +110,34 @@ export function NoteRow({ note }: { note: IdeaNote }) {
           <span className="font-medium">{note.title}</span>
           {!editing && note.detail && <span className="mt-0.5 block text-xs text-gray-500 dark:text-gray-400">{note.detail}</span>}
         </button>
-        <div className="flex shrink-0 items-center gap-2">
-          <select
-            aria-label="狀態"
-            className={smallSelect}
-            value={note.status}
-            onChange={(e) => updateIdeaNote(note.id, { status: e.target.value as IdeaNoteStatus })}
-          >
-            {IDEA_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {IDEA_STATUS_LABELS[s]}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="優先度"
-            className={smallSelect}
-            value={note.priority}
-            onChange={(e) => updateIdeaNote(note.id, { priority: e.target.value as IdeaNotePriority })}
-          >
-            {IDEA_PRIORITIES.map((p) => (
-              <option key={p} value={p}>
-                優先 {IDEA_PRIORITY_LABELS[p]}
-              </option>
-            ))}
-          </select>
-        </div>
+        {note.kind === 'improve' && (
+          <div className="flex shrink-0 items-center gap-2">
+            <select
+              aria-label="狀態"
+              className={smallSelect}
+              value={note.status}
+              onChange={(e) => updateIdeaNote(note.id, { status: e.target.value as IdeaNoteStatus })}
+            >
+              {IDEA_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {IDEA_STATUS_LABELS[s]}
+                </option>
+              ))}
+            </select>
+            <select
+              aria-label="優先度"
+              className={smallSelect}
+              value={note.priority}
+              onChange={(e) => updateIdeaNote(note.id, { priority: e.target.value as IdeaNotePriority })}
+            >
+              {IDEA_PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  優先 {IDEA_PRIORITY_LABELS[p]}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
       <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
         {note.createdAt.slice(0, 10)} 記
@@ -120,6 +153,7 @@ export function NoteRow({ note }: { note: IdeaNote }) {
       </p>
       {editing && (
         <div className="mt-3 space-y-3 rounded-md bg-gray-50 p-3 dark:bg-gray-900/40">
+          <KindPicker value={kind} onChange={setKind} />
           <label className="block">
             <span className={labelClass}>標題</span>
             <input className={inputClass} value={title} onChange={(e) => setTitle(e.target.value)} />

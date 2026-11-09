@@ -54,7 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: '績效歸因', to: '/portfolio/review' },
     ],
   },
-  { id: 'notes', label: '筆記', to: '/notes', tabs: [{ label: '精進筆記', to: '/notes' }], utility: true },
+  { id: 'notes', label: '筆記', to: '/notes', tabs: [{ label: '筆記', to: '/notes' }], utility: true },
   {
     id: 'handbook',
     label: '手冊',

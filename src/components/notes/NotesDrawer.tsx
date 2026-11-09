@@ -2,9 +2,9 @@ import { useEffect, useId, useRef, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAppStore } from '../../lib/storage/appStore'
 import { IDEA_PRIORITIES, IDEA_PRIORITY_LABELS, isOpen, nodeForPath, nodeOf, nodeTitle, pageLabel, sortNotes } from '../../lib/ideaNotes'
-import type { IdeaNotePriority } from '../../lib/storage/schema'
+import type { IdeaNoteKind, IdeaNotePriority } from '../../lib/storage/schema'
 import { inputClass, labelClass } from '../forms/FormField'
-import { NodeOptions, NoteRow } from './NoteRow'
+import { KindPicker, NodeOptions, NoteRow } from './NoteRow'
 import { useNotesDrawer } from './useNotesDrawer'
 
 type Scope = 'page' | 'node'
@@ -50,7 +50,7 @@ export function NotesDrawer() {
         type="button"
         onClick={() => (open ? close() : openNotes())}
         aria-expanded={open}
-        aria-label={`筆記${pageOpen > 0 ? `（本頁 ${pageOpen} 則未完成）` : ''}`}
+        aria-label={`筆記${pageOpen > 0 ? `（本頁 ${pageOpen} 則）` : ''}`}
         className="fixed right-4 bottom-4 z-40 flex items-center gap-1.5 rounded-full bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white shadow-lg hover:bg-indigo-700 print:hidden"
       >
         <span aria-hidden>✎</span>
@@ -69,7 +69,13 @@ function NotesPanel({ pathname, requestedNode, onClose }: { pathname: string; re
   const pageNode = nodeForPath(pathname)
   const titleId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
-  const [form, setForm] = useState({ nodeId: requestedNode ?? pageNode, title: '', detail: '', priority: 'medium' as IdeaNotePriority })
+  const [form, setForm] = useState({
+    kind: 'improve' as IdeaNoteKind,
+    nodeId: requestedNode ?? pageNode,
+    title: '',
+    detail: '',
+    priority: 'medium' as IdeaNotePriority,
+  })
   const [scope, setScope] = useState<Scope>(requestedNode && requestedNode !== pageNode ? 'node' : 'page')
   const [showAll, setShowAll] = useState(false)
   const [message, setMessage] = useState('')
@@ -79,7 +85,14 @@ function NotesPanel({ pathname, requestedNode, onClose }: { pathname: string; re
   const add = (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.title.trim()) return
-    addIdeaNote({ nodeId: form.nodeId, title: form.title.trim(), detail: form.detail.trim(), priority: form.priority, page: pathname })
+    addIdeaNote({
+      kind: form.kind,
+      nodeId: form.nodeId,
+      title: form.title.trim(),
+      detail: form.detail.trim(),
+      priority: form.priority,
+      page: pathname,
+    })
     setForm({ ...form, title: '', detail: '' })
     setMessage('已記下')
     inputRef.current?.focus()
@@ -120,13 +133,14 @@ function NotesPanel({ pathname, requestedNode, onClose }: { pathname: string; re
 
         <div className="overflow-y-auto px-5 py-4">
           <form onSubmit={add} className="space-y-3">
+            <KindPicker value={form.kind} onChange={(kind) => setForm({ ...form, kind })} />
             <label className="block">
-              <span className={labelClass}>想法</span>
+              <span className={labelClass}>標題</span>
               <input
                 ref={inputRef}
                 className={inputClass}
                 value={form.title}
-                placeholder="這一頁可以怎麼更好？"
+                placeholder={form.kind === 'improve' ? '這一頁可以怎麼更好？' : '想到什麼、學到什麼？'}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
               />
             </label>
@@ -134,27 +148,30 @@ function NotesPanel({ pathname, requestedNode, onClose }: { pathname: string; re
               <span className={labelClass}>說明（選填）</span>
               <textarea className={inputClass} rows={2} value={form.detail} onChange={(e) => setForm({ ...form, detail: e.target.value })} />
             </label>
-            <div className="grid grid-cols-[1fr_6rem] gap-3">
+            <div className={`grid gap-3 ${form.kind === 'improve' ? 'grid-cols-[1fr_6rem]' : 'grid-cols-1'}`}>
               <label className="block">
                 <span className={labelClass}>環節</span>
                 <select className={inputClass} value={form.nodeId} onChange={(e) => setForm({ ...form, nodeId: e.target.value })}>
                   <NodeOptions />
                 </select>
               </label>
-              <label className="block">
-                <span className={labelClass}>優先度</span>
-                <select
-                  className={inputClass}
-                  value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value as IdeaNotePriority })}
-                >
-                  {IDEA_PRIORITIES.map((p) => (
-                    <option key={p} value={p}>
-                      {IDEA_PRIORITY_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              {/* Insights are not worked through, so they take no priority. */}
+              {form.kind === 'improve' && (
+                <label className="block">
+                  <span className={labelClass}>優先度</span>
+                  <select
+                    className={inputClass}
+                    value={form.priority}
+                    onChange={(e) => setForm({ ...form, priority: e.target.value as IdeaNotePriority })}
+                  >
+                    {IDEA_PRIORITIES.map((p) => (
+                      <option key={p} value={p}>
+                        {IDEA_PRIORITY_LABELS[p]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <button

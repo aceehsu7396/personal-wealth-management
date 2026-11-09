@@ -748,8 +748,11 @@ export const WatchItemSchema = z.object({
 })
 export type WatchItem = z.infer<typeof WatchItemSchema>
 
-// An idea for improving the tool, filed under a part of the system map
-// (architecture.ts node id, or "general" for the whole site).
+// A note filed under a part of the system map (architecture.ts node id, or
+// "general" for the whole site): an improvement to the tool, tracked to done,
+// or an insight or thought kept as written.
+export const IdeaNoteKindSchema = z.enum(['improve', 'insight'])
+export type IdeaNoteKind = z.infer<typeof IdeaNoteKindSchema>
 export const IdeaNoteStatusSchema = z.enum(['idea', 'planned', 'done', 'dropped'])
 export type IdeaNoteStatus = z.infer<typeof IdeaNoteStatusSchema>
 export const IdeaNotePrioritySchema = z.enum(['high', 'medium', 'low'])
@@ -758,6 +761,8 @@ export type IdeaNotePriority = z.infer<typeof IdeaNotePrioritySchema>
 export const IdeaNoteSchema = z.object({
   id: z.string(),
   nodeId: z.string(),
+  // Notes written before kinds existed were all improvements.
+  kind: IdeaNoteKindSchema.default('improve'),
   title: z.string(),
   detail: z.string().default(''),
   status: IdeaNoteStatusSchema,

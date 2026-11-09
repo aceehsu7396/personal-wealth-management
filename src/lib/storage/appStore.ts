@@ -168,7 +168,7 @@ interface AppStore extends AppData {
   addWatchItem: (entry: Omit<WatchItem, 'addedAt'>) => void
   updateWatchItem: (symbol: string, entry: Partial<Omit<WatchItem, 'symbol' | 'addedAt'>>) => void
   removeWatchItem: (symbol: string) => void
-  addIdeaNote: (entry: Pick<IdeaNote, 'nodeId' | 'title'> & Partial<Pick<IdeaNote, 'detail' | 'priority' | 'page'>>) => string
+  addIdeaNote: (entry: Pick<IdeaNote, 'nodeId' | 'title'> & Partial<Pick<IdeaNote, 'kind' | 'detail' | 'priority' | 'page'>>) => string
   // Marking an idea done stamps doneAt; reopening it clears it.
   updateIdeaNote: (id: string, entry: Partial<Omit<IdeaNote, 'id' | 'createdAt' | 'updatedAt' | 'doneAt'>>) => void
   removeIdeaNote: (id: string) => void
@@ -517,7 +517,7 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({
           ideaNotes: [
             ...state.ideaNotes,
-            { detail: '', priority: 'medium', ...entry, id, status: 'idea', createdAt: now, updatedAt: now },
+            { kind: 'improve', detail: '', priority: 'medium', ...entry, id, status: 'idea', createdAt: now, updatedAt: now },
           ],
         }))
         return id

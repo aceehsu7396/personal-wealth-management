@@ -33,6 +33,12 @@ describe('AppDataSchema', () => {
     expect(result.data?.ideaNotes).toEqual([])
   })
 
+  it('reads notes saved before kinds existed as improvements', () => {
+    const note = { id: 'n', nodeId: 'general', title: 't', status: 'idea', createdAt: '', updatedAt: '' }
+    const result = AppDataSchema.safeParse({ ...createDefaultAppData(), ideaNotes: [note] })
+    expect(result.data?.ideaNotes[0]).toMatchObject({ kind: 'improve', priority: 'medium', detail: '' })
+  })
+
   it('loads research cards saved before the automatic health check', () => {
     const card = {
       id: 'x', ticker: '2330', name: '台積電', market: 'TW', sector: '半導體', lynchCategory: 'stalwart',

@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import {
   GENERAL_TITLE,
+  IDEA_KINDS,
+  IDEA_KIND_LABELS,
   IDEA_STATUSES,
   IDEA_STATUS_LABELS,
   groupByArea,
@@ -10,7 +12,7 @@ import {
   nodeOf,
   notesToMarkdown,
 } from '../lib/ideaNotes'
-import type { IdeaNoteStatus } from '../lib/storage/schema'
+import type { IdeaNoteKind, IdeaNoteStatus } from '../lib/storage/schema'
 import { todayIsoDate } from '../lib/market/twse'
 import { inputClass, labelClass } from '../components/forms/FormField'
 import { NoteRow, NodeOptions } from '../components/notes/NoteRow'
@@ -22,6 +24,7 @@ const buttonClass =
 const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400'
 
 type StatusFilter = 'open' | 'all' | IdeaNoteStatus
+type KindFilter = 'all' | IdeaNoteKind
 
 export function IdeaNotesPage() {
   const notes = useAppStore((s) => s.ideaNotes)
@@ -29,18 +32,23 @@ export function IdeaNotesPage() {
   const [search, setSearch] = useSearchParams()
   const nodeFilter = search.get('node') ?? ''
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open')
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [query, setQuery] = useState('')
   const [message, setMessage] = useState('')
 
   const q = query.trim().toLowerCase()
   const visible = notes.filter(
     (n) =>
-      (statusFilter === 'all' || (statusFilter === 'open' ? isOpen(n) : n.status === statusFilter)) &&
+      (kindFilter === 'all' || n.kind === kindFilter) &&
+      // A single status only applies to improvements; insights have none.
+      (statusFilter === 'all' || (statusFilter === 'open' ? isOpen(n) : n.kind === 'improve' && n.status === statusFilter)) &&
       (!nodeFilter || nodeOf(n) === nodeFilter) &&
       (!q || `${n.title} ${n.detail}`.toLowerCase().includes(q)),
   )
   const areas = groupByArea(visible)
-  const counts = IDEA_STATUSES.map((s) => ({ s, n: notes.filter((x) => x.status === s).length }))
+  const improvements = notes.filter((x) => x.kind === 'improve')
+  const counts = IDEA_STATUSES.map((s) => `${IDEA_STATUS_LABELS[s]} ${improvements.filter((x) => x.status === s).length}`)
+  const insights = notes.length - improvements.length
 
   const markdown = () => notesToMarkdown(visible, todayIsoDate())
   const copy = async () => {
@@ -55,7 +63,7 @@ export function IdeaNotesPage() {
     const url = URL.createObjectURL(new Blob([markdown()], { type: 'text/markdown' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `精進筆記-${todayIsoDate()}.md`
+    a.download = `筆記-${todayIsoDate()}.md`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -68,12 +76,12 @@ export function IdeaNotesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">精進筆記</h1>
+      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">筆記</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        記下工具在功能面上可以精進的想法，依系統地圖的三大項目與環節分類。每一頁右下角的「✎ 筆記」都能隨時記一筆；想實作時，在這裡複製成 Markdown 交給 Claude。
+        記下工具可以精進的地方，也記下使用時的心得與想法，依系統地圖的三大項目與環節分類。每一頁右下角的「✎ 筆記」都能隨時記一筆；在這裡可以篩選與複製成 Markdown，回顧心得或把精進項目交給 Claude 實作。
       </p>
       <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-        {counts.map(({ s, n }) => `${IDEA_STATUS_LABELS[s]} ${n}`).join('・')}
+        功能精進：{counts.join('・')}｜心得想法 {insights}
       </p>
 
       <div className="mt-4">
@@ -88,13 +96,24 @@ export function IdeaNotesPage() {
 
       <div className="mt-6 flex flex-wrap items-end gap-3">
         <label className="block">
+          <span className={labelClass}>類型</span>
+          <select className={inputClass} value={kindFilter} onChange={(e) => setKindFilter(e.target.value as KindFilter)}>
+            <option value="all">全部</option>
+            {IDEA_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {IDEA_KIND_LABELS[k]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block">
           <span className={labelClass}>狀態</span>
           <select
             className={inputClass}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
           >
-            <option value="open">未完成（想法＋規劃中）</option>
+            <option value="open">未完成的精進＋心得</option>
             <option value="all">全部</option>
             {IDEA_STATUSES.map((s) => (
               <option key={s} value={s}>
