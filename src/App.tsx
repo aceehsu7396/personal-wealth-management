@@ -1,6 +1,8 @@
 import { DemoBanner } from './components/DemoBanner'
 import { StorageWarning } from './components/StorageWarning'
 import { PageContext } from './components/PageContext'
+import { NotesDrawer } from './components/notes/NotesDrawer'
+import { NotesDrawerProvider } from './components/notes/NotesDrawerContext'
 import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/layout/NavBar'
@@ -29,46 +31,50 @@ const HandbookPage = lazy(() =>
 function App() {
   return (
     <HashRouter>
-      <div className="min-h-svh bg-gray-50 dark:bg-gray-900">
-        <NavBar />
-        <DemoBanner />
-        <StorageWarning />
-        <PortfolioSnapshotRecorder />
-        <PageContext />
-        <Routes>
-          <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
-          {/* 研究分析 */}
-          <Route path="/research/market" element={<MarketPage />} />
-          <Route path="/research/screener" element={<ScreenerPage />} />
-          <Route path="/research/stocks" element={<StocksPage />} />
-          {/* 模擬交易 */}
-          <Route path="/sim/strategies" element={<StrategiesPage />} />
-          <Route path="/sim/backtest" element={<BacktestPage />} />
-          <Route path="/sim/paper" element={<PaperPage />} />
-          {/* 投資持有與檢討回顧 */}
-          <Route path="/today" element={<DashboardPage />} />
-          <Route path="/goals" element={<GoalsPage />} />
-          <Route path="/portfolio" element={<PortfolioPage />} />
-          <Route path="/portfolio/trades" element={<TradesPage />} />
-          <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
-          {/* 筆記、手冊與行動路線、設定 */}
-          <Route path="/notes" element={<IdeaNotesPage />} />
-          <Route
-            path="/handbook/:slug?"
-            element={
-              <Suspense fallback={<p className="px-4 py-10 text-center text-sm text-gray-500">載入手冊中…</p>}>
-                <HandbookPage />
-              </Suspense>
-            }
-          />
-          <Route path="/journey" element={<JourneyPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
-            <Route key={from} path={from} element={<Navigate to={to} replace />} />
-          ))}
-          <Route path="*" element={<Navigate to={HOME_PATH} replace />} />
-        </Routes>
-      </div>
+      <NotesDrawerProvider>
+        {/* Bottom padding keeps the notes button off the last line of each page. */}
+        <div className="min-h-svh bg-gray-50 pb-20 dark:bg-gray-900">
+          <NavBar />
+          <DemoBanner />
+          <StorageWarning />
+          <PortfolioSnapshotRecorder />
+          <PageContext />
+          <Routes>
+            <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
+            {/* 研究分析 */}
+            <Route path="/research/market" element={<MarketPage />} />
+            <Route path="/research/screener" element={<ScreenerPage />} />
+            <Route path="/research/stocks" element={<StocksPage />} />
+            {/* 模擬交易 */}
+            <Route path="/sim/strategies" element={<StrategiesPage />} />
+            <Route path="/sim/backtest" element={<BacktestPage />} />
+            <Route path="/sim/paper" element={<PaperPage />} />
+            {/* 投資持有與檢討回顧 */}
+            <Route path="/today" element={<DashboardPage />} />
+            <Route path="/goals" element={<GoalsPage />} />
+            <Route path="/portfolio" element={<PortfolioPage />} />
+            <Route path="/portfolio/trades" element={<TradesPage />} />
+            <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
+            {/* 筆記、手冊與行動路線、設定 */}
+            <Route path="/notes" element={<IdeaNotesPage />} />
+            <Route
+              path="/handbook/:slug?"
+              element={
+                <Suspense fallback={<p className="px-4 py-10 text-center text-sm text-gray-500">載入手冊中…</p>}>
+                  <HandbookPage />
+                </Suspense>
+              }
+            />
+            <Route path="/journey" element={<JourneyPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
+              <Route key={from} path={from} element={<Navigate to={to} replace />} />
+            ))}
+            <Route path="*" element={<Navigate to={HOME_PATH} replace />} />
+          </Routes>
+          <NotesDrawer />
+        </div>
+      </NotesDrawerProvider>
     </HashRouter>
   )
 }

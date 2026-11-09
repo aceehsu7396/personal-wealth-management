@@ -1,7 +1,8 @@
 // Ideas for improving the tool, filed under the system map's three areas
 // (architecture.ts). Grouping, ordering and the Markdown export are pure so
 // the notes page and its tests share them.
-import { ARCH_LAYERS, ARCH_NODES, type ArchNode } from './architecture'
+import { ARCH_LAYERS, ARCH_NODES, PAGE_NODES, type ArchNode } from './architecture'
+import { NAV_GROUPS, tabMatches } from '../components/layout/navigation'
 import type { IdeaNote, IdeaNotePriority, IdeaNoteStatus } from './storage/schema'
 
 export const GENERAL_NODE = 'general'
@@ -30,6 +31,27 @@ export function nodeOf(note: IdeaNote): string {
 
 export function nodeTitle(nodeId: string): string {
   return ARCH_NODES[nodeId]?.title ?? GENERAL_TITLE
+}
+
+// The part a page belongs to: working pages by the system map, handbook
+// chapters by the part that cites them, everything else general.
+export function nodeForPath(pathname: string): string {
+  if (PAGE_NODES[pathname]) return PAGE_NODES[pathname]
+  const slug = decodeURIComponent(pathname.match(/^\/handbook\/(.+)$/)?.[1] ?? '')
+  const cited = slug ? Object.values(ARCH_NODES).find((n) => n.handbook.slug === slug) : undefined
+  return cited?.id ?? GENERAL_NODE
+}
+
+// "研究分析・選股", "手冊 05": a readable name for where a note was written.
+export function pageLabel(pathname: string): string {
+  const slug = decodeURIComponent(pathname.match(/^\/handbook\/(.+)$/)?.[1] ?? '')
+  if (slug) return `手冊 ${slug.replace(/^附錄/, '附錄 ')}`
+  // The most specific tab wins (/portfolio/trades over /portfolio).
+  for (const g of NAV_GROUPS) {
+    const tab = g.tabs.filter((t) => tabMatches(t, pathname)).sort((a, b) => b.to.length - a.to.length)[0]
+    if (tab) return g.utility ? tab.label : `${g.label}・${tab.label}`
+  }
+  return pathname
 }
 
 const PRIORITY_RANK: Record<IdeaNotePriority, number> = { high: 0, medium: 1, low: 2 }
@@ -73,7 +95,7 @@ export function groupByArea(notes: IdeaNote[]): AreaNotes[] {
 function noteLine(n: IdeaNote): string {
   const status = n.status === 'planned' || n.status === 'dropped' ? `〔${IDEA_STATUS_LABELS[n.status]}〕` : ''
   const detail = n.detail.trim() ? ` — ${n.detail.trim().replace(/\s*\n\s*/g, ' ')}` : ''
-  const where = [n.page ? `記於 ${n.page}` : '', n.createdAt.slice(0, 10)].filter(Boolean).join('，')
+  const where = [n.page ? `記於 ${pageLabel(n.page)}（${n.page}）` : '', n.createdAt.slice(0, 10)].filter(Boolean).join('，')
   return `- [${n.status === 'done' ? 'x' : ' '}] 〔${IDEA_PRIORITY_LABELS[n.priority]}〕${status}${n.title}${detail}（${where}）`
 }
 

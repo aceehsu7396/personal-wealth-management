@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GENERAL_NODE, groupByArea, notesToMarkdown, sortNotes } from './ideaNotes'
+import { GENERAL_NODE, groupByArea, nodeForPath, notesToMarkdown, pageLabel, sortNotes } from './ideaNotes'
 import type { IdeaNote } from './storage/schema'
 
 const note = (over: Partial<IdeaNote>): IdeaNote => ({
@@ -44,8 +44,25 @@ describe('ideaNotes', () => {
     expect(md).toContain('# 精進筆記（2026-11-06，共 3 則）')
     expect(md).toContain('## 整體／跨項目\n\n### 整體／跨項目\n- [ ] 〔中〕〔規劃中〕改成三大項目（2026-11-01）')
     expect(md).toContain('### 選股與觀察名單（頁面 /research/screener；手冊 附錄 B 名詞解釋）')
-    expect(md).toContain('- [ ] 〔高〕依產業分組 — 觀察名單 太長（記於 /research/screener，2026-11-01）')
+    expect(md).toContain('- [ ] 〔高〕依產業分組 — 觀察名單 太長（記於 研究分析・選股（/research/screener），2026-11-01）')
     expect(md).toContain('- [x] 〔中〕回測加手續費')
     expect(md).not.toContain('### 虛擬帳戶')
+  })
+
+  it('files each page under its part', () => {
+    expect(nodeForPath('/research/screener')).toBe('screener')
+    expect(nodeForPath('/handbook/05')).toBe('macro')
+    expect(nodeForPath('/handbook/10')).toBe('strategy')
+    expect(nodeForPath('/today')).toBe(GENERAL_NODE)
+    expect(nodeForPath('/settings')).toBe(GENERAL_NODE)
+    expect(nodeForPath('/handbook')).toBe(GENERAL_NODE)
+  })
+
+  it('names pages by their tab', () => {
+    expect(pageLabel('/today')).toBe('投資持有與檢討回顧・今日')
+    expect(pageLabel('/portfolio/trades')).toBe('投資持有與檢討回顧・交易日誌')
+    expect(pageLabel('/handbook/05')).toBe('手冊 05')
+    expect(pageLabel('/handbook/%E9%99%84%E9%8C%84C')).toBe('手冊 附錄 C')
+    expect(pageLabel('/journey')).toBe('行動路線')
   })
 })
