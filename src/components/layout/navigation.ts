@@ -10,7 +10,7 @@ export interface NavTab {
 }
 
 export interface NavGroup {
-  id: 'research' | 'strategy' | 'portfolio' | 'notes' | 'handbook' | 'settings'
+  id: 'research' | 'strategy' | 'portfolio' | 'insights' | 'notes' | 'handbook' | 'settings'
   label: string
   to: string
   tabs: NavTab[]
@@ -54,6 +54,8 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: '績效歸因', to: '/portfolio/review' },
     ],
   },
+  // Temporary: gathered notes from full-time traders.
+  { id: 'insights', label: '交易心得', to: '/insights', tabs: [{ label: '交易心得', to: '/insights' }] },
   { id: 'notes', label: '筆記', to: '/notes', tabs: [{ label: '筆記', to: '/notes' }], utility: true },
   {
     id: 'handbook',

@@ -8,8 +8,8 @@ const sources = import.meta.glob(['../../**/*.{ts,tsx}', '!../../**/*.test.ts', 
 }) as Record<string, string>
 
 describe('navigation', () => {
-  it('groups pages into the three areas, with notes, the handbook and settings at the side', () => {
-    expect(NAV_GROUPS.filter((g) => !g.utility).map((g) => g.label)).toEqual(['研究分析', '模擬交易', '投資持有與檢討回顧'])
+  it('groups pages into the three areas (plus the temporary insights page), with notes, the handbook and settings at the side', () => {
+    expect(NAV_GROUPS.filter((g) => !g.utility).map((g) => g.label)).toEqual(['研究分析', '模擬交易', '投資持有與檢討回顧', '交易心得'])
     expect(NAV_GROUPS.filter((g) => g.utility).map((g) => g.id)).toEqual(['notes', 'handbook', 'settings'])
     expect(groupOf('/research/screener')?.id).toBe('research')
     expect(groupOf('/today')?.id).toBe('portfolio')
@@ -17,6 +17,7 @@ describe('navigation', () => {
     expect(groupOf('/journey')?.id).toBe('handbook')
     expect(groupOf('/handbook/12')?.id).toBe('handbook')
     expect(groupOf('/notes')?.id).toBe('notes')
+    expect(groupOf('/insights')?.id).toBe('insights')
   })
 
   it('opens on the first area', () => {

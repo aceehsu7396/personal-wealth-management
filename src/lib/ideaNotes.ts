@@ -53,7 +53,7 @@ export function pageLabel(pathname: string): string {
   // The most specific tab wins (/portfolio/trades over /portfolio).
   for (const g of NAV_GROUPS) {
     const tab = g.tabs.filter((t) => tabMatches(t, pathname)).sort((a, b) => b.to.length - a.to.length)[0]
-    if (tab) return g.utility ? tab.label : `${g.label}・${tab.label}`
+    if (tab) return g.utility || g.tabs.length === 1 ? tab.label : `${g.label}・${tab.label}`
   }
   return pathname
 }
