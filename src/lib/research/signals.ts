@@ -413,3 +413,34 @@ export function buildSignals(input: SignalInput): SignalReport {
     asOf: t?.date ?? null,
   }
 }
+
+export interface BuyDistance {
+  label: string
+  // Sort key: 0 in the buy zone, else the % still to fall; larger = later.
+  rank: number
+  // The advice is to buy or add now (the 今日 page lists these).
+  inZone: boolean
+}
+
+const LAST = 10_000
+
+// How far a card is from its buy point, for the card list, the watchlist
+// and the 今日 reminders.
+export function buyDistanceOf(report: SignalReport, isEtf: boolean): BuyDistance {
+  const inZone = report.action === 'buy' || report.action === 'add'
+  if (report.action === 'trim' || report.action === 'exit' || report.action === 'review') {
+    return { label: ACTION_LABELS[report.action], rank: LAST, inZone }
+  }
+  if (report.action === 'add') return { label: '可加碼', rank: 0, inZone }
+  if (isEtf) {
+    if (report.action === 'buy') return { label: '趨勢轉強，可進場', rank: 0, inZone }
+    return report.action === 'wait' ? { label: '等站穩 120 日線', rank: 50, inZone } : { label: '—', rank: LAST, inZone }
+  }
+  const batch1 = report.levels.find((l) => l.key === 'batch1')
+  if (!batch1) return { label: '—', rank: LAST, inZone }
+  const batch3 = report.levels.find((l) => l.key === 'batch3')
+  if (batch3 && batch3.distancePercent >= 0) return { label: '強力買進區', rank: 0, inZone }
+  if (batch1.distancePercent >= 0) return { label: '已進入買進區', rank: 0, inZone }
+  const fall = Math.abs(batch1.distancePercent)
+  return { label: `再跌 ${fall.toFixed(1)}%`, rank: fall, inZone }
+}

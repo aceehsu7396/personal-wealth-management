@@ -13,6 +13,10 @@ import {
   type Screen,
 } from '../lib/screener/screens'
 import { Term } from '../components/Term'
+import { ActionBadge } from '../components/research/SignalPanel'
+import { evaluateThesis } from '../lib/calculations/thesisScoring'
+import { useSignals } from '../lib/research/useSignals'
+import { buyDistanceOf } from '../lib/research/signals'
 import { inputClass, labelClass } from '../components/forms/FormField'
 
 const cardClass =
@@ -55,6 +59,19 @@ export function ScreenerPage() {
   const addWatchItem = useAppStore((s) => s.addWatchItem)
   const updateWatchItem = useAppStore((s) => s.updateWatchItem)
   const removeWatchItem = useAppStore((s) => s.removeWatchItem)
+  const theses = useAppStore((s) => s.stockTheses)
+  const policy = useAppStore((s) => s.investmentPolicy)
+  const signalsFor = useSignals()
+  // A watched symbol's research card, if one is written: its advice and how
+  // far it is from the buy point.
+  const cardAdvice = (symbol: string) => {
+    const code = symbol.replace(/^TW:/, '')
+    const thesis = theses.find((x) => x.ticker.trim().toUpperCase() === code && x.status !== 'exited')
+    if (!thesis) return null
+    if (!thesis.auto) return { code, signals: null, distance: null }
+    const signals = signalsFor(thesis, evaluateThesis(thesis, policy))
+    return { code, signals, distance: buyDistanceOf(signals, thesis.kind === 'etf') }
+  }
 
   const [data, setData] = useState<StockData | null | undefined>(undefined)
   const [presetId, setPresetId] = useState<string>(PRESET_SCREENS[0].id)
@@ -274,7 +291,7 @@ export function ScreenerPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  {['代號／名稱', '加入', '加入以來', '本益比', '6 個月', '備註', ''].map((h) => (
+                  {['代號／名稱', '加入', '加入以來', '研究卡建議', '本益比', '6 個月', '備註', ''].map((h) => (
                     <th key={h} className={thClass}>
                       {h}
                     </th>
@@ -285,6 +302,7 @@ export function ScreenerPage() {
                 {watchlist.map((w) => {
                   const row = bySymbol.get(w.symbol)
                   const change = row?.close && w.priceAtAdd ? row.close / w.priceAtAdd - 1 : null
+                  const advice = cardAdvice(w.symbol)
                   return (
                     <tr key={w.symbol} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
                       <td className={tdClass}>
@@ -297,6 +315,22 @@ export function ScreenerPage() {
                       </td>
                       <td className={`${tdClass} ${change !== null && change < 0 ? 'text-orange-700 dark:text-orange-400' : ''}`}>
                         {change === null ? '—' : `${(change * 100).toFixed(1)}%`}
+                      </td>
+                      <td className={tdClass}>
+                        {!advice ? (
+                          <span className="text-xs text-gray-400">—</span>
+                        ) : (
+                          <Link to={`/research/stocks?new=${advice.code}`} className="flex items-center gap-1.5 hover:underline">
+                            {advice.signals ? (
+                              <>
+                                <ActionBadge action={advice.signals.action} title={advice.signals.headline} />
+                                <span className="text-xs">{advice.distance?.label}</span>
+                              </>
+                            ) : (
+                              <span className="text-xs text-gray-500 dark:text-gray-400">尚未體檢</span>
+                            )}
+                          </Link>
+                        )}
                       </td>
                       <td className={tdClass}>{row ? formatField(row, 'pe') : '—'}</td>
                       <td className={tdClass}>{row ? formatField(row, 'ret6m') : '—'}</td>

@@ -5,7 +5,7 @@ import type { ThesisEvaluation } from '../calculations/thesisScoring'
 import type { MacroAssessment } from '../calculations/macroRegime'
 import { technicalSnapshot, type TechnicalSnapshot } from './technical'
 import type { PriceRow } from './etfProfile'
-import { batchShares, buildSignals, heldPositionOf, stopLossOf, type HeldPosition } from './signals'
+import { batchShares, buildSignals, buyDistanceOf, heldPositionOf, stopLossOf, type HeldPosition, type PriceLevel, type SignalAction, type SignalReport } from './signals'
 
 const policy = createDefaultInvestmentPolicy()
 
@@ -197,5 +197,40 @@ describe('tranches', () => {
     const batches = r.levels.filter((l) => l.key.startsWith('batch'))
     expect(batches.map((l) => l.price)).toEqual([1000, 950, 900])
     expect(batches[1].label).toContain('悲觀合理價')
+  })
+})
+
+describe('buy distance', () => {
+  const level = (key: PriceLevel['key'], distancePercent: number): PriceLevel => ({ key, label: key, price: 1, distancePercent })
+  const report = (action: SignalAction, levels: PriceLevel[] = []): SignalReport => ({
+    action,
+    headline: '',
+    reasons: [],
+    levels,
+    signals: [],
+    stopLoss: null,
+    suggestedShares: null,
+    sizingNote: null,
+    held: false,
+    heldShares: null,
+    asOf: null,
+  })
+
+  it('reads how far a stock still has to fall to its first batch', () => {
+    expect(buyDistanceOf(report('wait', [level('batch1', -8.26), level('batch3', -20)]), false)).toEqual({ label: '再跌 8.3%', rank: 8.26, inZone: false })
+    expect(buyDistanceOf(report('buy', [level('batch1', 0), level('batch3', -12)]), false)).toEqual({ label: '已進入買進區', rank: 0, inZone: true })
+    expect(buyDistanceOf(report('buy', [level('batch1', 30), level('batch3', 2)]), false).label).toBe('強力買進區')
+    // In the zone but the verdict is still 觀察: shown, not a reminder.
+    expect(buyDistanceOf(report('wait', [level('batch1', 3)]), false)).toMatchObject({ rank: 0, inZone: false })
+  })
+
+  it('handles held positions, ETFs and missing data', () => {
+    expect(buyDistanceOf(report('add', [level('batch1', 1)]), false)).toEqual({ label: '可加碼', rank: 0, inZone: true })
+    expect(buyDistanceOf(report('trim', [level('batch1', -40)]), false)).toMatchObject({ label: '減碼', inZone: false })
+    expect(buyDistanceOf(report('buy'), true)).toEqual({ label: '趨勢轉強，可進場', rank: 0, inZone: true })
+    expect(buyDistanceOf(report('wait'), true).rank).toBe(50)
+    const missing = buyDistanceOf(report('wait'), false)
+    expect(missing.label).toBe('—')
+    expect(missing.rank).toBeGreaterThan(50)
   })
 })

@@ -15,6 +15,7 @@ import {
 import { StockThesisForm, type StockThesisFormValues } from '../components/forms/StockThesisForm'
 import { isStale, refreshedFields, refreshTechnical, technicalStale } from '../lib/research/autoResearch'
 import { useSignals } from '../lib/research/useSignals'
+import { buyDistanceOf } from '../lib/research/signals'
 import { ActionBadge } from '../components/research/SignalPanel'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
@@ -65,6 +66,8 @@ export function StocksPage() {
   }, [editing])
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('all')
+  // Nearest buy point first, so a daily glance shows what to look at.
+  const [sortBy, setSortBy] = useState<'buy' | 'conviction'>('buy')
 
   const signalsFor = useSignals()
   const editingThesis =
@@ -73,9 +76,14 @@ export function StocksPage() {
     .filter((t) => filter === 'all' || t.status === filter)
     .map((t) => {
       const evaluation = evaluateThesis(t, policy)
-      return { thesis: t, evaluation, signals: t.auto ? signalsFor(t, evaluation) : null }
+      const signals = t.auto ? signalsFor(t, evaluation) : null
+      return { thesis: t, evaluation, signals, distance: signals ? buyDistanceOf(signals, t.kind === 'etf') : null }
     })
-    .sort((a, b) => b.evaluation.convictionScore - a.evaluation.convictionScore)
+    .sort(
+      (a, b) =>
+        (sortBy === 'buy' ? (a.distance?.rank ?? Infinity) - (b.distance?.rank ?? Infinity) : 0) ||
+        b.evaluation.convictionScore - a.evaluation.convictionScore,
+    )
 
   const active = theses.filter((t) => t.status !== 'exited')
   const activeEvaluations = active.map((t) => evaluateThesis(t, policy))
@@ -197,7 +205,23 @@ export function StocksPage() {
       <div className={cardClass}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">研究卡</h2>
-          <div className="flex gap-1">
+          <div className="flex flex-wrap gap-1">
+            {(['buy', 'conviction'] as const).map((s) => (
+              <button
+                key={s}
+                type="button"
+                aria-pressed={sortBy === s}
+                onClick={() => setSortBy(s)}
+                className={`rounded-md px-2 py-1 text-xs font-medium ${
+                  sortBy === s
+                    ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900'
+                    : 'text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700'
+                }`}
+              >
+                {s === 'buy' ? '依距買點' : '依信心分數'}
+              </button>
+            ))}
+            <span className="mx-1 w-px bg-gray-200 dark:bg-gray-700" aria-hidden />
             {(['all', 'watch', 'holding', 'exited'] as Filter[]).map((f) => (
               <button
                 key={f}
@@ -230,12 +254,13 @@ export function StocksPage() {
                   <th className="py-2 pr-4">現價 / 基準合理價</th>
                   <th className="py-2 pr-4">本益比位置</th>
                   <th className="py-2 pr-4">價位</th>
+                  <th className="py-2 pr-4">距買點</th>
                   <th className="py-2 pr-4">建議</th>
                   <th className="py-2 pr-4 text-right">操作</th>
                 </tr>
               </thead>
               <tbody>
-                {evaluated.map(({ thesis: t, evaluation: e, signals }) => (
+                {evaluated.map(({ thesis: t, evaluation: e, signals, distance }) => (
                   <tr key={t.id} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
                     <td className="py-2 pr-4">
                       <div className="font-medium text-gray-900 dark:text-gray-100">
@@ -292,6 +317,13 @@ export function StocksPage() {
                     </td>
                     <td className="py-2 pr-4">
                       {t.kind === 'etf' || !t.auto ? <span className="text-xs text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
+                    </td>
+                    <td
+                      className={`py-2 pr-4 text-xs whitespace-nowrap ${
+                        distance?.rank === 0 ? 'font-medium text-indigo-700 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'
+                      }`}
+                    >
+                      {distance?.label ?? '—'}
                     </td>
                     <td className="py-2 pr-4">
                       {signals ? (

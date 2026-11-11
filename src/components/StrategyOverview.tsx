@@ -9,7 +9,7 @@ import { todayIsoDate } from '../lib/market/twse'
 import { useTraderReadiness } from '../lib/useTraderReadiness'
 import { evaluateThesis } from '../lib/calculations/thesisScoring'
 import { useSignals } from '../lib/research/useSignals'
-import { ACTION_LABELS, EXIT_ALERT_ACTIONS } from '../lib/research/signals'
+import { ACTION_LABELS, EXIT_ALERT_ACTIONS, buyDistanceOf } from '../lib/research/signals'
 import { StatCard } from './StatCard'
 import { RiskViolationList } from './RiskViolationList'
 import { formatCurrency } from '../lib/format'
@@ -44,10 +44,13 @@ export function StrategyOverview() {
       ? (readiness.target.annualExpenses / assumptions.currentNetWorth) * 100
       : null
   const signalsFor = useSignals()
-  const exitAlerts = theses
+  const advised = theses
     .filter((t) => t.auto && t.status !== 'exited')
     .map((t) => ({ thesis: t, report: signalsFor(t, evaluateThesis(t, policy)) }))
-    .filter(({ report }) => report.held && EXIT_ALERT_ACTIONS.includes(report.action))
+  const exitAlerts = advised.filter(({ report }) => report.held && EXIT_ALERT_ACTIONS.includes(report.action))
+  // Price reminders: cards whose advice is to buy or add now. Shown when the
+  // site is opened; there is no push.
+  const buyAlerts = advised.filter(({ thesis, report }) => buyDistanceOf(report, thesis.kind === 'etf').inZone)
 
   const todos: { text: string; to: string }[] = []
   // Macro reviews belong to stage three; only nag once the core is in place
@@ -66,6 +69,16 @@ export function StrategyOverview() {
         .map((t) => t.ticker)
         .join('、')}${stale.length > 3 ? '…' : ''}）`,
       to: '/research/stocks',
+    })
+  }
+  if (buyAlerts.length > 0) {
+    todos.push({
+      text: `${buyAlerts.length} 檔進入買進區或可加碼（${buyAlerts
+        .slice(0, 3)
+        .map(({ thesis, report }) => `${thesis.ticker} ${ACTION_LABELS[report.action]}`)
+        .join('、')}${buyAlerts.length > 3 ? '…' : ''}），下單前先過交易前檢核`,
+      // One card opens directly; several open the list, nearest buy point first.
+      to: buyAlerts.length === 1 ? `/research/stocks?new=${encodeURIComponent(buyAlerts[0].thesis.ticker)}` : '/research/stocks',
     })
   }
   if (exitAlerts.length > 0) {
