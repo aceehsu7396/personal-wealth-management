@@ -184,6 +184,7 @@ export const ARCH_EDGES: ArchEdge[] = [
   { from: 'screener', to: 'research', label: '候選個股與 ETF', kind: 'flow' },
   { from: 'industry', to: 'research', label: '能力圈與競爭優勢', kind: 'flow' },
   { from: 'research', to: 'checklist', label: '結論、買進價、建議股數與停損', kind: 'flow' },
+  { from: 'research', to: 'strategy', label: '結論與警訊（依代號連動；不投資或需複查時擋下策略實單）', kind: 'gate' },
   { from: 'core', to: 'checklist', label: '每月定期定額', kind: 'flow' },
   { from: 'checklist', to: 'risk', label: '成交後成為持股', kind: 'flow' },
   { from: 'risk', to: 'research', label: '持股對照：減碼、出清、複查提醒', kind: 'feedback' },

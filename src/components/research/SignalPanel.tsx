@@ -2,6 +2,9 @@ import { Link } from 'react-router-dom'
 import { ACTION_LABELS, type SignalAction, type SignalReport, type SignalTone } from '../../lib/research/signals'
 import { signalTradeLink } from '../../lib/trades/tradeLink'
 import type { StockThesis } from '../../lib/storage/schema'
+import { useAppStore } from '../../lib/storage/appStore'
+import { strategiesForThesis } from '../../lib/research/strategyLink'
+import { STRATEGY_STATUS_LABELS } from '../../lib/backtest/templates'
 
 const ACTION_STYLE: Record<SignalAction, string> = {
   buy: 'bg-indigo-600 text-white',
@@ -49,6 +52,45 @@ function SignalList({ signals }: { signals: SignalReport['signals'] }) {
   )
 }
 
+const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400'
+
+// The strategy cards trading this ticker (linked by code), and two ways to
+// start one: fundamental batches at this card's prices, or a backtestable
+// trend template on the company the card picked.
+function StrategyLinks({ thesis }: { thesis: Pick<StockThesis, 'ticker' | 'name' | 'market'> }) {
+  const strategies = useAppStore((s) => s.tradingStrategies)
+  const using = strategiesForThesis(thesis, strategies)
+  const symbol = encodeURIComponent(`${thesis.market}:${thesis.ticker}`)
+  const name = (suffix: string) => encodeURIComponent(`${thesis.ticker} ${thesis.name}${suffix}`)
+  return (
+    <div className="w-full text-xs text-gray-600 dark:text-gray-400">
+      <p>
+        <span className="font-medium text-gray-800 dark:text-gray-200">使用這檔的策略卡：</span>
+        {using.length === 0
+          ? '還沒有'
+          : using.map((s, i) => (
+              <span key={s.id}>
+                {i > 0 && '、'}
+                <Link to="/sim/strategies" className={linkClass}>
+                  {s.name}
+                </Link>
+                （{STRATEGY_STATUS_LABELS[s.status]}）
+              </span>
+            ))}
+      </p>
+      <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+        <span>建立策略卡：</span>
+        <Link to={`/sim/strategies?new=discretionary&symbols=${symbol}&name=${name('')}`} className={linkClass}>
+          基本面分批（自訂）
+        </Link>
+        <Link to={`/sim/strategies?new=ma_cross&symbols=${symbol}&name=${name(' 均線趨勢')}`} className={linkClass}>
+          均線趨勢（可回測）
+        </Link>
+      </p>
+    </div>
+  )
+}
+
 export function SignalPanel({
   report,
   price,
@@ -59,7 +101,7 @@ export function SignalPanel({
   price: number
   chipsDate?: string
   // A saved card: shows "next step" links into the trade log and strategy cards.
-  thesis?: Pick<StockThesis, 'id' | 'ticker' | 'name' | 'verdict' | 'currentPrice' | 'kind'>
+  thesis?: Pick<StockThesis, 'id' | 'ticker' | 'name' | 'verdict' | 'currentPrice' | 'kind' | 'market'>
 }) {
   const trade = thesis ? signalTradeLink(report, thesis) : null
   // Today's price slots in between the levels (sorted high → low).
@@ -92,12 +134,7 @@ export function SignalPanel({
               {trade.label} →
             </Link>
           )}
-          <Link
-            to={`/sim/strategies?new=discretionary&symbols=${encodeURIComponent(`TW:${thesis.ticker}`)}&name=${encodeURIComponent(`${thesis.ticker} ${thesis.name}`)}`}
-            className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
-          >
-            用這檔建立策略卡
-          </Link>
+          <StrategyLinks thesis={thesis} />
         </div>
       )}
       {report.suggestedShares !== null && (

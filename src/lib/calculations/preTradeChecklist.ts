@@ -13,7 +13,9 @@ import type { MacroAssessment } from './macroRegime'
 import { analyzePortfolio, isSatellite } from './portfolioRisk'
 import { evaluateThesis } from './thesisScoring'
 import { isFund } from './fundRules'
-import { STRATEGY_STATUS_LABELS } from '../backtest/templates'
+import { STRATEGY_STATUS_LABELS, parseSymbol } from '../backtest/templates'
+import { buildSignals, heldPositionOf } from '../research/signals'
+import { isStockCode, researchBlocks, thesisForCode } from '../research/strategyLink'
 
 export interface ChecklistEntry {
   key: string
@@ -216,7 +218,7 @@ export function buildPreTradeChecklist(
       // valuation, single-position and sector caps).
       const fund = holding !== undefined && isFund(holding)
       if (trade.reason === 'strategy_entry') {
-        items.push(...strategyChecks(trade, ctx, after.totalValueTwd))
+        items.push(...strategyChecks(trade, ctx, after.totalValueTwd, manualAnswers))
       } else {
         if (!fund) items.push(check('thesisLinked', '已連結研究卡', thesis !== undefined))
         if (evaluation && !fund) {
@@ -337,7 +339,39 @@ export function riskLimitOf(
   return { percent: policy.riskPerTradePercent, source: '投資政策' }
 }
 
-function strategyChecks(trade: PendingTrade, ctx: ChecklistContext, totalValueTwd: number): ChecklistEntry[] {
+// A strategy entry is still checked against the ticker's research card:
+// a pass verdict, or advice to review or exit, stops it; an individual stock
+// with no card asks the trader to confirm the risk.
+function researchChecks(trade: PendingTrade, ctx: ChecklistContext, totalValueTwd: number, manualAnswers: Record<string, boolean>): ChecklistEntry[] {
+  const { market, code } = parseSymbol(trade.currency === 'USD' ? `US:${trade.ticker}` : trade.ticker)
+  const thesis = thesisForCode(market, code, ctx.theses)
+  if (!thesis) {
+    if (!isStockCode(market, code)) return []
+    const key = 'researchMissing'
+    return [{ key, label: '這檔個股還沒有研究卡：我了解只靠策略規則進場的風險', passed: manualAnswers[key] === true, manual: true }]
+  }
+  const report = thesis.auto
+    ? buildSignals({
+        thesis: { ...thesis, currentPrice: trade.price },
+        evaluation: evaluateThesis({ ...thesis, currentPrice: trade.price }, ctx.policy),
+        macro: ctx.macro,
+        holding: heldPositionOf(thesis.ticker, ctx.holdings, totalValueTwd, ctx.meta.fxUsdTwd),
+        totalValueTwd,
+        policy: ctx.policy,
+      })
+    : null
+  const blocks = researchBlocks(thesis, report)
+  return [
+    check('researchVerdict', `研究卡結論不是「不投資」（${thesis.ticker}）`, thesis.verdict !== 'pass'),
+    check(
+      'researchSignal',
+      blocks.find((b) => b.startsWith('研究卡建議')) ?? '研究卡沒有需要複查或出清的警訊',
+      report === null || (report.action !== 'review' && report.action !== 'exit'),
+    ),
+  ]
+}
+
+function strategyChecks(trade: PendingTrade, ctx: ChecklistContext, totalValueTwd: number, manualAnswers: Record<string, boolean>): ChecklistEntry[] {
   const { policy } = ctx
   const strategy = trade.strategyId ? ctx.strategies?.find((s) => s.id === trade.strategyId) : undefined
   const items = [
@@ -348,6 +382,7 @@ function strategyChecks(trade: PendingTrade, ctx: ChecklistContext, totalValueTw
       strategy?.status === 'live',
     ),
   ]
+  items.push(...researchChecks(trade, ctx, totalValueTwd, manualAnswers))
   const hasStop = trade.stopLoss !== undefined && trade.stopLoss > 0 && trade.stopLoss < trade.price
   if (policy.requireStopLoss) items.push(check('stopLoss', '已設定低於成交價的停損價', hasStop))
   const risk = tradeRiskPercent(trade, totalValueTwd, policy, ctx.meta.fxUsdTwd)

@@ -289,6 +289,21 @@ describe('strategy entries', () => {
     expect(keys(buildPreTradeChecklist({ ...entry, stopLoss: 50 }, c, {})).riskPerTrade).toBe(false)
   })
 
+  it('checks an individual stock against its research card', () => {
+    const stock: PendingTrade = { ...entry, ticker: '2317', holdingId: undefined }
+    const card = { ...thesis, id: 'r', ticker: '2317', auto: undefined }
+    const c = (theses: StockThesis[]) => ctx({ holdings: [core, sat], strategies: [live], theses })
+    // No card: a manual confirmation is asked for.
+    const missing = buildPreTradeChecklist(stock, c([]), {}).find((i) => i.key === 'researchMissing')!
+    expect(missing).toMatchObject({ manual: true, passed: false })
+    expect(buildPreTradeChecklist(stock, c([]), { researchMissing: true }).find((i) => i.key === 'researchMissing')!.passed).toBe(true)
+    // A pass verdict fails; an invest verdict passes.
+    expect(keys(buildPreTradeChecklist(stock, c([{ ...card, verdict: 'pass' }]), {}))).toMatchObject({ researchVerdict: false, researchSignal: true })
+    expect(keys(buildPreTradeChecklist(stock, c([card]), {}))).toMatchObject({ researchVerdict: true, researchSignal: true })
+    // ETFs without a card are left to the strategy.
+    expect(keys(buildPreTradeChecklist(entry, c([]), {})).researchMissing).toBeUndefined()
+  })
+
   it('uses the stricter of the strategy card and the policy risk limit', () => {
     // 50 × 5 = 250 risk ≈ 0.79% of the trading budget.
     const strict = ctx({ holdings: [core, sat], strategies: [{ ...live, riskPerTradePercent: 0.5 }] })

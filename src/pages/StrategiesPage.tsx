@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { tradeLink } from '../lib/trades/tradeLink'
 import { STARTER_STRATEGIES, type StarterStrategy } from '../lib/backtest/starterStrategies'
 import { SimGuide } from '../components/SimGuide'
+import { StrategyResearchLinks } from '../components/research/StrategyResearchLinks'
 import { useAppStore } from '../lib/storage/appStore'
 import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, parseSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
 import { liveGate, PAPER_RULES } from '../lib/calculations/strategyProgress'
@@ -32,7 +33,7 @@ export function StrategiesPage() {
 
   // null = form closed, 'new' = creating, otherwise the id being edited
   const navigate = useNavigate()
-  // From a research card: ?new=discretionary&symbols=TW:2317&name=…
+  // From a research card: ?new=discretionary (or ma_cross)&symbols=TW:2317&name=…
   const [search, setSearch] = useSearchParams()
   const newTemplate = StrategyTemplateSchema.safeParse(search.get('new'))
   const [draft] = useState<Partial<StrategyFormValues> | undefined>(() =>
@@ -41,6 +42,13 @@ export function StrategiesPage() {
           template: newTemplate.data,
           name: search.get('name') ?? '',
           symbols: parseSymbolList(search.get('symbols') ?? ''),
+          // Opened from a research card: the card judged the company.
+          edge:
+            newTemplate.data === 'discretionary'
+              ? '基本面錯價：研究卡判斷公司品質與合理價，只在價格低於合理價時分批買進'
+              : newTemplate.data === 'ma_cross' && search.get('symbols')
+                ? '研究卡選出的好公司，用均線趨勢決定進出，避開長期下跌段'
+                : undefined,
           entryRules:
             newTemplate.data === 'discretionary'
               ? '研究卡結論為「值得投資」、現價進入買進區時，依進出場建議分 3 批建倉（每批受每筆風險限制）'
@@ -189,6 +197,7 @@ export function StrategiesPage() {
                   </div>
                 ))}
               </dl>
+              <StrategyResearchLinks strategy={s} />
 
               <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
                 {gate.backtestPassed ? '✓' : '☐'} 回測樣本外勝過買進持有（報酬或風險調整後；{ownRuns} 次回測）
