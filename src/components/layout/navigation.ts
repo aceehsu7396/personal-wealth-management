@@ -66,7 +66,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: '知識與方法論', to: '/blueprint/01' },
       { label: '平台功能', to: '/blueprint/02' },
       { label: 'AI 與架構', to: '/blueprint/03' },
-      { label: '差距與路線', to: '/blueprint/04' },
+      { label: '差異分析', to: '/blueprint/04' },
     ],
   },
   { id: 'notes', label: '筆記', to: '/notes', tabs: [{ label: '筆記', to: '/notes' }], utility: true },
