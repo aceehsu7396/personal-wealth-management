@@ -6,7 +6,6 @@ import { analyzePortfolio, isSatellite, SLEEVE_LABELS } from '../lib/calculation
 import { todayIsoDate } from '../lib/market/twse'
 import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { FUND_TYPE_LABELS, isFund, isNavStale } from '../lib/calculations/fundRules'
-import { FundNavUpdater } from '../components/research/FundNavUpdater'
 import { HoldingForm, type HoldingFormValues } from '../components/forms/HoldingForm'
 import { tradeLink } from '../lib/trades/tradeLink'
 import { RiskViolationList } from '../components/RiskViolationList'
@@ -175,7 +174,6 @@ export function PortfolioPage() {
             ))}
           </ul>
         )}
-        <FundNavUpdater pendingTickers={twse.summary?.skipped.map((x) => x.ticker)} />
         {report.holdings.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">還沒有持股。</p>
         ) : (

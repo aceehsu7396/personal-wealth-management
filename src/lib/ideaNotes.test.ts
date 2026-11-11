@@ -78,6 +78,6 @@ describe('ideaNotes', () => {
     expect(pageLabel('/handbook/05')).toBe('手冊 05')
     expect(pageLabel('/handbook/%E9%99%84%E9%8C%84C')).toBe('手冊 附錄 C')
     expect(pageLabel('/journey')).toBe('行動路線')
-    expect(pageLabel('/insights')).toBe('交易心得')
+    expect(pageLabel('/blueprint/02')).toBe('系統藍圖・平台功能')
   })
 })

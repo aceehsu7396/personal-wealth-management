@@ -129,11 +129,13 @@ export function FubonOutlookCard({ data }: { data: MacroData | null }) {
   }
 
   return (
-    <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">富邦總經觀點</h2>
+    // An outside view, kept for reference and collapsed by default: the
+    // site's own regime reading comes first (blueprint 04, stage 0).
+    <details className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
+      <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2">
+        <h2 className="inline text-lg font-semibold text-gray-900 dark:text-gray-100">外部觀點：富邦總經觀點（選用參考）</h2>
         {data && <span className="text-xs text-gray-500 dark:text-gray-400">資料更新於 {formatDateTime(data.generatedAt)}</span>}
-      </div>
+      </summary>
       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
         每天由 GitHub 自動讀取富邦金控「富邦總經觀點－市場展望」，依固定格式擷取配置觀點、預測區間與各段重點（免 API 金鑰），並逐月追蹤預測命中。
       </p>
@@ -284,6 +286,6 @@ export function FubonOutlookCard({ data }: { data: MacroData | null }) {
           )}
         </div>
       )}
-    </div>
+    </details>
   )
 }

@@ -43,7 +43,7 @@ describe('HANDBOOK', () => {
   it('bundles every strategy document and every internal link resolves', () => {
     expect(HANDBOOK.map((d) => d.slug)).toEqual([
       'index', '00', '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '附錄A', '附錄B', '附錄C',
-      '附錄D1', '附錄D2', '附錄D3', '附錄D4', '附錄D5',
+      '附錄D1', '附錄D2', '附錄D3', '附錄D4', '附錄D5', '附錄E',
     ])
     for (const doc of HANDBOOK) {
       for (const [, href] of doc.content.matchAll(/\]\(([^)]+\.md[^)]*)\)/g)) {
