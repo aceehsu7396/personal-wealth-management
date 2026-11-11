@@ -23,6 +23,7 @@ import { ScreenerPage } from './pages/ScreenerPage'
 import { BacktestPage } from './pages/BacktestPage'
 import { IdeaNotesPage } from './pages/IdeaNotesPage'
 import { InsightsPage } from './pages/InsightsPage'
+import { BlueprintPage } from './pages/BlueprintPage'
 
 // The handbook bundles the Markdown renderer; load it only when opened.
 const HandbookPage = lazy(() =>
@@ -58,6 +59,7 @@ function App() {
             <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
             {/* 交易心得（暫用） */}
             <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/blueprint/:slug?" element={<BlueprintPage />} />
             {/* 筆記、手冊與行動路線、設定 */}
             <Route path="/notes" element={<IdeaNotesPage />} />
             <Route

@@ -9,7 +9,7 @@ const sources = import.meta.glob(['../../**/*.{ts,tsx}', '!../../**/*.test.ts', 
 
 describe('navigation', () => {
   it('groups pages into the three areas (plus the temporary insights page), with notes, the handbook and settings at the side', () => {
-    expect(NAV_GROUPS.filter((g) => !g.utility).map((g) => g.label)).toEqual(['研究分析', '模擬交易', '投資持有與檢討回顧', '交易心得'])
+    expect(NAV_GROUPS.filter((g) => !g.utility).map((g) => g.label)).toEqual(['研究分析', '模擬交易', '投資持有與檢討回顧', '交易心得', '系統藍圖'])
     expect(NAV_GROUPS.filter((g) => g.utility).map((g) => g.id)).toEqual(['notes', 'handbook', 'settings'])
     expect(groupOf('/research/screener')?.id).toBe('research')
     expect(groupOf('/today')?.id).toBe('portfolio')
@@ -18,6 +18,7 @@ describe('navigation', () => {
     expect(groupOf('/handbook/12')?.id).toBe('handbook')
     expect(groupOf('/notes')?.id).toBe('notes')
     expect(groupOf('/insights')?.id).toBe('insights')
+    expect(groupOf('/blueprint/03')?.id).toBe('blueprint')
   })
 
   it('opens on the first area', () => {
