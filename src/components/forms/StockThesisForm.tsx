@@ -17,7 +17,7 @@ type Verdict = NonNullable<StockThesis['verdict']>
 const VERDICT_STYLE: Record<Verdict, string> = {
   invest: 'bg-indigo-600 text-white',
   watch: 'bg-gray-600 text-white',
-  pass: 'bg-orange-600 text-white',
+  pass: 'bg-orange-700 text-white',
 }
 
 // Fields the scoring no longer reads but the stored card still carries.

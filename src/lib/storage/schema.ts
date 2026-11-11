@@ -387,6 +387,8 @@ export const TradeSchema = z.object({
   holdingId: z.string().optional(),
   thesisId: z.string().optional(),
   strategyId: z.string().optional(),
+  // The trade plan this trade carried out (blueprint 02 §3.3).
+  planId: z.string().optional(),
   stopLoss: z.number().optional(),
   side: TradeSideSchema,
   reason: TradeReasonSchema,
@@ -713,6 +715,7 @@ export const PaperOrderSchema = z.object({
   fillPrice: z.number().optional(),
   fee: z.number().optional(),
   stopLoss: z.number().optional(),
+  planId: z.string().optional(),
   reason: z.string().default(''),
   emotion: z.number().int().min(1).max(5).optional(),
   // Realized profit of a sell, and in R (risk at entry), when known.
@@ -775,6 +778,81 @@ export const IdeaNoteSchema = z.object({
 })
 export type IdeaNote = z.infer<typeof IdeaNoteSchema>
 
+// A trade plan: written before a trade, it records why to enter, where the
+// idea is wrong, how to exit, how much and how to place the order, plus the
+// rules it rests on and the advice given (blueprint 02 §3.3, 01 §C1).
+export const TradePlanStatusSchema = z.enum(['draft', 'open', 'closed', 'cancelled'])
+export type TradePlanStatus = z.infer<typeof TradePlanStatusSchema>
+export const TradePlanSourceSchema = z.enum(['thesis', 'strategy', 'core', 'manual'])
+export type TradePlanSource = z.infer<typeof TradePlanSourceSchema>
+export const EntryMethodSchema = z.enum(['value_batches', 'breakout', 'pullback', 'mean_reversion', 'momentum', 'event', 'dca', 'other'])
+export type EntryMethod = z.infer<typeof EntryMethodSchema>
+export const StopMethodSchema = z.enum(['structure', 'atr', 'percent', 'manual'])
+export const TrailingMethodSchema = z.enum(['none', 'chandelier', 'moving_average', 'swing_low'])
+export const AdviceLevelSchema = z.enum(['required', 'suggest', 'notice'])
+
+export const PlanAdviceSchema = z.object({
+  level: AdviceLevelSchema,
+  text: z.string(),
+  basis: z.string(),
+  // Whether the trader followed it, and why not.
+  decision: z.enum(['accepted', 'declined']).optional(),
+  reason: z.string().optional(),
+})
+export type PlanAdvice = z.infer<typeof PlanAdviceSchema>
+
+export const TradePlanSchema = z.object({
+  id: z.string(),
+  status: TradePlanStatusSchema,
+  source: TradePlanSourceSchema,
+  thesisId: z.string().optional(),
+  strategyId: z.string().optional(),
+  ticker: z.string(),
+  name: z.string().default(''),
+  market: z.enum(['TW', 'US']).default('TW'),
+  entryMethod: EntryMethodSchema.default('other'),
+  // 1 setup, 2 trigger, 3 confirmation (01 §C1).
+  setup: z.string().default(''),
+  trigger: z.string().default(''),
+  confirmation: z.string().default(''),
+  // 4 invalidation: the initial stop.
+  stopLoss: z.number().optional(),
+  stopMethod: StopMethodSchema.default('manual'),
+  // 5 size.
+  entryPrice: z.number().optional(),
+  shares: z.number().optional(),
+  // 6 order.
+  orderType: z.enum(['limit', 'market', 'stop']).default('limit'),
+  orderNote: z.string().default(''),
+  // 7 exit plan.
+  trailing: TrailingMethodSchema.default('none'),
+  trailingParam: z.number().optional(),
+  targets: z.array(z.object({ price: z.number(), fraction: z.number() })).default([]),
+  timeStopDays: z.number().optional(),
+  thesisExit: z.string().default(''),
+  // The stop currently in force; it only moves up.
+  currentStop: z.number().optional(),
+  rules: z.array(z.string()).default([]),
+  regimeSnapshot: z.string().optional(),
+  advice: z.array(PlanAdviceSchema).default([]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  openedAt: z.string().optional(),
+  closedAt: z.string().optional(),
+})
+export type TradePlan = z.infer<typeof TradePlanSchema>
+
+// A signed version of a rule set (the investment policy now, the regime
+// parameter table later): what it was, when, and why it changed.
+export const RuleVersionSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['policy', 'regime_params']),
+  at: z.string(),
+  reason: z.string(),
+  snapshot: z.record(z.string(), z.unknown()),
+})
+export type RuleVersion = z.infer<typeof RuleVersionSchema>
+
 export const AppDataSchema = z.object({
   schemaVersion: z.number(),
   profile: UserProfileSchema,
@@ -801,6 +879,8 @@ export const AppDataSchema = z.object({
   paperAccounts: z.array(PaperAccountSchema).default([]),
   watchlist: z.array(WatchItemSchema).default([]),
   ideaNotes: z.array(IdeaNoteSchema).default([]),
+  tradePlans: z.array(TradePlanSchema).default([]),
+  ruleVersions: z.array(RuleVersionSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -855,5 +935,7 @@ export function createDefaultAppData(): AppData {
     paperAccounts: [],
     watchlist: [],
     ideaNotes: [],
+    tradePlans: [],
+    ruleVersions: [],
   }
 }

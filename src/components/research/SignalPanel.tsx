@@ -12,8 +12,8 @@ const ACTION_STYLE: Record<SignalAction, string> = {
   hold: 'bg-gray-600 text-white',
   wait: 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600',
   avoid: 'bg-gray-100 text-gray-700 ring-1 ring-inset ring-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:ring-gray-600',
-  trim: 'bg-orange-600 text-white',
-  exit: 'bg-orange-600 text-white',
+  trim: 'bg-orange-700 text-white',
+  exit: 'bg-orange-700 text-white',
   review: 'bg-orange-100 text-orange-800 ring-1 ring-inset ring-orange-300 dark:bg-orange-900/40 dark:text-orange-200 dark:ring-orange-800',
 }
 

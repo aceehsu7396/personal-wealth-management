@@ -1,0 +1,10 @@
+// Shared building blocks for every page (docs/ui-guidelines.md §7).
+export { AdviceList } from './AdviceList'
+export { ADVICE_LABELS, type Advice, type AdviceLevel } from './advice'
+export { Badge } from './Badge'
+export { Card } from './Card'
+export { DataTable, type Column } from './DataTable'
+export { Disclosure } from './Disclosure'
+export { PageHeader, primaryButton, secondaryButton, textLink } from './PageHeader'
+export { StatTile } from './StatTile'
+export { TONE_CLASS, type Tone } from './tone'

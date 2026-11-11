@@ -287,7 +287,7 @@ function IndicatorCard({ chart, years }: { chart: IndicatorChart; years: number 
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <p className="mt-1 text-[11px] text-gray-400">資料來源：{chart.source}</p>
+      <p className="mt-1 text-xs text-gray-400">資料來源：{chart.source}</p>
     </div>
   )
 }

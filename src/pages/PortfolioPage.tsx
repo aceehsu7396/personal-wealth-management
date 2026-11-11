@@ -197,7 +197,7 @@ export function PortfolioPage() {
                       <td className="py-2 pr-4">
                         <div className="font-medium text-gray-900 dark:text-gray-100">
                           {isFund(v.holding) && (
-                            <span className="mr-1 rounded bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
+                            <span className="mr-1 rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-800 dark:bg-orange-900/40 dark:text-orange-300">
                               基金
                             </span>
                           )}

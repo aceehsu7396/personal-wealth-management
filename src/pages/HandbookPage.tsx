@@ -61,7 +61,7 @@ export function HandbookPage() {
                         : 'text-gray-700 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700'
                     }`}
                   >
-                    {d.number && <span className="mr-1 font-mono text-xs opacity-70">{d.number}</span>}
+                    {d.number && <span className="mr-1 font-mono text-xs">{d.number}</span>}
                     {navLabel(d)}
                   </Link>
                 </li>

@@ -41,7 +41,7 @@ export function Term({ name, children }: { name: string; children?: React.ReactN
         aria-label={`${name}是什麼`}
         aria-expanded={at !== null}
         onClick={toggle}
-        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-[10px] leading-none font-medium text-gray-500 hover:border-indigo-500 hover:text-indigo-600 dark:border-gray-600 dark:text-gray-400"
+        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full border border-gray-300 text-xs leading-none font-medium text-gray-500 hover:border-indigo-500 hover:text-indigo-600 dark:border-gray-600 dark:text-gray-400"
       >
         ?
       </button>

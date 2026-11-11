@@ -22,7 +22,7 @@ export function DemoBanner() {
             setBusy(true)
             void exitDemo().finally(() => setBusy(false))
           }}
-          className="ml-auto rounded-md bg-orange-600 px-3 py-1 text-xs font-medium text-white hover:bg-orange-700 disabled:opacity-50"
+          className="ml-auto rounded-md bg-orange-700 px-3 py-1 text-xs font-medium text-white hover:bg-orange-800 disabled:opacity-50"
         >
           結束示範，還原我的資料
         </button>
@@ -47,7 +47,7 @@ export function DemoControl() {
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         {active ? (
-          <button type="button" disabled={busy} onClick={() => run(exitDemo)} className="rounded-md bg-orange-600 px-4 py-2 text-sm font-medium text-white hover:bg-orange-700 disabled:opacity-50">
+          <button type="button" disabled={busy} onClick={() => run(exitDemo)} className="rounded-md bg-orange-700 px-4 py-2 text-sm font-medium text-white hover:bg-orange-800 disabled:opacity-50">
             結束示範，還原我的資料
           </button>
         ) : (

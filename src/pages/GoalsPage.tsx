@@ -24,6 +24,7 @@ export function GoalsPage() {
   const { assumptions, fromPortfolio } = usePlanningAssumptions()
   const policy = useAppStore((s) => s.investmentPolicy)
   const setInvestmentPolicy = useAppStore((s) => s.setInvestmentPolicy)
+  const addRuleVersion = useAppStore((s) => s.addRuleVersion)
   const readiness = useTraderReadiness()
 
   const projection = computeFireProjection(profile, assumptions)
@@ -165,7 +166,12 @@ export function GoalsPage() {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() => setInvestmentPolicy({ signedAt: todayIsoDate() })}
+            onClick={() => {
+              const signedAt = todayIsoDate()
+              setInvestmentPolicy({ signedAt })
+              // Each signing keeps a copy, so later changes can be traced.
+              addRuleVersion({ kind: 'policy', reason: policy.signedAt ? '年度檢討後重新簽署' : '第一次簽署', snapshot: { ...policy, signedAt } })
+            }}
             className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
           >
             {policy.signedAt ? '重新簽署（年度檢討後）' : '我已確認，簽署投資政策聲明'}

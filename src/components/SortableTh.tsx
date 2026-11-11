@@ -33,7 +33,7 @@ export function SortableTh<K extends string>({
           type="button"
           onClick={() => onSort(sortKey)}
           aria-label={`依${label}排序`}
-          className={`px-0.5 text-[10px] leading-none hover:text-gray-900 dark:hover:text-gray-100 ${active ? '' : 'opacity-40'}`}
+          className={`px-0.5 text-xs leading-none hover:text-gray-900 dark:hover:text-gray-100 ${active ? '' : 'opacity-40'}`}
         >
           {active ? (sort.desc ? '▼' : '▲') : '↕'}
         </button>

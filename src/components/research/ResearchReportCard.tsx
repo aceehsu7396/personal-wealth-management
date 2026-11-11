@@ -78,7 +78,7 @@ export function ResearchReportCard({
                       {s.title}
                     </a>
                     {s.kind === 'fetched' && (
-                      <span className="ml-1 rounded bg-indigo-100 px-1 text-[10px] font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
+                      <span className="ml-1 rounded bg-indigo-100 px-1 text-xs font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300">
                         已讀取全文
                       </span>
                     )}

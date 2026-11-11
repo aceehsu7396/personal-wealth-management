@@ -132,7 +132,7 @@ export function ArchitectureMap() {
             <div key={layer.title} className="sm:grid sm:grid-cols-[120px_1fr] sm:items-center sm:gap-3">
               <div className="mb-1 sm:mb-0">
                 <p className="text-xs font-semibold text-gray-900 dark:text-gray-100">{layer.title}</p>
-                <p className="text-[11px] leading-4 text-gray-500 dark:text-gray-400">{layer.summary}</p>
+                <p className="text-xs leading-4 text-gray-500 dark:text-gray-400">{layer.summary}</p>
               </div>
               <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
                 {layer.nodes.map((id) => {
@@ -155,7 +155,7 @@ export function ArchitectureMap() {
                       <span className="mr-1 font-mono">{STATUS_MARK[s]}</span>
                       <span className="font-medium">{n.title}</span>
                       {n.steps.length > 0 && (
-                        <span className="ml-1 text-[11px] opacity-70">
+                        <span className="ml-1 text-xs">
                           {n.steps.length > 2 ? `${n.steps[0]}–${n.steps[n.steps.length - 1]}` : n.steps.join('・')}
                         </span>
                       )}

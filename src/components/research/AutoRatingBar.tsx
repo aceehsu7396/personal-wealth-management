@@ -10,7 +10,7 @@ const TONE_MARK: Record<Tone, string> = { good: '✓', neutral: '·', warn: '△
 const OVERALL_STYLE: Record<AutoRating['overall'], string> = {
   strong: 'bg-indigo-600 text-white',
   caution: 'bg-gray-600 text-white',
-  weak: 'bg-orange-600 text-white',
+  weak: 'bg-orange-700 text-white',
 }
 
 // The watch rating: overall label plus one chip per dimension. `compact`

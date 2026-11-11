@@ -6,6 +6,7 @@ import { NotesDrawerProvider } from './components/notes/NotesDrawerContext'
 import { lazy, Suspense } from 'react'
 import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { NavBar } from './components/layout/NavBar'
+import { ScrollToTop } from './components/layout/ScrollToTop'
 import { PortfolioSnapshotRecorder } from './components/PortfolioSnapshotRecorder'
 import { HOME_PATH, LEGACY_REDIRECTS } from './components/layout/navigation'
 import { DashboardPage } from './pages/DashboardPage'
@@ -35,6 +36,7 @@ function App() {
       <NotesDrawerProvider>
         {/* Bottom padding keeps the notes button off the last line of each page. */}
         <div className="min-h-svh bg-gray-50 pb-20 dark:bg-gray-900">
+          <ScrollToTop />
           <NavBar />
           <DemoBanner />
           <StorageWarning />

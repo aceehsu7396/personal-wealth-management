@@ -33,6 +33,16 @@ describe('AppDataSchema', () => {
     expect(result.data?.ideaNotes).toEqual([])
   })
 
+  it('gives older saves empty trade plans and rule versions, and fills plan defaults', () => {
+    const { tradePlans: _p, ruleVersions: _v, ...older } = createDefaultAppData()
+    const result = AppDataSchema.safeParse(older)
+    expect(result.data?.tradePlans).toEqual([])
+    expect(result.data?.ruleVersions).toEqual([])
+    const plan = { id: 'p', status: 'draft', source: 'thesis', ticker: '2330', createdAt: '', updatedAt: '' }
+    const parsed = AppDataSchema.safeParse({ ...createDefaultAppData(), tradePlans: [plan] })
+    expect(parsed.data?.tradePlans[0]).toMatchObject({ market: 'TW', entryMethod: 'other', stopMethod: 'manual', trailing: 'none', targets: [], advice: [] })
+  })
+
   it('reads notes saved before kinds existed as improvements', () => {
     const note = { id: 'n', nodeId: 'general', title: 't', status: 'idea', createdAt: '', updatedAt: '' }
     const result = AppDataSchema.safeParse({ ...createDefaultAppData(), ideaNotes: [note] })

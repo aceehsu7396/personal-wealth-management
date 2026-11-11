@@ -30,6 +30,8 @@ import {
   type PaperAccount,
   type WatchItem,
   type IdeaNote,
+  type TradePlan,
+  type RuleVersion,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -172,6 +174,11 @@ interface AppStore extends AppData {
   // Marking an idea done stamps doneAt; reopening it clears it.
   updateIdeaNote: (id: string, entry: Partial<Omit<IdeaNote, 'id' | 'createdAt' | 'updatedAt' | 'doneAt'>>) => void
   removeIdeaNote: (id: string) => void
+  addTradePlan: (entry: Omit<TradePlan, 'id' | 'createdAt' | 'updatedAt'>) => string
+  updateTradePlan: (id: string, entry: Partial<Omit<TradePlan, 'id' | 'createdAt'>>) => void
+  removeTradePlan: (id: string) => void
+  // Keeps the latest copy of a rule set each time it is signed or changed.
+  addRuleVersion: (entry: Omit<RuleVersion, 'id' | 'at'>) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -208,6 +215,8 @@ function toAppData(state: AppData): AppData {
     paperAccounts: state.paperAccounts,
     watchlist: state.watchlist,
     ideaNotes: state.ideaNotes,
+    tradePlans: state.tradePlans,
+    ruleVersions: state.ruleVersions,
   }
 }
 
@@ -535,6 +544,33 @@ export const useAppStore = create<AppStore>()(
         })),
 
       removeIdeaNote: (id) => set((state) => ({ ideaNotes: state.ideaNotes.filter((n) => n.id !== id) })),
+
+      addTradePlan: (entry) => {
+        const id = crypto.randomUUID()
+        const now = new Date().toISOString()
+        set((state) => ({ tradePlans: [...state.tradePlans, { ...entry, id, createdAt: now, updatedAt: now }] }))
+        return id
+      },
+
+      updateTradePlan: (id, entry) =>
+        set((state) => ({
+          tradePlans: state.tradePlans.map((p) => {
+            if (p.id !== id) return p
+            const next = { ...p, ...entry, updatedAt: new Date().toISOString() }
+            // The stop in force only moves up (01 §C4).
+            if (entry.currentStop !== undefined && p.currentStop !== undefined && entry.currentStop < p.currentStop) {
+              next.currentStop = p.currentStop
+            }
+            return next
+          }),
+        })),
+
+      removeTradePlan: (id) => set((state) => ({ tradePlans: state.tradePlans.filter((p) => p.id !== id) })),
+
+      addRuleVersion: (entry) =>
+        set((state) => ({
+          ruleVersions: [...state.ruleVersions, { ...entry, id: crypto.randomUUID(), at: new Date().toISOString() }],
+        })),
 
       removePaperAccount: (id) =>
         set((state) => ({ paperAccounts: state.paperAccounts.filter((a) => a.id !== id) })),

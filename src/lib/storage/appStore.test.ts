@@ -54,4 +54,22 @@ describe('appStore storage', () => {
     s().removeIdeaNote(id)
     expect(s().ideaNotes).toEqual([])
   })
+
+  it('keeps the plan stop from moving down, and records rule versions', async () => {
+    const { useAppStore } = await import('./appStore')
+    const s = () => useAppStore.getState()
+    const id = s().addTradePlan({
+      status: 'open', source: 'thesis', ticker: '2330', name: '', market: 'TW', entryMethod: 'value_batches',
+      setup: '', trigger: '', confirmation: '', stopMethod: 'atr', orderType: 'limit', orderNote: '',
+      trailing: 'chandelier', targets: [], thesisExit: '', rules: [], advice: [], currentStop: 885,
+    })
+    s().updateTradePlan(id, { currentStop: 1100 })
+    expect(s().tradePlans[0].currentStop).toBe(1100)
+    s().updateTradePlan(id, { currentStop: 900 })
+    expect(s().tradePlans[0].currentStop).toBe(1100)
+    s().addRuleVersion({ kind: 'policy', reason: '第一次簽署', snapshot: { riskPerTradePercent: 1 } })
+    expect(s().ruleVersions[0]).toMatchObject({ kind: 'policy', reason: '第一次簽署' })
+    s().removeTradePlan(id)
+    expect(s().tradePlans).toEqual([])
+  })
 })
