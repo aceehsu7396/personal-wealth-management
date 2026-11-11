@@ -4,6 +4,7 @@ import { useAppStore } from '../lib/storage/appStore'
 import { fetchStockData, type StockData, type StockRow } from '../lib/screener/stockData'
 import {
   applyScreen,
+  fieldValue,
   FIELDS,
   formatField,
   industries,
@@ -13,6 +14,8 @@ import {
   type Screen,
 } from '../lib/screener/screens'
 import { Term } from '../components/Term'
+import { SortableTh } from '../components/SortableTh'
+import { nextSort, sortRows, type SortState, type SortValue } from '../lib/sortRows'
 import { ActionBadge } from '../components/research/SignalPanel'
 import { evaluateThesis } from '../lib/calculations/thesisScoring'
 import { useSignals } from '../lib/research/useSignals'
@@ -25,6 +28,9 @@ const thClass = 'py-2 pr-3 text-left text-xs font-medium whitespace-nowrap text-
 const tdClass = 'py-1.5 pr-3 whitespace-nowrap text-gray-700 dark:text-gray-300'
 const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400'
 const MAX_ROWS = 100
+
+type ResultKey = 'code' | 'industry' | 'close' | NumericField
+type WatchKey = 'code' | 'added' | 'change' | 'advice' | 'pe' | 'ret6m'
 
 const COLUMNS: NumericField[] = ['pe', 'dividendYield', 'pb', 'revenueYoy', 'ret6m', 'ret12m', 'marketCap', 'tradeValue']
 
@@ -88,7 +94,19 @@ export function ScreenerPage() {
     }
   }, [])
 
-  const rows = useMemo(() => (data ? applyScreen(data.stocks, screen) : []), [data, screen])
+  const screened = useMemo(() => (data ? applyScreen(data.stocks, screen) : []), [data, screen])
+  // Clicking a header re-sorts the matched rows; null keeps the screen's order.
+  const [resultSort, setResultSort] = useState<SortState<ResultKey> | null>(null)
+  const rows = useMemo(() => {
+    if (!resultSort) return screened
+    const key = resultSort.key
+    const value = (r: StockRow): SortValue =>
+      key === 'code' ? r.code : key === 'industry' ? r.industry : key === 'close' ? r.close : fieldValue(r, key)
+    return sortRows(screened, value, resultSort.desc)
+  }, [screened, resultSort])
+  const sortResults = (key: ResultKey) => setResultSort((s) => nextSort(s, key, key !== 'code' && key !== 'industry'))
+  const [watchSort, setWatchSort] = useState<SortState<WatchKey> | null>(null)
+  const sortWatch = (key: WatchKey) => setWatchSort((s) => nextSort(s, key, key !== 'code' && key !== 'advice'))
   const bySymbol = useMemo(() => new Map((data?.stocks ?? []).map((s) => [`TW:${s.code}`, s])), [data])
   const preset = PRESET_SCREENS.find((p) => p.id === presetId)
 
@@ -126,6 +144,16 @@ export function ScreenerPage() {
   }
 
   const watchedSymbols = new Set(watchlist.map((w) => w.symbol))
+  const watchValue = (w: (typeof watchlist)[number], key: WatchKey): SortValue => {
+    const row = bySymbol.get(w.symbol)
+    if (key === 'code') return w.symbol.replace('TW:', '')
+    if (key === 'added') return w.addedAt
+    if (key === 'change') return row?.close && w.priceAtAdd ? row.close / w.priceAtAdd - 1 : null
+    // Nearest buy point first when sorted ascending.
+    if (key === 'advice') return cardAdvice(w.symbol)?.distance?.rank ?? null
+    return row ? fieldValue(row, key) : null
+  }
+  const sortedWatchlist = watchSort ? sortRows(watchlist, (w) => watchValue(w, watchSort.key), watchSort.desc) : watchlist
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -227,19 +255,32 @@ export function ScreenerPage() {
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {data.date} 收盤資料，共 {data.stocks.length} 檔，符合 {rows.length} 檔
-                {rows.length > MAX_ROWS && `（顯示前 ${MAX_ROWS} 檔）`}。報酬未加回股利；上櫃股票不在範圍內。
+                {rows.length > MAX_ROWS && `（顯示前 ${MAX_ROWS} 檔）`}。報酬未加回股利；上櫃股票不在範圍內。點欄位標題可以排序
+                {resultSort ? (
+                  <>
+                    {'，'}
+                    <button type="button" onClick={() => setResultSort(null)} className={linkClass}>
+                      恢復篩選排序
+                    </button>
+                  </>
+                ) : (
+                  ''
+                )}
+                。
               </p>
               <div className="mt-2 max-h-[32rem] overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-white dark:bg-gray-800">
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      <th className={`${thClass} sticky left-0 z-10 bg-white dark:bg-gray-800`}>代號／名稱</th>
-                      <th className={thClass}>產業</th>
-                      <th className={thClass}>收盤</th>
+                      <SortableTh sortKey="code" label="代號" sort={resultSort} onSort={sortResults} className={`${thClass} sticky left-0 z-10 bg-white dark:bg-gray-800`}>
+                        代號／名稱
+                      </SortableTh>
+                      <SortableTh sortKey="industry" label="產業" sort={resultSort} onSort={sortResults} className={thClass} />
+                      <SortableTh sortKey="close" label="收盤" sort={resultSort} onSort={sortResults} className={thClass} />
                       {COLUMNS.map((c) => (
-                        <th key={c} className={thClass}>
+                        <SortableTh key={c} sortKey={c} label={FIELDS[c].label} sort={resultSort} onSort={sortResults} className={thClass}>
                           <Header field={c} />
-                        </th>
+                        </SortableTh>
                       ))}
                       <th className={thClass} />
                     </tr>
@@ -291,15 +332,24 @@ export function ScreenerPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  {['代號／名稱', '加入', '加入以來', '研究卡建議', '本益比', '6 個月', '備註', ''].map((h) => (
-                    <th key={h} className={thClass}>
-                      {h}
-                    </th>
+                  {(
+                    [
+                      ['code', '代號／名稱'],
+                      ['added', '加入'],
+                      ['change', '加入以來'],
+                      ['advice', '研究卡建議'],
+                      ['pe', '本益比'],
+                      ['ret6m', '6 個月'],
+                    ] as [WatchKey, string][]
+                  ).map(([k, h]) => (
+                    <SortableTh key={k} sortKey={k} label={h} sort={watchSort} onSort={sortWatch} className={thClass} />
                   ))}
+                  <th className={thClass}>備註</th>
+                  <th className={thClass} />
                 </tr>
               </thead>
               <tbody>
-                {watchlist.map((w) => {
+                {sortedWatchlist.map((w) => {
                   const row = bySymbol.get(w.symbol)
                   const change = row?.close && w.priceAtAdd ? row.close / w.priceAtAdd - 1 : null
                   const advice = cardAdvice(w.symbol)
