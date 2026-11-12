@@ -8,6 +8,7 @@ import { riskLimitOf } from '../../lib/calculations/preTradeChecklist'
 import { useChecklistContext } from '../../lib/trades/useChecklistContext'
 import { backtestOf, planAdvice, sizeOptions } from '../../lib/trades/tradePlan'
 import { useAnnualVol } from '../../lib/useHoldingReturns'
+import { useEvents } from '../../lib/market/events'
 import { tradeLink } from '../../lib/trades/tradeLink'
 import { todayIsoDate } from '../../lib/market/twse'
 import type { PlanAdvice, TradePlan } from '../../lib/storage/schema'
@@ -82,7 +83,8 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
   const thesis = plan.thesisId ? theses.find((t) => t.id === plan.thesisId) : undefined
   const report = thesis?.auto ? signalsFor(thesis, evaluateThesis(thesis, ctx.policy)) : null
   const today = todayIsoDate()
-  const advice = planAdvice(plan, { ctx, report, thesis, today })
+  const events = useEvents(today)
+  const advice = planAdvice(plan, { ctx, report, thesis, today, events })
   const draft = plan.status === 'draft'
   const set = (patch: Partial<TradePlan>) => update(plan.id, patch)
 

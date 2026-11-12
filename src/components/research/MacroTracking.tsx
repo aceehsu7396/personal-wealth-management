@@ -305,7 +305,7 @@ function Charts({ data }: { data: MacroData | null }) {
             key={y}
             type="button"
             onClick={() => setYears(y)}
-            className={`rounded px-2 py-1 ${years === y ? 'bg-indigo-600 text-white' : 'text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-700'}`}
+            className={`rounded px-2 py-1 ${years === y ? 'bg-indigo-600 text-white' : 'text-gray-600 ring-1 ring-gray-200 hover:bg-gray-50 dark:text-gray-300 dark:ring-gray-700 dark:hover:bg-gray-700'}`}
           >
             {y} 年
           </button>

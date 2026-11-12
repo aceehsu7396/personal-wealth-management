@@ -18,7 +18,7 @@ import { useResearchTask } from '../lib/ai/useResearchTask'
 import { latestOutlook, MACRO_SIGNAL_LABELS, PILLAR_LABELS } from '../lib/calculations/fubonTracking'
 import { todayIsoDate } from '../lib/market/twse'
 import type { MacroCheckIn, MacroSignalKey } from '../lib/storage/schema'
-import { fetchMacroData, toOutlooks, type MacroData } from '../lib/macro/macroData'
+import { FRED_NOTICE, fetchMacroData, toOutlooks, type MacroData } from '../lib/macro/macroData'
 import { AUTO_NOTE, rulesCheckIn, shouldAutoSave } from '../lib/macro/signalRules'
 
 const cardClass =
@@ -285,6 +285,7 @@ export function MacroPanel() {
             還沒有總經檢視；讀到每日總經資料後會自動建立本月檢視。
           </p>
         )}
+        <p className="mt-4 text-xs text-gray-600 dark:text-gray-400">美國數據來自聖路易聯邦準備銀行經濟資料庫（FRED）。{FRED_NOTICE}</p>
       </div>
 
       {editing && (

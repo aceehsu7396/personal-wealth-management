@@ -4,6 +4,7 @@ import { fetchRecentTaiexAndTw0050, todayIsoDate } from '../lib/market/twse'
 import { DailyMarketPanel } from '../components/market/DailyMarketPanel'
 import { MacroPanel } from '../components/MacroPanel'
 import { RegimeCard } from '../components/market/RegimeCard'
+import { EventCalendarCard } from '../components/market/EventCalendarCard'
 import { PageHeader } from '../components/ui'
 
 export function MarketPage() {
@@ -23,6 +24,10 @@ export function MarketPage() {
 
       <div className="mt-6">
         <RegimeCard />
+      </div>
+
+      <div className="mt-6">
+        <EventCalendarCard />
       </div>
 
       <DailyMarketPanel />

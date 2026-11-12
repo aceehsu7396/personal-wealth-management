@@ -3,6 +3,8 @@ import type { MacroAssessment } from '../calculations/macroRegime'
 import type { EntryMethod, RegimeKey, RegimeParamRow, RegimeParams } from '../storage/schema'
 import type { Breadth, FlowDay, IndexPoint, MarginDay } from './indices'
 import { flowSums, marginChange, vixBand, type IndexTrend, type Tone } from './trend'
+import type { MacroData, Point } from '../macro/macroData'
+import type { ValuationPoint } from './valuation'
 
 // Market regime (blueprint 02 §1.1, 01 §C6): one of seven states, read from
 // the TAIEX by fixed price rules and confirmed over a few sessions. The
@@ -212,6 +214,86 @@ export interface FacetInputs {
   flows: FlowDay[]
   margin: MarginDay[]
   macro: MacroAssessment | null
+  // Stage 5: FRED and ETF series, and the TWSE-wide P/E history.
+  macroData?: MacroData | null
+  valuation?: ValuationPoint[]
+}
+
+export const FACET_RULES = {
+  creditDrop: -1,
+  creditStress: -3,
+  dollarPercent: 2,
+  valuationHigh: 80,
+  valuationExtreme: 95,
+  valuationLow: 20,
+  valuationCheap: 5,
+  valuationMinDays: 240,
+} as const
+
+const shiftMonths = (iso: string, n: number) => {
+  const d = new Date(`${iso}T00:00:00Z`)
+  d.setUTCMonth(d.getUTCMonth() + n)
+  return d.toISOString().slice(0, 10)
+}
+// The change in % over the last three months, with the last point.
+function threeMonth(points: Point[] | undefined): { pct: number; last: Point } | null {
+  const last = points?.at(-1)
+  if (!points || !last) return null
+  const before = [...points].reverse().find((p) => p.date <= shiftMonths(last.date, -3))
+  return before && before.value !== 0 ? { pct: (last.value / before.value - 1) * 100, last } : null
+}
+const signedPct = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(1)}%`
+
+export function creditFacet(d: MacroData | null | undefined): Facet {
+  const c = threeMonth(d?.series.HYG_IEF)
+  if (!c) return { key: 'credit', label: '信用', score: null, basis: '資料不足' }
+  const score = c.pct <= FACET_RULES.creditStress ? -2 : c.pct <= FACET_RULES.creditDrop ? -1 : c.pct > 0 ? 1 : 0
+  return { key: 'credit', label: '信用', score, basis: `高收益債 ÷ 公債 ETF（HYG ÷ IEF）3 個月 ${signedPct(c.pct)}（${c.last.date}，Yahoo Finance）` }
+}
+
+export function ratesFacet(d: MacroData | null | undefined): Facet {
+  const curve = d?.series.T10Y2Y
+  const last = curve?.at(-1)
+  if (!curve || !last) return { key: 'rates', label: '利率', score: null, basis: '資料不足' }
+  const year = curve.filter((p) => p.date > shiftMonths(last.date, -12))
+  const wasInverted = year.some((p) => p.value < 0)
+  const fed = threeMonth(d?.series.FEDFUNDS)
+  const cutting = !!fed && fed.last.value < fed.last.value / (1 + fed.pct / 100) - 0.1
+  let score = 0
+  let why = '利差為正、利率沒有明顯變化'
+  if (last.value > 0 && wasInverted) {
+    score = -1
+    why = '一年內曾倒掛、現在轉正：歷史上常在衰退前出現'
+  } else if (last.value > 0 && cutting) {
+    score = 1
+    why = '利差為正且聯準會在降息'
+  } else if (last.value < 0) {
+    why = '殖利率曲線倒掛中'
+  }
+  return { key: 'rates', label: '利率', score, basis: `10 年減 2 年利差 ${last.value.toFixed(2)} 個百分點（${last.date}）：${why}（資料：FRED）` }
+}
+
+export function valuationFacet(points: ValuationPoint[] | undefined): Facet {
+  const last = points?.at(-1)
+  if (!points || !last) return { key: 'valuation', label: '估值', score: null, basis: '資料不足' }
+  if (points.length < FACET_RULES.valuationMinDays) {
+    return { key: 'valuation', label: '估值', score: null, basis: `台股整體本益比 ${last.pe} 倍（${last.date}，證交所）；歷史不足一年，不計分` }
+  }
+  const rank = Math.round((points.filter((p) => p.pe <= last.pe).length / points.length) * 100)
+  const r = FACET_RULES
+  const score = rank >= r.valuationExtreme ? -2 : rank >= r.valuationHigh ? -1 : rank <= r.valuationCheap ? 2 : rank <= r.valuationLow ? 1 : 0
+  return { key: 'valuation', label: '估值', score, basis: `台股整體本益比 ${last.pe} 倍，在紀錄中的第 ${rank} 百分位（證交所）` }
+}
+
+export function fxFacet(d: MacroData | null | undefined): Facet {
+  const dollar = threeMonth(d?.series.DTWEXBGS)
+  const twd = threeMonth(d?.indexCloses?.usdtwd)
+  if (!dollar && !twd) return { key: 'fx', label: '匯率', score: null, basis: '資料不足' }
+  const limit = FACET_RULES.dollarPercent
+  const weaker = (dollar ? dollar.pct <= -limit : true) && (twd ? twd.pct <= -limit : true)
+  const stronger = (dollar?.pct ?? 0) >= limit || (twd?.pct ?? 0) >= limit
+  const parts = [dollar && `美元指數 3 個月 ${signedPct(dollar.pct)}`, twd && `美元兌新台幣 ${signedPct(twd.pct)}`].filter(Boolean).join('、')
+  return { key: 'fx', label: '匯率', score: weaker ? 1 : stronger ? -1 : 0, basis: `${parts}（FRED）：美元走弱、新台幣走強有利資金流入台股` }
 }
 
 const TREND_SCORE = { bull: 2, strengthening: 1, range: 0, weakening: -1, bear: -2 } as const
@@ -258,6 +340,8 @@ export function facetScores(input: FacetInputs): Facet[] {
     const score = f >= 1500e8 ? 2 : f > 0 ? 1 : f <= -1500e8 ? -2 : -1
     out.push({ key: 'flows', label: '資金', score, basis: `外資近 20 日${f >= 0 ? '買超' : '賣超'} ${yi(Math.abs(f))}（超過 1,500 億為 ±2）` })
   } else out.push({ key: 'flows', label: '資金', score: null, basis: '資料不足' })
+
+  out.push(creditFacet(input.macroData), ratesFacet(input.macroData), valuationFacet(input.valuation), fxFacet(input.macroData))
 
   const m = input.macro
   out.push(

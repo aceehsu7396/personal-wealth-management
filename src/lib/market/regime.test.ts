@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyDay, facetScores, regimeContext, regimeHistory, type DayMetrics } from './regime'
+import { classifyDay, creditFacet, facetScores, fxFacet, ratesFacet, valuationFacet, regimeContext, regimeHistory, type DayMetrics } from './regime'
 import { createDefaultRegimeParams } from '../storage/schema'
 import type { MacroAssessment } from '../calculations/macroRegime'
 import type { IndexPoint } from './indices'
@@ -106,6 +106,41 @@ describe('facetScores', () => {
     })
     expect(facets.find((f) => f.key === 'breadth')?.score).toBe(1)
     expect(facets.find((f) => f.key === 'trend')?.score).toBeNull()
-    expect(facets).toHaveLength(6)
+    expect(facets).toHaveLength(10)
+    expect(facets.find((f) => f.key === 'credit')?.score).toBeNull()
+  })
+})
+
+describe('stage 5 facets', () => {
+  const months = (values: number[], end = '2026-10-01') =>
+    values.map((value, i) => {
+      const d = new Date(`${end}T00:00:00Z`)
+      d.setUTCMonth(d.getUTCMonth() - (values.length - 1 - i))
+      return { date: d.toISOString().slice(0, 10), value }
+    })
+  const macro = (series: Record<string, { date: string; value: number }[]>, usdtwd?: { date: string; value: number }[]) =>
+    ({ series, indexCloses: usdtwd ? { usdtwd } : {} }) as never
+
+  it('scores credit by the HYG ÷ IEF move', () => {
+    expect(creditFacet(macro({ HYG_IEF: months([1, 1, 1, 0.96]) })).score).toBe(-2)
+    expect(creditFacet(macro({ HYG_IEF: months([1, 1, 1, 0.985]) })).score).toBe(-1)
+    expect(creditFacet(macro({ HYG_IEF: months([1, 1, 1, 1.01]) })).score).toBe(1)
+    expect(creditFacet(null).score).toBeNull()
+  })
+
+  it('flags an un-inverting curve and rewards cuts with a positive curve', () => {
+    expect(ratesFacet(macro({ T10Y2Y: months([-0.3, -0.1, 0.2]), FEDFUNDS: months([5, 5, 5]) })).score).toBe(-1)
+    expect(ratesFacet(macro({ T10Y2Y: months([0.4, 0.5, 0.6, 0.6]), FEDFUNDS: months([5, 4.75, 4.5, 4.25]) })).score).toBe(1)
+  })
+
+  it('needs a year of P/E history before scoring valuation', () => {
+    expect(valuationFacet([{ date: '2026-11-03', pe: 22 }]).score).toBeNull()
+    const year = Array.from({ length: 250 }, (_, i) => ({ date: `d${String(i).padStart(3, '0')}`, pe: 15 + i * 0.02 }))
+    expect(valuationFacet(year).score).toBe(-2)
+  })
+
+  it('reads a weaker dollar and stronger NT dollar as favourable', () => {
+    expect(fxFacet(macro({ DTWEXBGS: months([120, 119, 118, 116]) }, months([32, 31.5, 31, 30.8]))).score).toBe(1)
+    expect(fxFacet(macro({ DTWEXBGS: months([116, 118, 119, 120]) })).score).toBe(-1)
   })
 })

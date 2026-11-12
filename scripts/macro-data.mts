@@ -161,6 +161,13 @@ async function eastmoney(secid: string): Promise<Point[]> {
     .filter((p) => p.value > 0)
 }
 
+// HYG ÷ IEF on the dates both traded: falls when credit stress rises.
+async function creditRatio(): Promise<Point[]> {
+  const hyg = await yahoo('HYG')
+  const ief = new Map((await yahoo('IEF')).map((p) => [p.date, p.value]))
+  return hyg.filter((p) => ief.has(p.date)).map((p) => ({ date: p.date, value: Math.round((p.value / ief.get(p.date)!) * 10_000) / 10_000 }))
+}
+
 const FETCHERS: Record<string, (id: string) => Promise<Point[]>> = { FRED: fred, 'Yahoo Finance': yahoo, 東方財富: eastmoney }
 
 async function indexCloses(errors: string[]): Promise<MarketCloses> {
@@ -202,6 +209,8 @@ async function main() {
   }
   const cpi = await attempt('主計總處 CPI', errors, twCpi)
   if (cpi) series.TW_CPI = cpi
+  const credit = await attempt('Yahoo Finance HYG、IEF', errors, creditRatio)
+  if (credit) series.HYG_IEF = credit
 
   const before = new Date(`${today}T00:00:00Z`)
   before.setUTCMonth(before.getUTCMonth() - 3)

@@ -278,7 +278,7 @@ export function PaperPage() {
               setSignals(null)
             }}
             aria-pressed={a.id === selectedId && !creating}
-            className={`rounded-md px-3 py-1.5 text-sm ${a.id === selectedId && !creating ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700'}`}
+            className={`rounded-md px-3 py-1.5 text-sm ${a.id === selectedId && !creating ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700'}`}
           >
             {a.name}
           </button>

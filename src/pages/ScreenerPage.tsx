@@ -21,6 +21,8 @@ import { evaluateThesis } from '../lib/calculations/thesisScoring'
 import { useSignals } from '../lib/research/useSignals'
 import { buyDistanceOf } from '../lib/research/signals'
 import { inputClass, labelClass } from '../components/forms/FormField'
+import { useEntrySignals } from '../lib/trades/useEntrySignals'
+import { ENTRY_SIGNAL_LABELS } from '../lib/trades/entrySignals'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -62,6 +64,7 @@ function StockActions({ row, onWatch, watched }: { row: StockRow; onWatch?: () =
 
 export function ScreenerPage() {
   const watchlist = useAppStore((s) => s.watchlist)
+  const entry = useEntrySignals()
   const addWatchItem = useAppStore((s) => s.addWatchItem)
   const updateWatchItem = useAppStore((s) => s.updateWatchItem)
   const removeWatchItem = useAppStore((s) => s.removeWatchItem)
@@ -174,7 +177,7 @@ export function ScreenerPage() {
               className={`rounded-md px-3 py-1.5 text-sm ${
                 presetId === p.id
                   ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700'
+                  : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700'
               }`}
             >
               {p.name}
@@ -344,6 +347,7 @@ export function ScreenerPage() {
                   ).map(([k, h]) => (
                     <SortableTh key={k} sortKey={k} label={h} sort={watchSort} onSort={sortWatch} className={thClass} />
                   ))}
+                  <th className={thClass}>進場條件</th>
                   <th className={thClass}>備註</th>
                   <th className={thClass} />
                 </tr>
@@ -357,7 +361,7 @@ export function ScreenerPage() {
                     <tr key={w.symbol} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
                       <td className={tdClass}>
                         <span className="font-medium text-gray-900 dark:text-gray-100">{w.symbol.replace('TW:', '')}</span> {w.name}
-                        <span className="block text-xs text-gray-400">{w.source}</span>
+                        <span className="block text-xs text-gray-600 dark:text-gray-400">{w.source}</span>
                       </td>
                       <td className={`${tdClass} text-xs`}>
                         {w.addedAt}
@@ -368,7 +372,7 @@ export function ScreenerPage() {
                       </td>
                       <td className={tdClass}>
                         {!advice ? (
-                          <span className="text-xs text-gray-400">—</span>
+                          <span className="text-xs text-gray-600 dark:text-gray-400">—</span>
                         ) : (
                           <Link to={`/research/stocks?new=${advice.code}`} className="flex items-center gap-1.5 hover:underline">
                             {advice.signals ? (
@@ -385,6 +389,21 @@ export function ScreenerPage() {
                       <td className={tdClass}>{row ? formatField(row, 'pe') : '—'}</td>
                       <td className={tdClass}>{row ? formatField(row, 'ret6m') : '—'}</td>
                       <td className={tdClass}>
+                        {(() => {
+                          const sigs = entry.items.find((x) => `${x.market}:${x.ticker}` === w.symbol || x.ticker === w.symbol)?.signals ?? []
+                          if (sigs.length === 0) return <span className="text-xs text-gray-600 dark:text-gray-400">{entry.loading ? '讀取中' : '—'}</span>
+                          return (
+                            <span className="flex flex-wrap gap-1">
+                              {sigs.map((sg) => (
+                                <span key={sg.kind} title={sg.detail} className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+                                  {ENTRY_SIGNAL_LABELS[sg.kind]}
+                                </span>
+                              ))}
+                            </span>
+                          )
+                        })()}
+                      </td>
+                      <td className={tdClass}>
                         <input
                           className="w-40 rounded border border-gray-300 px-1 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800"
                           defaultValue={w.note}
@@ -395,7 +414,7 @@ export function ScreenerPage() {
                       <td className={tdClass}>
                         <span className="flex gap-2">
                           {row && <StockActions row={row} />}
-                          <button type="button" onClick={() => removeWatchItem(w.symbol)} className="text-xs text-gray-500 hover:underline">
+                          <button type="button" onClick={() => removeWatchItem(w.symbol)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
                             移除
                           </button>
                         </span>

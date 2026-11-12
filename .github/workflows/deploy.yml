@@ -36,7 +36,7 @@ jobs:
       - name: Restore last published data
         run: |
           mkdir -p public/data
-          for f in macro stocks funds indices; do
+          for f in macro stocks funds indices events valuation; do
             curl -sf -o "public/data/$f.json" "https://aceehsu7396.github.io/personal-wealth-management/data/$f.json" \
               || rm -f "public/data/$f.json"
           done
@@ -55,6 +55,15 @@ jobs:
       # Listed stocks and ETFs for the screener (TWSE open data, no key).
       - name: Fetch stock data
         run: npx tsx scripts/stocks-data.mts
+        continue-on-error: true
+      # TWSE-wide P/E, one point per day on top of the published history.
+      - name: Update valuation history
+        run: npx tsx scripts/valuation-data.mts
+        continue-on-error: true
+      # Ex-dividend dates and investor conferences (TWSE and TPEx open data,
+      # no key); conference notices accumulate on top of the published file.
+      - name: Fetch event calendar
+        run: npx tsx scripts/events-data.mts
         continue-on-error: true
       # Latest NAV of every fund sold in Taiwan (Anue fund list, no key).
       - name: Fetch fund NAVs

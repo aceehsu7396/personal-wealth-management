@@ -12,7 +12,7 @@ import { useRegime } from '../lib/market/useRegime'
 import { annualVolPercent, historyStart } from '../lib/useHoldingReturns'
 import { todayIsoDate } from '../lib/market/twse'
 import { backtestOf, manualPlan, planFromStrategy, planFromThesis, type PlanDraft } from '../lib/trades/tradePlan'
-import type { TradePlan } from '../lib/storage/schema'
+import { EntryMethodSchema, type TradePlan } from '../lib/storage/schema'
 import { PlanEditor } from '../components/trades/PlanEditor'
 import { ENTRY_METHOD_LABELS, PLAN_STATUS } from '../components/trades/planLabels'
 import { Badge, Card, DataTable, PageHeader, primaryButton, textLink } from '../components/ui'
@@ -84,14 +84,23 @@ export function TradePlansPage() {
 
   const thesisId = search.get('thesis')
   const strategyId = search.get('strategy')
+  const tickerParam = search.get('ticker')
   const planId = search.get('id')
+  // From an entry-condition signal: the method it suggests.
+  const method = EntryMethodSchema.safeParse(search.get('method')).data
 
   useEffect(() => {
     // Drafts wait for the regime so their size carries its multiplier.
-    if (started.current || (!thesisId && !strategyId) || regimeLoading) return
+    if (started.current || (!thesisId && !strategyId && !tickerParam) || regimeLoading) return
     started.current = true
     const open = (id: string) => {
       void navigate(`/portfolio/plans?id=${id}`, { replace: true })
+    }
+    const withMethod = <T extends PlanDraft>(d: T): T => (method ? { ...d, entryMethod: method } : d)
+    if (tickerParam && !thesisId && !strategyId) {
+      const market = search.get('market') === 'US' ? 'US' : 'TW'
+      open(addTradePlan(withMethod({ ...manualPlan(policy), ticker: tickerParam, market })))
+      return
     }
     const existing = plans.find((p) => p.status === 'draft' && ((thesisId && p.thesisId === thesisId) || (strategyId && p.strategyId === strategyId)))
     if (existing) {
@@ -108,7 +117,7 @@ export function TradePlansPage() {
       const total = analyzePortfolio(holdings, theses, policy, guardrails, meta).totalValueTwd
       setCreating(true)
       void (thesis.market === 'TW' ? lastCloseAndAtr(thesis.ticker) : Promise.resolve({ vol: undefined })).then((q) => {
-        open(addTradePlan(planFromThesis(thesis, report, policy, regime, { annualVolPercent: q.vol, totalValueTwd: total })))
+        open(addTradePlan(withMethod(planFromThesis(thesis, report, policy, regime, { annualVolPercent: q.vol, totalValueTwd: total }))))
       })
       return
     }
@@ -122,9 +131,9 @@ export function TradePlansPage() {
     const total = analyzePortfolio(holdings, theses, policy, guardrails, meta).totalValueTwd
     void (market === 'TW' && code ? lastCloseAndAtr(code) : Promise.resolve({} as { close?: number; atr?: number; vol?: number })).then((quote) => {
       const draft: PlanDraft = planFromStrategy(strategy, quote, total, policy, regime, { annualVolPercent: quote.vol, backtest: backtestOf(runs, strategy.id) })
-      open(addTradePlan(draft))
+      open(addTradePlan(withMethod(draft)))
     })
-  }, [thesisId, strategyId, plans, theses, strategies, holdings, policy, guardrails, meta, signalsFor, addTradePlan, navigate, setSearch, regime, regimeLoading, runs])
+  }, [thesisId, strategyId, plans, theses, strategies, holdings, policy, guardrails, meta, signalsFor, addTradePlan, navigate, setSearch, regime, regimeLoading, runs, tickerParam, method, search])
 
   const plan = planId ? plans.find((p) => p.id === planId) : undefined
   const newManual = () => {

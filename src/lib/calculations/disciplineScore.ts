@@ -95,9 +95,12 @@ export function computeDiscipline(
   today: string,
   plans: Pick<TradePlan, 'id' | 'currentStop' | 'stopLoss'>[] = [],
 ): DisciplineReport {
-  const exceptionTrades = trades.filter(isException)
+  // Imported trades never ran the checklist: they count neither as rule
+  // breaks nor as rule-following trades.
+  const checked = trades.filter((t) => t.source !== 'broker')
+  const exceptionTrades = checked.filter(isException)
   const complianceRate =
-    trades.length > 0 ? ((trades.length - exceptionTrades.length) / trades.length) * 100 : null
+    checked.length > 0 ? ((checked.length - exceptionTrades.length) / checked.length) * 100 : null
 
   const thesisById = new Map(theses.map((t) => [t.id, t]))
   const satelliteHoldings = holdings.filter((h) => isSatellite(h.sleeve) && h.shares > 0)

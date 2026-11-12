@@ -401,6 +401,10 @@ export const TradeSchema = z.object({
   biasNotes: z.string(),
   review6m: TradeReviewSchema.optional(),
   review12m: TradeReviewSchema.optional(),
+  // Imported from a broker statement: the checklist was not run (stage 5).
+  source: z.enum(['manual', 'broker']).optional(),
+  fee: z.number().optional(),
+  tax: z.number().optional(),
   createdAt: z.string(),
 })
 export type Trade = z.infer<typeof TradeSchema>

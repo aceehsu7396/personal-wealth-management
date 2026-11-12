@@ -8,6 +8,7 @@ import { atr, sma } from '../backtest/indicators'
 import { parseSymbol, resolveParams, STRATEGY_TEMPLATES } from '../backtest/templates'
 import type { Bar } from '../market/priceHistory'
 import { ADD_ON_LABELS, allows, type RegimeContext } from '../market/regime'
+import { EVENT_LABELS, EVENT_RULES, GAP_RISK, upcoming, type MarketEvent } from '../market/events'
 
 // The entry-exit assistant's rule layer (blueprint 02 §3): drafts a trade
 // plan from a research card or a strategy card, checks it against the
@@ -287,6 +288,7 @@ export interface AdviceInput {
   report?: SignalReport | null
   thesis?: StockThesis | null
   today: string
+  events?: MarketEvent[]
 }
 
 export function pendingTradeOf(plan: Pick<PlanDraft, 'ticker' | 'name' | 'market' | 'source' | 'thesisId' | 'strategyId' | 'entryPrice' | 'shares' | 'stopLoss'>): PendingTrade {
@@ -341,6 +343,15 @@ export function planAdvice(plan: PlanDraft, input: AdviceInput): PlanAdvice[] {
     if (regime.macroHeadwind) out.push(advice('suggest', '總經逆風：部位可以再小一點，或只買第 1 批', '總經三支柱：逆風'))
     if (regime.coolingOff) out.push(advice('suggest', '局勢參數剛簽署，仍在 7 天冷靜期：照新規則前再確認一次', '紀律：修改規則後的冷靜期'))
     if (regime.changedRecently) out.push(advice('notice', `局勢最近轉為「${regime.label}」（${regime.since} 起）`, '局勢狀態：確認期 3 個交易日'))
+  }
+
+  if (input.events && plan.ticker && plan.status === 'draft') {
+    const soon = upcoming(input.events, input.today, EVENT_RULES.planSessions, new Set([plan.ticker])).filter((e) => GAP_RISK.includes(e.kind))
+    const e = soon[0]
+    if (e) {
+      const text = e.ticker ? `${e.date} ${EVENT_LABELS[e.kind]}：事件前先別進場，或部位減半` : `${e.date} ${e.title}：公司可能在這之前公布財報，部位可以減半`
+      out.push(advice('suggest', text, `事件日曆：${e.title}（${e.source}）；跳空可能越過停損`))
+    }
   }
 
   const report = input.report
@@ -465,7 +476,9 @@ export const SCAN_PRIORITY = {
   raise_stop: 7,
   dip_ladder: 8,
   buy_zone: 8,
+  entry_signal: 8,
   review_due: 9,
+  event: 9,
   housekeeping: 10,
 } as const
 

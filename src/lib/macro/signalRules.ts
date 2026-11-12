@@ -19,12 +19,13 @@ export const RULES = {
   policyRatePoints: 0.2,
   curveLoose: 0.5,
   curveTight: 0,
-  spreadChangePoints: 0.3,
+  // HYG ÷ IEF: % change over the trend window, and its rank in a year.
+  creditRatioPercent: 1,
   balanceSheetPercent: 1,
   dollarPercent: 2,
   valuationBandPercent: 15,
-  spreadHot: 3,
-  spreadPanic: 6,
+  creditHotPercentile: 90,
+  creditPanicPercentile: 10,
   marginPercent: 15,
   vixHot: 13,
   vixPanic: 30,
@@ -40,11 +41,11 @@ export const METRIC_LABELS: Partial<Record<MacroSignalKey, { label: string; unit
   'inflation.twCpi': { label: 'CPI 年增', unit: '%' },
   'liquidity.policyRate': { label: '聯邦基金利率', unit: '%' },
   'liquidity.yieldCurve': { label: '10Y−2Y 利差', unit: '個百分點' },
-  'liquidity.creditSpread': { label: '高收益債利差', unit: '%' },
+  'liquidity.creditSpread': { label: '高收益債 ÷ 公債 ETF 3 個月變化', unit: '%' },
   'liquidity.centralBankBalanceSheet': { label: 'Fed 資產負債表 3 個月', unit: '%' },
   'liquidity.usDollar': { label: '美元指數 3 個月', unit: '%' },
   'sentiment.valuation': { label: 'S&P 500 預估本益比', unit: '倍' },
-  'sentiment.credit': { label: '高收益債利差', unit: '%' },
+  'sentiment.credit': { label: '高收益債 ÷ 公債 ETF 一年內位置', unit: '百分位' },
   'sentiment.margin': { label: '融資餘額 3 個月', unit: '%' },
   'sentiment.vix': { label: 'VIX', unit: '' },
 }
@@ -77,6 +78,16 @@ function monthsBefore(s: Series, months: number): Point | undefined {
   if (!s || !last) return undefined
   const cutoff = addMonths(last.date, -months)
   return [...s].reverse().find((p) => p.date <= cutoff)
+}
+
+// Rank (0–100) of the last point among the past year's points.
+function percentileInYear(s: Series): number | null {
+  const last = lastPoint(s)
+  if (!s || !last) return null
+  const cutoff = addMonths(last.date, -12)
+  const year = s.filter((p) => p.date > cutoff)
+  if (year.length < 120) return null
+  return Math.round((year.filter((p) => p.value <= last.value).length / year.length) * 100)
 }
 
 function average(points: Point[]): number {
@@ -239,15 +250,18 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
       )
     : missing('殖利率曲線')
 
-  const hy = lastPoint(s.BAMLH0A0HYM2)
-  const hyBefore = monthsBefore(s.BAMLH0A0HYM2, m)
+  const hy = lastPoint(s.HYG_IEF)
+  const hyBefore = monthsBefore(s.HYG_IEF, m)
   out['liquidity.creditSpread'] =
     hy && hyBefore
-      ? score(
-          (-byChange(hy.value - hyBefore.value, RULES.spreadChangePoints, -RULES.spreadChangePoints) || 0) as -1 | 0 | 1,
-          `高收益債利差 ${fmt(hy.value)}%，3 個月前 ${fmt(hyBefore.value)}%${src('BAMLH0A0HYM2', hy.date)}`,
-          { value: round(hy.value), unit: '%' },
-        )
+      ? (() => {
+          const pct = (hy.value / hyBefore.value - 1) * 100
+          return score(
+            byChange(pct, RULES.creditRatioPercent, -RULES.creditRatioPercent),
+            `高收益債 ÷ 公債 ETF 比值 3 個月 ${signed(pct, 1)}%（下跌＝信用轉緊）${src('HYG_IEF', hy.date)}`,
+            { value: round(pct), unit: '%' },
+          )
+        })()
       : missing('信用利差')
 
   const bs = lastPoint(s.WALCL)
@@ -299,13 +313,15 @@ export function judgeSignals(data: MacroData): Record<MacroSignalKey, SignalJudg
         : missing('評價')
   } else out['sentiment.valuation'] = missing('評價')
 
-  out['sentiment.credit'] = hy
-    ? score(
-        hy.value < RULES.spreadHot ? 1 : hy.value > RULES.spreadPanic ? -1 : 0,
-        `高收益債利差 ${fmt(hy.value)}%：低於 ${RULES.spreadHot}% 代表信用過度寬鬆、高於 ${RULES.spreadPanic}% 代表恐慌${src('BAMLH0A0HYM2', hy.date)}`,
-        { value: round(hy.value), unit: '%' },
-      )
-    : missing('信用條件')
+  const rank = percentileInYear(s.HYG_IEF)
+  out['sentiment.credit'] =
+    hy && rank !== null
+      ? score(
+          rank >= RULES.creditHotPercentile ? 1 : rank <= RULES.creditPanicPercentile ? -1 : 0,
+          `高收益債 ÷ 公債 ETF 比值在一年內的第 ${rank} 百分位：前 ${100 - RULES.creditHotPercentile}% 代表信用過度寬鬆、後 ${RULES.creditPanicPercentile}% 代表恐慌${src('HYG_IEF', hy.date)}`,
+          { value: rank, unit: '百分位' },
+        )
+      : missing('信用條件')
 
   out['sentiment.ipoHype'] = {
     value: 0,

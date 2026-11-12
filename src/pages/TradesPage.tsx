@@ -10,10 +10,11 @@ import { computeDiscipline, isException, type ReviewSlot } from '../lib/calculat
 import { applyTradeToHoldings, TRADE_REASON_LABELS } from '../lib/calculations/preTradeChecklist'
 import { isSatellite } from '../lib/calculations/portfolioRisk'
 import { todayIsoDate } from '../lib/market/twse'
+import { BrokerImport } from '../components/trades/BrokerImport'
 import { TradeForm, type TradeSubmission } from '../components/forms/TradeForm'
 import { TradeReviewForm } from '../components/forms/TradeReviewForm'
 import { StatCard } from '../components/StatCard'
-import { PageHeader, primaryButton } from '../components/ui'
+import { Disclosure, PageHeader, primaryButton } from '../components/ui'
 import { formatPercent } from '../lib/format'
 
 const cardClass =
@@ -237,6 +238,14 @@ export function TradesPage() {
       )}
 
       <div className={cardClass}>
+        <Disclosure summary="匯入券商對帳單（富邦證券成交明細 CSV）">
+          <div className="mt-3">
+            <BrokerImport onImport={handleSubmit} />
+          </div>
+        </Disclosure>
+      </div>
+
+      <div className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">交易紀錄</h2>
         {sortedTrades.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">還沒有交易紀錄。</p>
@@ -280,7 +289,10 @@ export function TradesPage() {
                           )
                         })()}
                       </td>
-                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">{TRADE_REASON_LABELS[t.reason]}</td>
+                      <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
+                        {TRADE_REASON_LABELS[t.reason]}
+                        {t.source === 'broker' && <span className="ml-1 rounded bg-gray-100 px-1.5 py-0.5 text-xs text-gray-700 dark:bg-gray-700 dark:text-gray-200">券商匯入</span>}
+                      </td>
                       <td className="py-2 pr-4">
                         <span
                           className={

@@ -180,14 +180,11 @@ export function indicatorSeries(data: MacroData): IndicatorChart[] {
     },
     {
       id: 'hy',
-      label: '高收益債利差',
-      unit: '%',
-      source: source('BAMLH0A0HYM2'),
-      points: monthly(s.BAMLH0A0HYM2),
-      thresholds: [
-        { value: RULES.spreadHot, label: '過熱' },
-        { value: RULES.spreadPanic, label: '恐慌' },
-      ],
+      label: '高收益債 ÷ 公債 ETF 比值',
+      unit: '',
+      source: source('HYG_IEF'),
+      points: monthly(s.HYG_IEF),
+      thresholds: [],
     },
     {
       id: 'vix',

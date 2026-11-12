@@ -6,6 +6,7 @@ import { todayIsoDate } from './market/twse'
 import { annualVol, onCalendar, returnsByDate, TRADING_DAYS } from './calculations/riskMetrics'
 import { exposureKind } from './calculations/stressTest'
 import type { Holding } from './storage/schema'
+import type { Bar } from './market/priceHistory'
 
 export type ReturnSource = 'history' | 'proxy' | 'none'
 
@@ -109,4 +110,21 @@ export function useAnnualVol(ticker: string, market: 'TW' | 'US'): number | null
     }
   }, [key, ticker, market])
   return vol?.key === key ? vol.value : null
+}
+
+// A year of daily bars for one ticker (same download and cache as
+// yearCloses); null when FinMind cannot help.
+export async function yearBars(ticker: string, market: 'TW' | 'US', today: string): Promise<Bar[] | null> {
+  if (Date.now() < blockedUntil) return null
+  try {
+    type Row = { date: string; open?: number; max?: number; min?: number; close?: number; Trading_Volume?: number; Open?: number; High?: number; Low?: number; Close?: number; Volume?: number }
+    const rows = await fetchDataset<Row>(market === 'TW' ? 'TaiwanStockPrice' : 'USStockPrice', ticker, historyStart(today))
+    const bars = rows
+      .map((r) => ({ date: r.date.slice(0, 10), open: r.open ?? r.Open ?? 0, high: r.max ?? r.High ?? 0, low: r.min ?? r.Low ?? 0, close: r.close ?? r.Close ?? 0, volume: r.Trading_Volume ?? r.Volume ?? 0 }))
+      .filter((b) => b.close > 0)
+    return bars.length >= 60 ? bars : null
+  } catch {
+    blockedUntil = Date.now() + BACKOFF_MS
+    return null
+  }
 }

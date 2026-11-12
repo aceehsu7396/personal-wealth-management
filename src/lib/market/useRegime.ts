@@ -3,6 +3,8 @@ import { useAppStore } from '../storage/appStore'
 import { assessMacro, type MacroAssessment } from '../calculations/macroRegime'
 import { todayIsoDate } from './twse'
 import { useDailyMarket } from './useDailyMarket'
+import { useMacroData } from '../macro/useMacroData'
+import { useValuation } from './valuation'
 import { facetScores, regimeContext, regimeHistory, type Facet, type RegimeContext, type RegimeHistory } from './regime'
 
 export interface RegimeView {
@@ -32,6 +34,8 @@ export function useRegime(): RegimeView {
   const { data, trends, usBreadth, loading } = useDailyMarket()
   const params = useAppStore((s) => s.regimeParams)
   const macro = useLatestMacro()
+  const macroData = useMacroData()
+  const valuation = useValuation()
   const taiex = data?.series.TAIEX
   const vix = data?.series.VIX
   const history = useMemo(() => (taiex && taiex.length > 0 ? regimeHistory(taiex, vix ?? []) : null), [taiex, vix])
@@ -46,8 +50,10 @@ export function useRegime(): RegimeView {
         flows: data?.flows ?? [],
         margin: data?.margin ?? [],
         macro,
+        macroData,
+        valuation,
       }),
-    [trends, data, usBreadth, macro],
+    [trends, data, usBreadth, macro, macroData, valuation],
   )
   const lastHigh = useMemo(() => {
     if (!taiex) return null

@@ -13,6 +13,12 @@ function monthly(values: number[]): Point[] {
 
 const flat = (n: number, v: number) => Array.from({ length: n }, () => v)
 
+// Daily points ending 2026-09-01, oldest first.
+function daily(values: number[]): Point[] {
+  const end = Date.parse('2026-09-01T00:00:00Z')
+  return values.map((value, i) => ({ date: new Date(end - (values.length - 1 - i) * 86400000).toISOString().slice(0, 10), value }))
+}
+
 function data(overrides: Partial<MacroData['series']> = {}, rest: Partial<MacroData> = {}): MacroData {
   return {
     generatedAt: '2026-10-15T00:00:00Z',
@@ -25,7 +31,7 @@ function data(overrides: Partial<MacroData['series']> = {}, rest: Partial<MacroD
       PCEPILFE: monthly(Array.from({ length: 24 }, (_, i) => 120 * 1.0025 ** i)),
       FEDFUNDS: monthly(flat(24, 4)),
       T10Y2Y: monthly(flat(24, 0.3)),
-      BAMLH0A0HYM2: monthly(flat(24, 4)),
+      HYG_IEF: daily(Array.from({ length: 400 }, (_, i) => 0.8 + 0.01 * Math.sin(i / 7))),
       WALCL: monthly(flat(24, 7_000_000)),
       DTWEXBGS: monthly(flat(24, 120)),
       VIXCLS: monthly(flat(24, 18)),
@@ -64,7 +70,7 @@ describe('judgeSignals', () => {
         FEDFUNDS: monthly([...flat(20, 4.5), 4.25, 4.0, 3.75, 3.75]),
         T10Y2Y: monthly([...flat(23, 0.3), 0.6]),
         DTWEXBGS: monthly([...flat(20, 120), 118, 116, 115, 114]),
-        BAMLH0A0HYM2: monthly([...flat(20, 4), 3.8, 3.6, 3.4, 3.4]),
+        HYG_IEF: daily(Array.from({ length: 400 }, (_, i) => 0.8 + i * 0.0002)),
         WALCL: monthly([...flat(20, 7_000_000), 7_050_000, 7_100_000, 7_150_000, 7_200_000]),
       }),
     )
@@ -78,7 +84,7 @@ describe('judgeSignals', () => {
   it('flags overheating and panic at the thresholds', () => {
     const hot = judgeSignals(
       data(
-        { VIXCLS: monthly([...flat(23, 18), 12.9]), BAMLH0A0HYM2: monthly(flat(24, 2.9)) },
+        { VIXCLS: monthly([...flat(23, 18), 12.9]), HYG_IEF: daily(Array.from({ length: 400 }, (_, i) => 0.8 + i * 0.0002)) },
         {
           margin: { now: { date: '2026-10-14', value: 116 }, before: { date: '2026-07-14', value: 100 } },
           fubon: [{ valuation: { pe: 22, average: 19, sdLow: 17, sdHigh: 21 }, reportDate: '2026-09-02', reportTitle: '富邦總經觀點-9月市場展望', summary: '' } as never],
@@ -89,8 +95,10 @@ describe('judgeSignals', () => {
     expect(hot['sentiment.credit'].value).toBe(1)
     expect(hot['sentiment.margin'].value).toBe(1)
     expect(hot['sentiment.valuation'].value).toBe(1)
-    const panic = judgeSignals(data({ VIXCLS: monthly([...flat(23, 18), 31]) }))
+    const panic = judgeSignals(data({ VIXCLS: monthly([...flat(23, 18), 31]), HYG_IEF: daily(Array.from({ length: 400 }, (_, i) => 0.9 - i * 0.0002)) }))
     expect(panic['sentiment.vix'].value).toBe(-1)
+    expect(panic['sentiment.credit'].value).toBe(-1)
+    expect(panic['liquidity.creditSpread'].value).toBe(-1)
   })
 
   it('reads growth and inflation turns', () => {

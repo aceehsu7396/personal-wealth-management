@@ -19,7 +19,6 @@ export const FRED_SERIES = {
   PCEPILFE: '美國核心 PCE',
   FEDFUNDS: '聯邦基金利率',
   T10Y2Y: '美債 10 年減 2 年利差',
-  BAMLH0A0HYM2: '美國高收益債利差',
   WALCL: 'Fed 資產負債表',
   DTWEXBGS: '美元指數（廣義）',
   VIXCLS: 'VIX 恐慌指數',
@@ -31,13 +30,23 @@ export const TW_SERIES = {
   TW_CPI: '台灣 CPI',
 } as const
 
-export type SeriesKey = keyof typeof FRED_SERIES | keyof typeof TW_SERIES
+// High-yield ÷ Treasury ETF price ratio (HYG ÷ IEF), standing in for the
+// ICE BofA high-yield spread, which may not be republished (stage 5).
+export const CREDIT_SERIES = {
+  HYG_IEF: '高收益債 ÷ 公債 ETF 比值（HYG ÷ IEF）',
+} as const
+
+export type SeriesKey = keyof typeof FRED_SERIES | keyof typeof TW_SERIES | keyof typeof CREDIT_SERIES
+
+// Required wherever FRED data is shown (FRED API terms of use).
+export const FRED_NOTICE = 'This product uses the FRED® API but is not endorsed or certified by the Federal Reserve Bank of St. Louis.'
 
 export const SERIES_SOURCES: Record<SeriesKey, string> = {
   ...(Object.fromEntries(Object.keys(FRED_SERIES).map((k) => [k, `FRED ${k}`])) as Record<keyof typeof FRED_SERIES, string>),
   TW_BUSINESS_SCORE: '國發會景氣指標',
   TW_EXPORTS: '國發會同時指標',
   TW_CPI: '主計總處',
+  HYG_IEF: 'Yahoo Finance HYG、IEF',
 }
 
 export interface FubonReportData extends ParsedFubon {

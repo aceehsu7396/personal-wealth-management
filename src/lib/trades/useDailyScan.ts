@@ -6,12 +6,15 @@ import { addMonths, computeDiscipline } from '../calculations/disciplineScore'
 import { ACTION_LABELS, EXIT_ALERT_ACTIONS, buyDistanceOf } from '../research/signals'
 import { todayIsoDate } from '../market/twse'
 import { useRegime } from '../market/useRegime'
+import { EVENT_RULES, GAP_RISK, upcoming, useEvents } from '../market/events'
 import { allows } from '../market/regime'
 import { dipLadderStatus } from '../market/dipLadder'
 import { fullTimeTarget } from '../calculations/traderReadiness'
 import { ENTRY_METHOD_LABELS, positionScanItems, scanItem, sortScan, type ScanItem } from './tradePlan'
 import { useOpenPlanStatus } from './useOpenPlanStatus'
 import { usePauseStatus } from './usePauseStatus'
+import { useEntrySignals } from './useEntrySignals'
+import { ENTRY_SIGNAL_LABELS, ENTRY_SIGNAL_METHOD } from './entrySignals'
 
 // Research cards should be refreshed after every quarterly report.
 const THESIS_STALE_MONTHS = 4
@@ -32,6 +35,8 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   const foundation = useAppStore((s) => s.foundation)
   const regime = useRegime()
   const pause = usePauseStatus()
+  const events = useEvents(todayIsoDate())
+  const entry = useEntrySignals()
   const { policy, journey } = useJourney()
   const signalsFor = useSignals()
   const { items: open, loading } = useOpenPlanStatus()
@@ -95,6 +100,17 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
     }
   }
 
+  // Entry conditions on watched symbols: a nudge to draft a plan.
+  for (const w of entry.items) {
+    for (const sig of w.signals) {
+      const method = ENTRY_SIGNAL_METHOD[sig.kind]
+      const q = `method=${method}`
+      const to = w.thesisId ? `/portfolio/plans?thesis=${encodeURIComponent(w.thesisId)}&${q}` : w.strategyId ? `/portfolio/plans?strategy=${encodeURIComponent(w.strategyId)}&${q}` : `/portfolio/plans?ticker=${encodeURIComponent(w.ticker)}&market=${w.market}&${q}`
+      const blocked = regime.ctx && !allows(regime.ctx, method) ? `；目前局勢「${regime.ctx.label}」不允許${ENTRY_METHOD_LABELS[method]}進場` : ''
+      items.push(scanItem('entry_signal', `${w.ticker} ${w.name}：${ENTRY_SIGNAL_LABELS[sig.kind]}（${sig.detail}）：建立計畫單`, `進場條件監控（${sig.date}）${blocked}`, to))
+    }
+  }
+
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
   if (discipline.pendingReviews.length > 0) {
     items.push(scanItem('review_due', `${discipline.pendingReviews.length} 筆交易待完成事後檢討`, '紀律：每筆交易 6 與 12 個月後檢討', '/portfolio/trades'))
@@ -105,6 +121,12 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   const macroStageReached = journey.stages[1].done || latestMacro !== undefined
   if (macroStageReached && (!latestMacro || addMonths(latestMacro.date, 1) <= today)) {
     items.push(scanItem('housekeeping', '本月的總經三支柱檢視尚未完成', '手冊 05：每月檢視一次', '/research/market'))
+  }
+  // Events for what is held or planned, within three trading days.
+  const watched = new Set([...holdings.filter((h) => h.shares > 0).map((h) => h.ticker), ...plans.filter((p) => p.status === 'open').map((p) => p.ticker)])
+  for (const e of upcoming(events, today, EVENT_RULES.soonSessions, watched, false)) {
+    const gap = GAP_RISK.includes(e.kind) ? '；可能跳空，確認停損' : ''
+    items.push(scanItem('event', `${e.ticker} ${e.name ?? ''}：${e.date.slice(5).replace('-', '/')} ${e.title}${gap}`, `事件日曆（${e.source}）`, '/research/market'))
   }
   const dueDecisions = decisions.filter((d) => !d.reviewedAt && d.reviewDate <= today)
   if (dueDecisions.length > 0) {
@@ -119,5 +141,5 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
     const names = stale.slice(0, 3).map((t) => t.ticker).join('、') + (stale.length > 3 ? '…' : '')
     items.push(scanItem('housekeeping', `${stale.length} 張研究卡超過 ${THESIS_STALE_MONTHS} 個月未更新（${names}）`, '手冊 07：每季財報後更新', '/research/stocks'))
   }
-  return { items: sortScan(items), loading: loading || regime.loading }
+  return { items: sortScan(items), loading: loading || regime.loading || entry.loading }
 }

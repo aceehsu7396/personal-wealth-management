@@ -32,7 +32,7 @@ export function CalibrationPage() {
             role="tab"
             aria-selected={tab === t.key}
             onClick={() => setSearch({ tab: t.key })}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === t.key ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700'}`}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${tab === t.key ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700'}`}
           >
             {t.label}
           </button>

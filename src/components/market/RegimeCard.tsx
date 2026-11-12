@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useRegime } from '../../lib/market/useRegime'
 import { ADD_ON_LABELS, REGIME_LABELS, REGIME_RULE_LIST, REGIME_TONE, REGIME_RULES, type Facet, type RegimeSegment } from '../../lib/market/regime'
 import { ENTRY_METHOD_LABELS } from '../../lib/trades/tradePlan'
+import { FRED_NOTICE } from '../../lib/macro/macroData'
 import { Badge, Card, DataTable, Disclosure, textLink, type Tone } from '../ui'
 
 const signed = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`)
@@ -82,7 +83,7 @@ export function RegimeCard() {
               <FacetRow key={f.key} facet={f} />
             ))}
           </ul>
-          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">面向分數只當依據，不改變局勢；總經只會讓部位更保守。估值、信用、利率需要新的資料來源，之後補上。</p>
+          <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">面向分數只當依據，不改變局勢；總經只會讓部位更保守。資料來源含 FRED：{FRED_NOTICE}</p>
           <Disclosure summary="判斷規則（依序比對，先符合的採用）">
             <ol className="mt-2 list-decimal space-y-1 pl-5 text-xs text-gray-700 dark:text-gray-300">
               {REGIME_RULE_LIST.map((r) => (
