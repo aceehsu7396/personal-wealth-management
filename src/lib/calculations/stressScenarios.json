@@ -1,0 +1,60 @@
+{
+  "generatedAt": "2026-11-12T12:10:25.013Z",
+  "scenarios": [
+    {
+      "id": "h2000",
+      "label": "2000 網路泡沫",
+      "period": "2000-02-17 – 2001-10-03",
+      "kind": "historical",
+      "tw": -66.2,
+      "us": -22.8,
+      "fx": 12.7,
+      "bond": 20.6,
+      "source": "加權指數：證交所；S&P 500：FinMind；美元兌新台幣：FRED DEXTAUS；長債：FRED DGS20 殖利率變化 × 存續期間 17 估算"
+    },
+    {
+      "id": "h2008",
+      "label": "2008 金融海嘯",
+      "period": "2007-10-29 – 2008-11-20",
+      "kind": "historical",
+      "tw": -58.3,
+      "us": -51.2,
+      "fx": 3.2,
+      "bond": 14.3,
+      "source": "加權指數：證交所；S&P 500：FinMind；美元兌新台幣：FRED DEXTAUS；長債：FRED DGS20 殖利率變化 × 存續期間 17 估算"
+    },
+    {
+      "id": "h2015",
+      "label": "2015 中國股災",
+      "period": "2015-04-27 – 2015-08-24",
+      "kind": "historical",
+      "tw": -25.7,
+      "us": -10.2,
+      "fx": 8.4,
+      "bond": -1,
+      "source": "加權指數：證交所；S&P 500：FinMind；美元兌新台幣：FRED DEXTAUS；長債：FRED DGS20 殖利率變化 × 存續期間 17 估算"
+    },
+    {
+      "id": "h2020",
+      "label": "2020 新冠疫情",
+      "period": "2020-01-14 – 2020-03-19",
+      "kind": "historical",
+      "tw": -28.7,
+      "us": -26.6,
+      "fx": 1.7,
+      "bond": 9.5,
+      "source": "加權指數：證交所；S&P 500：FinMind；美元兌新台幣：FRED DEXTAUS；長債：FRED DGS20 殖利率變化 × 存續期間 17 估算"
+    },
+    {
+      "id": "h2022",
+      "label": "2022 升息",
+      "period": "2022-01-04 – 2022-10-25",
+      "kind": "historical",
+      "tw": -31.6,
+      "us": -19.5,
+      "fx": 17.5,
+      "bond": -39.9,
+      "source": "加權指數：證交所；S&P 500：FinMind；美元兌新台幣：FRED DEXTAUS；長債：FRED DGS20 殖利率變化 × 存續期間 17 估算"
+    }
+  ]
+}

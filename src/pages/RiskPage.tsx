@@ -83,7 +83,7 @@ export function RiskPage() {
         <StatTile
           label="最壞歷史情境"
           value={r.worstHistorical ? twd(r.worstHistorical.result.lossTwd) : '—'}
-          hint={r.worstHistorical ? `${r.worstHistorical.scenario.label}重演：${r.worstHistorical.result.lossPercent.toFixed(1)}%` : '歷史情境資料讀取中'}
+          hint={r.worstHistorical ? `${r.worstHistorical.scenario.label}重演：${r.worstHistorical.result.lossPercent.toFixed(1)}%` : '還沒有持股'}
         />
         <StatTile
           label="距熔斷還能跌"

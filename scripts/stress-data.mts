@@ -1,4 +1,4 @@
-// Builds public/data/stress.json: the historical stress scenarios of the
+// Builds src/lib/calculations/stressScenarios.json: the historical stress scenarios of the
 // risk page (blueprint 02 §5.2). For each crisis it finds the TAIEX peak
 // and trough inside a search window, then measures the other markets over
 // the same dates:
@@ -8,13 +8,13 @@
 //   - USD/TWD: FRED DEXTAUS
 //   - Long bonds: FRED DGS20 yield change × duration 17 (price ≈ −D × Δy)
 // History does not change, so this runs once by hand and the JSON is
-// committed:
+// committed and bundled with the site:
 //
 //   npx tsx scripts/stress-data.mts
 import { writeFileSync } from 'node:fs'
 import { requestDataset } from '../src/lib/research/finmind.ts'
 
-const OUT = 'public/data/stress.json'
+const OUT = 'src/lib/calculations/stressScenarios.json'
 const DURATION = 17
 const TWSE_GAP_MS = 3500
 
