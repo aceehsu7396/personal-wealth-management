@@ -4,7 +4,7 @@ import { useJourney } from '../lib/useJourney'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { computeRequiredReturn, FEASIBILITY_LABELS } from '../lib/calculations/requiredReturn'
 import { analyzePortfolio } from '../lib/calculations/portfolioRisk'
-import { computeDiscipline } from '../lib/calculations/disciplineScore'
+import { penaltySummary, computeDiscipline } from '../lib/calculations/disciplineScore'
 import { todayIsoDate } from '../lib/market/twse'
 import { useTraderReadiness } from '../lib/useTraderReadiness'
 import { StatCard } from './StatCard'
@@ -99,7 +99,7 @@ export function StrategyOverview() {
           <StatCard
             label="紀律分數"
             value={discipline.score === null ? '—' : `${discipline.score}`}
-            hint={discipline.tier}
+            hint={`${discipline.tier}；${penaltySummary(discipline)}`}
           />
         </Link>
       </div>

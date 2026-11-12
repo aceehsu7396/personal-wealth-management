@@ -68,9 +68,16 @@ export function ExitManager() {
             key: 'ticker',
             label: '標的',
             render: ({ plan }) => (
-              <Link to={`/portfolio/plans?id=${plan.id}`} className="font-medium text-gray-900 hover:underline dark:text-gray-100">
-                {plan.ticker} {plan.name}
-              </Link>
+              <span>
+                <Link to={`/portfolio/plans?id=${plan.id}`} className="font-medium text-gray-900 hover:underline dark:text-gray-100">
+                  {plan.ticker} {plan.name}
+                </Link>
+                {plan.batches.length > 1 && (
+                  <span className="block text-xs text-gray-600 dark:text-gray-400">
+                    已成交 {plan.batches.filter((b) => b.filledAt).length}／{plan.batches.length} 批
+                  </span>
+                )}
+              </span>
             ),
             sortValue: ({ plan }) => plan.ticker,
           },

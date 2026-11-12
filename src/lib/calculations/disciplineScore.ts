@@ -20,6 +20,11 @@ export interface DisciplineReport {
   pendingReviews: PendingReview[]
   // Stop-loss exits filled well below the plan's stop.
   lateStops: number
+  // Mean buy slippage against the plan, and required advice declined on
+  // executed plans (blueprint 02 §3.8).
+  avgSlippage: number | null
+  declinedRequired: number
+  penalties: { lateStops: number; slippage: number; declined: number }
 }
 
 const WEIGHTS = { compliance: 0.4, thesis: 0.3, review: 0.3 }
@@ -86,6 +91,27 @@ export function lateStopExits(plans: Pick<TradePlan, 'id' | 'currentStop' | 'sto
 // before trade plans existed are not penalised.
 const LATE_STOP_PENALTY = 5
 const LATE_STOP_MAX_PENALTY = 20
+// Execution penalties (blueprint 02 §3.8), revised at the yearly review.
+export const EXECUTION_RULES = { slippageWarn: 0.005, slippageBad: 0.01, slippageWarnPenalty: 5, slippageBadPenalty: 10, declinedPenalty: 3, declinedMaxPenalty: 15 } as const
+
+type PlanLike = Pick<TradePlan, 'id' | 'currentStop' | 'stopLoss'> & Partial<Pick<TradePlan, 'status' | 'advice' | 'entryPrice' | 'batches'>>
+
+// "扣分：停損延遲 −5、滑價 −5" for the score's hint.
+export function penaltySummary(r: Pick<DisciplineReport, 'penalties'>): string {
+  const parts = [
+    r.penalties.lateStops ? `停損延遲 −${r.penalties.lateStops}` : '',
+    r.penalties.slippage ? `滑價 −${r.penalties.slippage}` : '',
+    r.penalties.declined ? `不採納紀律要求 −${r.penalties.declined}` : '',
+  ].filter(Boolean)
+  return parts.length ? `扣分：${parts.join('、')}` : '沒有扣分'
+}
+
+// The price the plan meant for this buy: the batch it filled, or the
+// plan's entry price.
+export function plannedPrice(trade: Pick<Trade, 'date' | 'price'>, plan: Partial<Pick<TradePlan, 'entryPrice' | 'batches'>>): number | undefined {
+  const batch = plan.batches?.find((b) => b.filledAt?.slice(0, 10) === trade.date.slice(0, 10) && b.fillPrice === trade.price)
+  return batch?.price ?? plan.entryPrice
+}
 
 export function computeDiscipline(
   trades: Trade[],
@@ -93,7 +119,7 @@ export function computeDiscipline(
   theses: StockThesis[],
   policy: InvestmentPolicy,
   today: string,
-  plans: Pick<TradePlan, 'id' | 'currentStop' | 'stopLoss'>[] = [],
+  plans: PlanLike[] = [],
 ): DisciplineReport {
   // Imported trades never ran the checklist: they count neither as rule
   // breaks nor as rule-following trades.
@@ -126,7 +152,27 @@ export function computeDiscipline(
   const available = parts.filter((p): p is [number, number] => p[0] !== null)
   const weightSum = available.reduce((acc, [, w]) => acc + w, 0)
   const lateStops = lateStopExits(plans, trades)
-  const penalty = Math.min(lateStops * LATE_STOP_PENALTY, LATE_STOP_MAX_PENALTY)
+  const R = EXECUTION_RULES
+  const byId = new Map(plans.map((p) => [p.id, p]))
+  const slips = trades
+    .filter((t) => t.side === 'buy' && t.planId && byId.has(t.planId))
+    .map((t) => {
+      const planned = plannedPrice(t, byId.get(t.planId!)!)
+      return planned ? (t.price - planned) / planned : null
+    })
+    .filter((v): v is number => v !== null)
+  const avgSlippage = slips.length ? slips.reduce((a, b) => a + b, 0) / slips.length : null
+  // A plan whose trade already counted as an exception is not counted again.
+  const excepted = new Set(exceptionTrades.map((t) => t.planId).filter(Boolean))
+  const declinedRequired = plans
+    .filter((p) => (p.status === 'open' || p.status === 'closed') && !excepted.has(p.id))
+    .reduce((n, p) => n + (p.advice ?? []).filter((a) => a.level === 'required' && a.decision === 'declined').length, 0)
+  const penalties = {
+    lateStops: Math.min(lateStops * LATE_STOP_PENALTY, LATE_STOP_MAX_PENALTY),
+    slippage: avgSlippage === null ? 0 : avgSlippage > R.slippageBad ? R.slippageBadPenalty : avgSlippage > R.slippageWarn ? R.slippageWarnPenalty : 0,
+    declined: Math.min(declinedRequired * R.declinedPenalty, R.declinedMaxPenalty),
+  }
+  const penalty = penalties.lateStops + penalties.slippage + penalties.declined
   const score =
     weightSum > 0
       ? Math.max(0, Math.round(available.reduce((acc, [v, w]) => acc + v * w, 0) / weightSum) - penalty)
@@ -141,5 +187,8 @@ export function computeDiscipline(
     exceptionTrades,
     pendingReviews: due,
     lateStops,
+    avgSlippage,
+    declinedRequired,
+    penalties,
   }
 }

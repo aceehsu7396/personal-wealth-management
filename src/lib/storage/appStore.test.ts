@@ -61,7 +61,7 @@ describe('appStore storage', () => {
     const id = s().addTradePlan({
       status: 'open', source: 'thesis', ticker: '2330', name: '', market: 'TW', entryMethod: 'value_batches',
       setup: '', trigger: '', confirmation: '', stopMethod: 'atr', orderType: 'limit', orderNote: '',
-      trailing: 'chandelier', targets: [], thesisExit: '', rules: [], advice: [], currentStop: 885,
+      trailing: 'chandelier', targets: [], thesisExit: '', rules: [], advice: [], batches: [], currentStop: 885,
     })
     s().updateTradePlan(id, { currentStop: 1100 })
     expect(s().tradePlans[0].currentStop).toBe(1100)

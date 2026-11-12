@@ -81,6 +81,37 @@ describe('computeDiscipline', () => {
   })
 })
 
+describe('execution penalties', () => {
+  const buy = (price: number, planId = 'p') => trade({ side: 'buy', reason: 'tranche_1', planId, price })
+  const plan = (over: object = {}) => ({ id: 'p', stopLoss: 900, currentStop: 900, entryPrice: 1000, status: 'open' as const, advice: [], ...over })
+
+  it('takes 5 points above 0.5% average slippage and 10 above 1%', () => {
+    const base = computeDiscipline([buy(1000)], [], [], policy, '', [plan()])
+    expect(base.penalties.slippage).toBe(0)
+    expect(computeDiscipline([buy(1007)], [], [], policy, '', [plan()])).toMatchObject({ penalties: { slippage: 5 }, score: base.score! - 5 })
+    expect(computeDiscipline([buy(1020)], [], [], policy, '', [plan()]).penalties.slippage).toBe(10)
+  })
+
+  it('measures a later batch against its own price', () => {
+    const batches = [
+      { kind: 'batch' as const, price: 1000, shares: 1, addedAt: '', filledAt: '2026-01-01', fillPrice: 1000 },
+      { kind: 'batch' as const, price: 900, shares: 1, addedAt: '', filledAt: '2026-02-01', fillPrice: 901 },
+    ]
+    const r = computeDiscipline([buy(1000), { ...buy(901), date: '2026-02-01' }], [], [], policy, '', [plan({ batches })])
+    expect(r.avgSlippage).toBeCloseTo(0.000556, 5)
+  })
+
+  it('takes 3 points per declined required item on executed plans, at most 15, not twice', () => {
+    const declined = { level: 'required' as const, text: 'x', basis: '', decision: 'declined' as const, reason: 'r' }
+    const base = computeDiscipline([buy(1000)], [], [], policy, '', [plan()]).score!
+    expect(computeDiscipline([buy(1000)], [], [], policy, '', [plan({ advice: [declined, declined] })])).toMatchObject({ declinedRequired: 2, score: base - 6 })
+    expect(computeDiscipline([buy(1000)], [], [], policy, '', [plan({ advice: Array(9).fill(declined) })]).penalties.declined).toBe(15)
+    expect(computeDiscipline([buy(1000)], [], [], policy, '', [plan({ status: 'draft', advice: [declined] })]).declinedRequired).toBe(0)
+    const exception = { ...buy(1000), checklist: [{ key: 'a', label: 'a', passed: false }], exceptionReason: 'x' }
+    expect(computeDiscipline([exception], [], [], policy, '', [plan({ advice: [declined] })]).declinedRequired).toBe(0)
+  })
+})
+
 describe('tierOf', () => {
   it('maps scores to tiers', () => {
     expect(tierOf(95)).toContain('優秀')

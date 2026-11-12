@@ -11,6 +11,8 @@ import { useAnnualVol } from '../../lib/useHoldingReturns'
 import { useEvents } from '../../lib/market/events'
 import { planPrompt, redTeamPrompt, type PlanInput } from '../../lib/ai/prompts/agents'
 import { PromptPanel } from '../ai/PromptPanel'
+import { OrderTicket } from './OrderTicket'
+import { BatchPlan } from './BatchPlan'
 import { tradeLink } from '../../lib/trades/tradeLink'
 import { todayIsoDate } from '../../lib/market/twse'
 import type { PlanAdvice, TradePlan } from '../../lib/storage/schema'
@@ -86,7 +88,8 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
   const report = thesis?.auto ? signalsFor(thesis, evaluateThesis(thesis, ctx.policy)) : null
   const today = todayIsoDate()
   const events = useEvents(today)
-  const advice = planAdvice(plan, { ctx, report, thesis, today, events })
+  const close = holdings.find((h) => h.ticker === plan.ticker && h.shares > 0)?.currentPrice ?? thesis?.currentPrice ?? null
+  const advice = planAdvice(plan, { ctx, report, thesis, today, events, close })
   const draft = plan.status === 'draft'
   const set = (patch: Partial<TradePlan>) => update(plan.id, patch)
 
@@ -297,6 +300,12 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
                 </ul>
               </Disclosure>
             )}
+            <div className="border-t border-gray-100 pt-3 dark:border-gray-700">
+              <p className="text-sm font-medium text-gray-800 dark:text-gray-200">分批與加碼</p>
+              <div className="mt-1">
+                <BatchPlan plan={plan} />
+              </div>
+            </div>
           </Section>
           <Section step={6} title="委託：怎麼下單">
             <div className="grid grid-cols-[8rem_1fr] gap-3">
@@ -311,6 +320,7 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
                 <input className={inputClass} value={plan.orderNote} onChange={(e) => set({ orderNote: e.target.value })} />
               </Field>
             </div>
+            <OrderTicket plan={plan} discount={ctx.policy.brokerFeeDiscount} />
           </Section>
           <Section step={7} title="出場計畫：對了怎麼出、錯了怎麼出">
             <div className="grid grid-cols-2 gap-3">

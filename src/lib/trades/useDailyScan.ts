@@ -14,6 +14,7 @@ import { ENTRY_METHOD_LABELS, positionScanItems, scanItem, sortScan, type ScanIt
 import { useOpenPlanStatus } from './useOpenPlanStatus'
 import { usePauseStatus } from './usePauseStatus'
 import { useEntrySignals } from './useEntrySignals'
+import { nextBatch } from './batches'
 import { ENTRY_SIGNAL_LABELS, ENTRY_SIGNAL_METHOD } from './entrySignals'
 
 // Research cards should be refreshed after every quarterly report.
@@ -44,6 +45,18 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
 
   const items: ScanItem[] = []
   for (const { plan, status } of open) if (status) items.push(...positionScanItems(plan, status))
+
+  // The next planned batch at its price: lower for value batches, higher
+  // for an add-on bought on strength.
+  for (const { plan, status } of open) {
+    const i = nextBatch(plan.batches)
+    if (!status || i < 0) continue
+    const b = plan.batches[i]
+    const reached = b.kind === 'add' ? status.close >= b.price : status.close <= b.price
+    if (!reached) continue
+    const note = regime.ctx && regime.ctx.row.addOn === 'none' ? `；目前局勢「${regime.ctx.label}」不加碼` : ''
+    items.push(scanItem('buy_zone', `${plan.ticker} ${plan.name}：第 ${i + 1} 批到價（${b.price}，收盤 ${status.close}），${b.shares} 股`, `計畫單：分批與加碼${note}`, `/portfolio/plans?id=${plan.id}`))
+  }
 
   // Pause rules come before any new risk (blueprint 02 §5.5).
   if (pause.streakPaused) {

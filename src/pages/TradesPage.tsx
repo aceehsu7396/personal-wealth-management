@@ -6,11 +6,12 @@ import { useAppStore } from '../lib/storage/appStore'
 import { useJourney } from '../lib/useJourney'
 import { JourneyNotice } from '../components/JourneyNotice'
 import { useChecklistContext } from '../lib/trades/useChecklistContext'
-import { computeDiscipline, isException, type ReviewSlot } from '../lib/calculations/disciplineScore'
+import { penaltySummary, computeDiscipline, isException, type ReviewSlot } from '../lib/calculations/disciplineScore'
 import { applyTradeToHoldings, TRADE_REASON_LABELS } from '../lib/calculations/preTradeChecklist'
 import { isSatellite } from '../lib/calculations/portfolioRisk'
 import { todayIsoDate } from '../lib/market/twse'
 import { BrokerImport } from '../components/trades/BrokerImport'
+import { applyFill } from '../lib/trades/batches'
 import { TradeForm, type TradeSubmission } from '../components/forms/TradeForm'
 import { TradeReviewForm } from '../components/forms/TradeReviewForm'
 import { StatCard } from '../components/StatCard'
@@ -105,14 +106,18 @@ export function TradesPage() {
     if (trade.planId) {
       const plan = useAppStore.getState().tradePlans.find((p) => p.id === trade.planId)
       if (plan && pending.side === 'buy' && plan.status === 'draft') {
+        // The first batch: the plan opens with the actual fill.
+        const fill = plan.batches.length > 0 ? applyFill(plan, pending.price, pending.shares, trade.date) : { fillPrice: pending.price, shares: pending.shares }
         updateTradePlan(plan.id, {
           status: 'open',
           openedAt: trade.date,
           entryPrice: plan.entryPrice ?? pending.price,
-          fillPrice: pending.price,
-          shares: pending.shares,
+          ...fill,
           currentStop: plan.currentStop ?? plan.stopLoss,
         })
+      } else if (plan && pending.side === 'buy' && plan.status === 'open') {
+        // A later batch or add-on: shares add up, the fill is the average.
+        updateTradePlan(plan.id, applyFill(plan, pending.price, pending.shares, trade.date))
       } else if (plan && pending.side === 'sell') {
         const remaining = useAppStore.getState().holdings.find((h) => h.id === holdingId)?.shares ?? 0
         if (remaining <= 0) updateTradePlan(plan.id, { status: 'closed', closedAt: trade.date })
@@ -143,7 +148,7 @@ export function TradesPage() {
         <StatCard
           label="紀律分數"
           value={discipline.score === null ? '—' : `${discipline.score}`}
-          hint={discipline.tier}
+          hint={`${discipline.tier}；${penaltySummary(discipline)}`}
         />
         <StatCard
           label="依規交易比例"

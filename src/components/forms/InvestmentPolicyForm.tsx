@@ -28,6 +28,7 @@ const formSchema = z
     maxConsecutiveLosses: z.coerce.number().int().min(2, '至少 2').max(10),
     monthlyLossLimitPercent: z.coerce.number().min(1, '至少 1').max(20, '不建議超過 20'),
     targetVolatilityPercent: z.coerce.number().min(5).max(40),
+    brokerFeeDiscount: z.coerce.number().min(0.1, '至少 0.1').max(1, '1 代表不打折'),
   })
   .refine(
     (v) =>
@@ -115,6 +116,7 @@ const FIELDS: { name: keyof FormOutput; label: string; step: string; hint?: stri
   { name: 'maxConsecutiveLosses', label: '連續虧損幾筆就暫停新建倉', step: '1' },
   { name: 'monthlyLossLimitPercent', label: '單月虧損上限（占交易部位 %）', step: '0.5' },
   { name: 'targetVolatilityPercent', label: '部位目標波動度（年化 %）', step: '1' },
+  { name: 'brokerFeeDiscount', label: '券商手續費折扣（例如 0.28；1 為不打折）', step: '0.01' },
 ]
 
 export function InvestmentPolicyForm() {

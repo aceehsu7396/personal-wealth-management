@@ -2,13 +2,15 @@ import type { InvestmentPolicy, PlanAdvice, StockThesis, Trade, TradePlan, Tradi
 import type { SignalReport } from '../research/signals'
 import { VERDICT_LABELS } from '../calculations/thesisScoring'
 import { buildPreTradeChecklist, riskLimitOf, type ChecklistContext, type PendingTrade } from '../calculations/preTradeChecklist'
-import { addMonths, lateStopExits } from '../calculations/disciplineScore'
+import { addMonths, lateStopExits, plannedPrice } from '../calculations/disciplineScore'
 import { SATELLITE_ENTRIES } from '../calculations/tradingPause'
 import { atr, sma } from '../backtest/indicators'
 import { parseSymbol, resolveParams, STRATEGY_TEMPLATES } from '../backtest/templates'
 import type { Bar } from '../market/priceHistory'
 import { ADD_ON_LABELS, allows, type RegimeContext } from '../market/regime'
 import { EVENT_LABELS, EVENT_RULES, GAP_RISK, upcoming, type MarketEvent } from '../market/events'
+import { batchChecks, draftBatches } from './batches'
+import { analyzePortfolio } from '../calculations/portfolioRisk'
 
 // The entry-exit assistant's rule layer (blueprint 02 §3): drafts a trade
 // plan from a research card or a strategy card, checks it against the
@@ -37,6 +39,7 @@ const blank = (over: Partial<PlanDraft> & Pick<PlanDraft, 'source' | 'ticker'>):
   thesisExit: '',
   rules: [],
   advice: [],
+  batches: [],
   ...over,
 })
 
@@ -86,7 +89,9 @@ export function planFromThesis(
       draft.rules = [...draft.rules, `部位大小：目標波動度 ${policy.targetVolatilityPercent}% 給 ${vol.shares} 股，少於研究卡建議`]
     }
   }
-  return applyRegime(draft, regime)
+  const out = applyRegime(draft, regime)
+  // The research card's three batches, each the size of the first.
+  return { ...out, batches: draftBatches(report.levels, out.shares, new Date().toISOString()) }
 }
 
 export const backtestOf = (runs: { strategyId?: string; stats: { full: { winRate: number | null; profitFactor: number | null }; outOfSample: { winRate: number | null; profitFactor: number | null } | null } }[], strategyId?: string) => {
@@ -289,6 +294,8 @@ export interface AdviceInput {
   thesis?: StockThesis | null
   today: string
   events?: MarketEvent[]
+  // Latest close, for the add-on check.
+  close?: number | null
 }
 
 export function pendingTradeOf(plan: Pick<PlanDraft, 'ticker' | 'name' | 'market' | 'source' | 'thesisId' | 'strategyId' | 'entryPrice' | 'shares' | 'stopLoss'>): PendingTrade {
@@ -343,6 +350,24 @@ export function planAdvice(plan: PlanDraft, input: AdviceInput): PlanAdvice[] {
     if (regime.macroHeadwind) out.push(advice('suggest', '總經逆風：部位可以再小一點，或只買第 1 批', '總經三支柱：逆風'))
     if (regime.coolingOff) out.push(advice('suggest', '局勢參數剛簽署，仍在 7 天冷靜期：照新規則前再確認一次', '紀律：修改規則後的冷靜期'))
     if (regime.changedRecently) out.push(advice('notice', `局勢最近轉為「${regime.label}」（${regime.since} 起）`, '局勢狀態：確認期 3 個交易日'))
+  }
+
+  if (plan.batches.length > 1 && plan.status !== 'closed' && plan.status !== 'cancelled') {
+    const { policy } = input.ctx
+    const total = analyzePortfolio(input.ctx.holdings, input.ctx.theses, policy, input.ctx.guardrails, input.ctx.meta).totalValueTwd
+    const strategy = plan.strategyId ? input.ctx.strategies?.find((s) => s.id === plan.strategyId) : undefined
+    const limit = riskLimitOf(strategy, policy).percent
+    out.push(
+      ...batchChecks({
+        plan: { ...plan, createdAt: (plan as Partial<TradePlan>).createdAt ?? new Date().toISOString() },
+        riskBudgetTwd: (((total * policy.satellitePercent) / 100) * limit) / 100,
+        positionCapTwd: (total * policy.maxSinglePositionPercent) / 100,
+        addOn: input.ctx.regime?.row.addOn ?? null,
+        regimeLabel: input.ctx.regime?.label,
+        close: input.close,
+        fxUsdTwd: input.ctx.meta.fxUsdTwd,
+      }),
+    )
   }
 
   if (input.events && plan.ticker && plan.status === 'draft') {
@@ -516,9 +541,10 @@ export interface ExecutionStats {
 }
 
 
-export function slippageOf(trade: Pick<Trade, 'side' | 'price'>, plan: Pick<TradePlan, 'entryPrice'> | undefined): number | null {
-  if (!plan?.entryPrice || trade.side !== 'buy') return null
-  return (trade.price - plan.entryPrice) / plan.entryPrice
+export function slippageOf(trade: Pick<Trade, 'side' | 'price'> & Partial<Pick<Trade, 'date'>>, plan: Partial<Pick<TradePlan, 'entryPrice' | 'batches'>> | undefined): number | null {
+  if (!plan || trade.side !== 'buy') return null
+  const planned = plannedPrice({ date: trade.date ?? '', price: trade.price }, plan)
+  return planned ? (trade.price - planned) / planned : null
 }
 
 export function executionStats(plans: TradePlan[], trades: Trade[]): ExecutionStats {

@@ -459,6 +459,8 @@ export const InvestmentPolicySchema = z.object({
   maxConsecutiveLosses: z.number().default(3),
   monthlyLossLimitPercent: z.number().default(6),
   targetVolatilityPercent: z.number().default(15),
+  // Broker commission discount on the posted 0.1425% (1 = no discount).
+  brokerFeeDiscount: z.number().default(1),
   signedAt: z.string().optional(),
   updatedAt: z.string(),
 })
@@ -620,6 +622,7 @@ export function createDefaultInvestmentPolicy(): InvestmentPolicy {
     maxConsecutiveLosses: 3,
     monthlyLossLimitPercent: 6,
     targetVolatilityPercent: 15,
+    brokerFeeDiscount: 1,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -851,6 +854,20 @@ export const TradePlanSchema = z.object({
   regimeSnapshot: z.string().optional(),
   // The regime's size multiplier when the plan was drafted (stage 2).
   regimeMultiplier: z.number().optional(),
+  // Planned batches and add-ons, each filled in turn (blueprint 02 §3.5).
+  batches: z
+    .array(
+      z.object({
+        kind: z.enum(['batch', 'add']),
+        price: z.number(),
+        shares: z.number(),
+        addedAt: z.string(),
+        filledAt: z.string().optional(),
+        fillPrice: z.number().optional(),
+        fillShares: z.number().optional(),
+      }),
+    )
+    .default([]),
   advice: z.array(PlanAdviceSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
