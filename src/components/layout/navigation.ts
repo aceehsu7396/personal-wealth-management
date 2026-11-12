@@ -54,6 +54,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { label: '風險', to: '/portfolio/risk' },
       { label: '交易日誌', to: '/portfolio/trades' },
       { label: '績效歸因', to: '/portfolio/review' },
+      { label: '檢討與校準', to: '/portfolio/calibration' },
     ],
   },
   // Temporary: the planning blueprint (docs/blueprint/).

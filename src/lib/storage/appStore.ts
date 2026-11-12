@@ -35,6 +35,8 @@ import {
   type RegimeParamRow,
   type DipLadder,
   type PauseReview,
+  type Decision,
+  type ScenarioSet,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -187,6 +189,12 @@ interface AppStore extends AppData {
   signDipLadder: (steps: DipLadder['steps'], reason: string) => void
   markDipStep: (drawdownPercent: number, executedAt: string | null) => void
   addPauseReview: (entry: Omit<PauseReview, 'id'>) => void
+  addDecision: (entry: Omit<Decision, 'id'>) => string
+  updateDecision: (id: string, entry: Partial<Omit<Decision, 'id'>>) => void
+  removeDecision: (id: string) => void
+  addScenarioSet: (entry: Omit<ScenarioSet, 'id'>) => string
+  updateScenarioSet: (id: string, entry: Partial<Omit<ScenarioSet, 'id'>>) => void
+  removeScenarioSet: (id: string) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -228,6 +236,8 @@ function toAppData(state: AppData): AppData {
     regimeParams: state.regimeParams,
     dipLadder: state.dipLadder,
     pauseReviews: state.pauseReviews,
+    decisions: state.decisions,
+    scenarioSets: state.scenarioSets,
   }
 }
 
@@ -608,6 +618,21 @@ export const useAppStore = create<AppStore>()(
         })),
 
       addPauseReview: (entry) => set((state) => ({ pauseReviews: [...state.pauseReviews, { ...entry, id: crypto.randomUUID() }] })),
+
+      addDecision: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({ decisions: [...state.decisions, { ...entry, id }] }))
+        return id
+      },
+      updateDecision: (id, entry) => set((state) => ({ decisions: state.decisions.map((d) => (d.id === id ? { ...d, ...entry } : d)) })),
+      removeDecision: (id) => set((state) => ({ decisions: state.decisions.filter((d) => d.id !== id) })),
+      addScenarioSet: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({ scenarioSets: [...state.scenarioSets, { ...entry, id }] }))
+        return id
+      },
+      updateScenarioSet: (id, entry) => set((state) => ({ scenarioSets: state.scenarioSets.map((s) => (s.id === id ? { ...s, ...entry } : s)) })),
+      removeScenarioSet: (id) => set((state) => ({ scenarioSets: state.scenarioSets.filter((s) => s.id !== id) })),
 
       removePaperAccount: (id) =>
         set((state) => ({ paperAccounts: state.paperAccounts.filter((a) => a.id !== id) })),

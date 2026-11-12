@@ -3,6 +3,11 @@ import type { Bar } from '../market/priceHistory'
 import { STRATEGY_TEMPLATES } from './templates'
 import {
   computeStats,
+  costSensitivity,
+  deflatedSharpe,
+  normCdf,
+  normInv,
+  walkForward,
   coreTradingMix,
   marketCosts,
   parameterSweep,
@@ -236,5 +241,36 @@ describe('parameter sweep', () => {
         for (const text of Object.values(p.help)) expect(text.length).toBeGreaterThan(10)
       }
     }
+  })
+})
+
+describe('bias checks', () => {
+  const closes = Array.from({ length: 600 }, (_, i) => 100 + 10 * Math.sin(i / 15) + i * 0.08)
+  const ma = input({ template: 'ma_cross', params: { fast: 20, slow: 60, atrStop: 0 }, data: { 'TW:0050': bars(closes) } })
+
+  it('walks forward choosing each value only from earlier data', () => {
+    const wf = walkForward(ma, 'fast', 4)!
+    expect(wf.segments).toHaveLength(4)
+    // Each test part starts where the data used to choose it ends.
+    for (let k = 1; k < wf.segments.length; k++) expect(wf.segments[k].from).toBe(wf.segments[k - 1].to)
+    expect(wf.segments.every((s) => s.value >= 1 && s.value <= 100)).toBe(true)
+    expect(walkForward(input({ template: 'ma_cross', params: { fast: 20, slow: 60 }, data: { 'TW:0050': bars(closes.slice(0, 100)) } }), 'fast')).toBeNull()
+  })
+
+  it('deflates the Sharpe ratio for the number of trials', () => {
+    const daily = Array.from({ length: 500 }, (_, i) => 0.0008 + 0.01 * Math.sin(i * 1.7))
+    const one = deflatedSharpe(daily, 1)!
+    const many = deflatedSharpe(daily, 100)!
+    expect(one.luckSharpe).toBe(0)
+    expect(one.probability).toBeGreaterThan(many.probability)
+    expect(many.luckSharpe).toBeGreaterThan(0)
+    expect(normCdf(0)).toBeCloseTo(0.5)
+    expect(normInv(0.975)).toBeCloseTo(1.96, 2)
+  })
+
+  it('reruns with scaled costs', () => {
+    const c = costSensitivity({ ...ma, costs: marketCosts() })
+    expect(c.rows.map((r) => r.multiple)).toEqual([0, 1, 2, 3])
+    expect(c.rows[0].cagr).toBeGreaterThanOrEqual(c.rows[3].cagr)
   })
 })

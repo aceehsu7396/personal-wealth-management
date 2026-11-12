@@ -7,6 +7,7 @@ import { ENTRY_METHOD_LABELS } from '../../lib/trades/tradePlan'
 import { AddOnRuleSchema, EntryMethodSchema, RegimeParamRowSchema, type RegimeParamRow } from '../../lib/storage/schema'
 import { Field, inputClass } from '../forms/FormField'
 import { Badge, Card, Disclosure, secondaryButton } from '../ui'
+import { DecisionPrompt } from '../calibration/DecisionPrompt'
 
 const thClass = 'py-2 pr-3 text-left text-xs font-medium text-gray-600 dark:text-gray-400'
 const tdClass = 'py-2 pr-3 align-top text-sm text-gray-800 dark:text-gray-200'
@@ -65,6 +66,7 @@ export function RegimeParamsCard() {
   const [draft, setDraft] = useState<RegimeParamRow[] | null>(null)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [signedReason, setSignedReason] = useState<string | null>(null)
   const ref = useRef<HTMLDivElement>(null)
   const { hash } = useLocation()
 
@@ -79,6 +81,7 @@ export function RegimeParamsCard() {
     if (bad.length > 0) return setError(`數值超出範圍：${bad.join('、')}。部位倍數 0 到 1，停損 0.5 到 4 倍 ATR。`)
     if (!reason.trim()) return setError('請寫下修改理由。')
     sign(draft, reason.trim())
+    setSignedReason(reason.trim())
     setDraft(null)
     setReason('')
     setError(null)
@@ -102,6 +105,7 @@ export function RegimeParamsCard() {
           {ctx && `　目前局勢：${ctx.label}`}
         </p>
 
+        {signedReason && !draft && <DecisionPrompt kind="regime_params" title="修改局勢參數表" reasons={signedReason} />}
         {draft ? (
           <div className="mt-4 space-y-4">
             {draft.map((row, i) => (

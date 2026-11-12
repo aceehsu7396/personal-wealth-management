@@ -5,6 +5,8 @@ import {
   modifiedDietz,
   netFlowsBySleeve,
   summarizeAttribution,
+  weightedReturns,
+  xirr,
 } from './attribution'
 import {
   createDefaultInvestmentPolicy,
@@ -139,5 +141,21 @@ describe('netFlowsBySleeve', () => {
     const flows = netFlowsBySleeve(trades, holdings, '2026-01-01', '2026-03-31', 30)
     expect(flows.core_tw).toBe(800)
     expect(flows.satellite_us).toBe(300)
+  })
+})
+
+describe('weighted returns', () => {
+  it('solves the money-weighted rate', () => {
+    expect(xirr([{ date: '2024-01-01', amount: -100 }, { date: '2025-01-01', amount: 110 }])).toBeCloseTo(0.0997, 3)
+    expect(xirr([{ date: '2024-01-01', amount: 100 }])).toBeNull()
+  })
+
+  it('chains time-weighted returns; a top-up before a loss lowers the money-weighted rate', () => {
+    // +10% in Q1; then 200 added right before a −10% quarter.
+    const reviews = [review('2024-03-31', sleeves({ core_tw: [100, 110] })), review('2024-06-30', sleeves({ core_tw: [110, 279, 200] })), review('2024-09-30', sleeves({ core_tw: [279, 279] }))]
+    const w = weightedReturns(reviews)!
+    expect(w.twr).toBeCloseTo(1.1 * (1 + (279 - 110 - 200) / (110 + 100)) - 1)
+    expect(w.mwrAnnual!).toBeLessThan(w.twrAnnual!)
+    expect(weightedReturns([])).toBeNull()
   })
 })

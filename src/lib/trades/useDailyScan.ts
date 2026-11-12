@@ -26,6 +26,8 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   const holdings = useAppStore((s) => s.holdings)
   const macroCheckIns = useAppStore((s) => s.macroCheckIns)
   const ladder = useAppStore((s) => s.dipLadder)
+  const decisions = useAppStore((s) => s.decisions)
+  const scenarioSets = useAppStore((s) => s.scenarioSets)
   const assumptions = useAppStore((s) => s.assumptions)
   const foundation = useAppStore((s) => s.foundation)
   const regime = useRegime()
@@ -103,6 +105,14 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   const macroStageReached = journey.stages[1].done || latestMacro !== undefined
   if (macroStageReached && (!latestMacro || addMonths(latestMacro.date, 1) <= today)) {
     items.push(scanItem('housekeeping', '本月的總經三支柱檢視尚未完成', '手冊 05：每月檢視一次', '/research/market'))
+  }
+  const dueDecisions = decisions.filter((d) => !d.reviewedAt && d.reviewDate <= today)
+  if (dueDecisions.length > 0) {
+    items.push(scanItem('review_due', `${dueDecisions.length} 筆決策到了檢討日，回填結果`, '決策日誌：事前寫下、事後對答案', '/portfolio/calibration?tab=decisions'))
+  }
+  const dueSets = scenarioSets.filter((s) => s.outcome === undefined && s.horizon <= today)
+  if (dueSets.length > 0) {
+    items.push(scanItem('review_due', `${dueSets.length} 組情境推演已到期，標記實際發生的情境`, '機率校準：到期才能計分', '/portfolio/calibration?tab=scenarios'))
   }
   const stale = theses.filter((t) => t.status !== 'exited' && addMonths(t.updatedAt.slice(0, 10), THESIS_STALE_MONTHS) <= today)
   if (stale.length > 0) {

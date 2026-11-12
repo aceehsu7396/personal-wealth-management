@@ -207,6 +207,7 @@ export const PAGE_NODES: Record<string, string> = {
   '/portfolio/risk': 'risk',
   '/portfolio/trades': 'checklist',
   '/portfolio/review': 'review',
+  '/portfolio/calibration': 'review',
 }
 
 export type NodeStatus = 'done' | 'current' | 'todo' | 'ongoing'

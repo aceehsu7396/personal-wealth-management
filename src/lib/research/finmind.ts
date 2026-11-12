@@ -78,6 +78,15 @@ export async function fetchDataset<T>(
   return data
 }
 
+// Once the free quota is used up, every request fails (in the browser as
+// a CORS error, since the 402 reply has no CORS header). Pause all requests
+// for a while instead of sending one failing call per caller.
+export const QUOTA_BACKOFF_MS = 10 * 60 * 1000
+let blockedUntil = 0
+export const resetFinMindBackoff = () => {
+  blockedUntil = 0
+}
+
 // One uncached request; for large datasets whose callers cache a
 // condensed form themselves.
 export async function requestDataset<T>(
@@ -86,14 +95,23 @@ export async function requestDataset<T>(
   startDate?: string,
   fetcher: Fetcher = (url) => fetch(url),
 ): Promise<T[]> {
+  if (Date.now() < blockedUntil) throw new FinMindError('FinMind 免費額度暫時用完，請一小時後再試。')
   const params = new URLSearchParams({ dataset, data_id: id, ...(startDate ? { start_date: startDate } : {}) })
-  const response = await fetcher(`${API}?${params}`)
+  let response: Awaited<ReturnType<Fetcher>>
+  try {
+    response = await fetcher(`${API}?${params}`)
+  } catch (e) {
+    blockedUntil = Date.now() + QUOTA_BACKOFF_MS
+    throw e
+  }
   if (response.status === 402 || response.status === 429) {
+    blockedUntil = Date.now() + QUOTA_BACKOFF_MS
     throw new FinMindError('FinMind 免費額度暫時用完，請一小時後再試。')
   }
   if (!response.ok) throw new FinMindError(`FinMind 讀取失敗（${response.status}）`)
   const json = (await response.json()) as { msg?: string; status?: number; data?: T[] }
   if (json.status && json.status !== 200) {
+    if (json.status === 402) blockedUntil = Date.now() + QUOTA_BACKOFF_MS
     throw new FinMindError(json.status === 402 ? 'FinMind 免費額度暫時用完，請一小時後再試。' : `FinMind：${json.msg ?? '讀取失敗'}`)
   }
   return json.data ?? []

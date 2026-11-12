@@ -38,6 +38,8 @@ import { Field, inputClass, labelClass } from '../components/forms/FormField'
 import type { BacktestStats, StrategyTemplate } from '../lib/storage/schema'
 import { INTERPRET_RULES, interpretBacktest } from '../lib/backtest/interpret'
 import { SimGuide } from '../components/SimGuide'
+import { BiasChecks } from '../components/backtest/BiasChecks'
+import { PageHeader, primaryButton, secondaryButton } from '../components/ui'
 import { Term } from '../components/Term'
 
 const cardClass =
@@ -286,15 +288,24 @@ export function BacktestPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">回測</h1>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        用歷史日線檢驗策略：收盤判斷、隔日開盤成交，計入手續費與證交稅，台股自動還原除權息與分割。最後 {oos}% 期間保留為樣本外，
-        樣本外<strong>年化報酬勝過買進持有</strong>，或<strong>夏普比率不低於買進持有、且最大回撤不到它的 2/3</strong>，才算通過（行動路線 4.2）。說明見手冊{' '}
-        <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          10 §6
-        </Link>
-        。
-      </p>
+      <PageHeader
+        title="回測"
+        summary={
+          <>
+            用歷史日線檢驗策略：收盤判斷、隔日開盤成交，計入手續費與證交稅，台股自動還原除權息與分割。最後 {oos}% 期間保留為樣本外，
+            樣本外<strong>年化報酬勝過買進持有</strong>，或<strong>夏普比率不低於買進持有、且最大回撤不到它的 2/3</strong>，才算通過（行動路線 4.2）。說明見手冊{' '}
+            <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              10 §6
+            </Link>
+            。
+          </>
+        }
+        action={
+          <button type="button" onClick={() => void run()} disabled={status.kind === 'loading'} className={primaryButton}>
+            執行回測
+          </button>
+        }
+      />
 
       <SimGuide />
 
@@ -421,7 +432,7 @@ export function BacktestPage() {
             type="button"
             onClick={() => void run()}
             disabled={status.kind === 'loading'}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+            className={secondaryButton}
           >
             執行回測
           </button>
@@ -740,12 +751,19 @@ export function BacktestPage() {
             )}
           </div>
 
+          <BiasChecks
+            input={output.input}
+            result={output.strategy}
+            trials={(card ? runs.filter((r) => r.strategyId === card.id).length : 0) + (sweep?.points.length ?? 0) + 1}
+            sweepKey={sweepKey}
+          />
+
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               type="button"
               onClick={save}
               disabled={savedId !== null}
-              className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              className={secondaryButton}
             >
               {savedId ? '已儲存' : '儲存回測結果'}
             </button>
@@ -782,7 +800,7 @@ export function BacktestPage() {
                     <td className={tdClass}>{pct(r.stats.full.maxDrawdown)}</td>
                     <td className={tdClass}>{backtestPasses(r) ? '✓ 通過' : '✗'}</td>
                     <td className={tdClass}>
-                      <button type="button" onClick={() => removeBacktestRun(r.id)} className="text-xs text-gray-500 hover:underline">
+                      <button type="button" onClick={() => removeBacktestRun(r.id)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
                         刪除
                       </button>
                     </td>

@@ -687,3 +687,141 @@ export function latestSignals(
   }
   return out
 }
+
+// ---------------------------------------------------------------------------
+// Bias checks (blueprint 02 §7.1)
+// ---------------------------------------------------------------------------
+
+export interface WalkSegment {
+  from: string
+  to: string
+  // The value chosen on the data before `from`.
+  value: number
+  testReturn: number
+}
+
+export interface WalkForward {
+  key: string
+  label: string
+  segments: WalkSegment[]
+  cagr: number
+  maxDrawdown: number
+  // The current setting over the same test periods.
+  fixedCagr: number
+  fixedMaxDrawdown: number
+}
+
+function spanStats(parts: { index: number[]; from: number; to: number }[], dates: string[], first: number, last: number) {
+  let level = 1
+  let peak = 1
+  let maxDrawdown = 0
+  for (const p of parts) {
+    for (let i = p.from + 1; i <= p.to; i++) {
+      level *= p.index[i] / p.index[i - 1]
+      peak = Math.max(peak, level)
+      maxDrawdown = Math.min(maxDrawdown, level / peak - 1)
+    }
+  }
+  const years = (Date.parse(dates[last]) - Date.parse(dates[first])) / (365.25 * 86_400_000)
+  return { cagr: years > 0 && level > 0 ? level ** (1 / years) - 1 : 0, maxDrawdown }
+}
+
+// Anchored walk-forward on one parameter: the period is cut into
+// windows + 1 equal parts; before each test part the value with the best
+// annual return on all earlier data is chosen, so no choice sees the future.
+export function walkForward(input: BacktestInput, key: string, windows = 4, count = 7): WalkForward | null {
+  const def = STRATEGY_TEMPLATES[input.template].params.find((x) => x.key === key)
+  if (!def) return null
+  const params = resolveParams(input.template, input.params)
+  const values = sweepValues(def, params[key], count)
+  const runs = values.map((value) => ({ value, result: runBacktest({ ...input, params: { ...params, [key]: value } }) }))
+  const fixed = runBacktest({ ...input, params })
+  const n = fixed.dates.length
+  if (n < (windows + 1) * 40) return null
+  const bounds = Array.from({ length: windows + 2 }, (_, k) => Math.min(n - 1, Math.floor(((n - 1) * k) / (windows + 1))))
+  const segments: WalkSegment[] = []
+  const parts: { index: number[]; from: number; to: number }[] = []
+  for (let k = 1; k <= windows; k++) {
+    const trainEnd = bounds[k]
+    const testEnd = bounds[k + 1]
+    const best = runs.reduce((a, b) => (computeStats(b.result, 0, trainEnd).cagr > computeStats(a.result, 0, trainEnd).cagr ? b : a))
+    const idx = best.result.index
+    segments.push({ from: fixed.dates[trainEnd], to: fixed.dates[testEnd], value: best.value, testReturn: idx[testEnd] / idx[trainEnd] - 1 })
+    parts.push({ index: idx, from: trainEnd, to: testEnd })
+  }
+  const wf = spanStats(parts, fixed.dates, bounds[1], n - 1)
+  const fx = spanStats([{ index: fixed.index, from: bounds[1], to: n - 1 }], fixed.dates, bounds[1], n - 1)
+  return { key, label: def.label, segments, cagr: wf.cagr, maxDrawdown: wf.maxDrawdown, fixedCagr: fx.cagr, fixedMaxDrawdown: fx.maxDrawdown }
+}
+
+// Standard normal CDF (Abramowitz–Stegun 7.1.26) and its inverse (Acklam).
+export function normCdf(x: number): number {
+  const t = 1 / (1 + 0.3275911 * Math.abs(x) / Math.SQRT2)
+  const y = 1 - ((((1.061405429 * t - 1.453152027) * t + 1.421413741) * t - 0.284496736) * t + 0.254829592) * t * Math.exp(-(x * x) / 2)
+  return x >= 0 ? (1 + y) / 2 : (1 - y) / 2
+}
+
+export function normInv(p: number): number {
+  const a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.357751867269, -30.66479806614716, 2.506628277459239]
+  const b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572]
+  const c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783]
+  const d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416]
+  const q = p < 0.02425 ? Math.sqrt(-2 * Math.log(p)) : p > 1 - 0.02425 ? Math.sqrt(-2 * Math.log(1 - p)) : 0
+  if (p < 0.02425) return (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+  if (p > 1 - 0.02425) return -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1)
+  const r = p - 0.5
+  const s = r * r
+  return ((((((a[0] * s + a[1]) * s + a[2]) * s + a[3]) * s + a[4]) * s + a[5]) * r) / (((((b[0] * s + b[1]) * s + b[2]) * s + b[3]) * s + b[4]) * s + 1)
+}
+
+export interface DeflatedSharpe {
+  trials: number
+  sharpe: number
+  // The best annual Sharpe that luck alone would give after this many tries.
+  luckSharpe: number
+  // Probability the true Sharpe is above that, given skew and fat tails.
+  probability: number
+}
+
+const EULER_GAMMA = 0.5772156649
+
+// Deflated Sharpe ratio (Bailey & López de Prado, 2014) from daily returns.
+// The spread of Sharpe across trials is taken as the estimator's own
+// variance, (1 + SR²/2) / T, since the other trials are not stored.
+export function deflatedSharpe(daily: number[], trials: number): DeflatedSharpe | null {
+  const T = daily.length
+  if (T < 60) return null
+  const mean = daily.reduce((a, b) => a + b, 0) / T
+  const sd = Math.sqrt(daily.reduce((a, b) => a + (b - mean) ** 2, 0) / (T - 1))
+  if (sd <= 0) return null
+  const sr = mean / sd
+  const skew = daily.reduce((a, b) => a + ((b - mean) / sd) ** 3, 0) / T
+  const kurt = daily.reduce((a, b) => a + ((b - mean) / sd) ** 4, 0) / T
+  const n = Math.max(1, Math.round(trials))
+  const v = (1 + (sr * sr) / 2) / T
+  const sr0 = n === 1 ? 0 : Math.sqrt(v) * ((1 - EULER_GAMMA) * normInv(1 - 1 / n) + EULER_GAMMA * normInv(1 - 1 / (n * Math.E)))
+  const denom = Math.sqrt(Math.max(1e-12, 1 - skew * sr + ((kurt - 1) / 4) * sr * sr))
+  return { trials: n, sharpe: sr * Math.sqrt(252), luckSharpe: sr0 * Math.sqrt(252), probability: normCdf(((sr - sr0) * Math.sqrt(T - 1)) / denom) }
+}
+
+export const dailyReturnsOf = (result: BacktestResult) => result.index.slice(1).map((v, i) => v / result.index[i] - 1)
+
+export interface CostRow {
+  multiple: number
+  cagr: number
+  sharpe: number | null
+}
+
+export const COST_MULTIPLES = [0, 1, 2, 3]
+
+export function costSensitivity(input: BacktestInput): { rows: CostRow[]; sensitive: boolean } {
+  const rows = COST_MULTIPLES.map((m) => {
+    const costs: BacktestCosts = { feeRate: (s) => input.costs.feeRate(s) * m, minFee: (s) => input.costs.minFee(s) * m, taxRate: (s) => input.costs.taxRate(s) * m }
+    const result = runBacktest({ ...input, costs })
+    const stats = computeStats(result, 0, Math.max(0, result.dates.length - 1))
+    return { multiple: m, cagr: stats.cagr, sharpe: stats.sharpe }
+  })
+  const base = rows[1].cagr
+  // The edge mostly goes when costs double.
+  return { rows, sensitive: base > 0 ? rows[2].cagr < base / 2 : true }
+}

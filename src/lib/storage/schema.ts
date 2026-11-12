@@ -950,6 +950,51 @@ export const PauseReviewSchema = z.object({
 })
 export type PauseReview = z.infer<typeof PauseReviewSchema>
 
+// A non-trade decision written before it plays out (blueprint 02 §6.2):
+// the call, why, how sure, and a pre-mortem; filled in after the review date.
+export const DecisionKindSchema = z.enum(['tilt', 'regime_params', 'policy', 'other'])
+export type DecisionKind = z.infer<typeof DecisionKindSchema>
+export const DecisionSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  kind: DecisionKindSchema,
+  title: z.string(),
+  judgment: z.string(),
+  reasons: z.string(),
+  confidence: z.number().min(0).max(100),
+  premortem: z.string(),
+  reviewDate: z.string(),
+  outcome: z.string().optional(),
+  quality: z.number().int().min(1).max(5).optional(),
+  lesson: z.string().optional(),
+  reviewedAt: z.string().optional(),
+})
+export type Decision = z.infer<typeof DecisionSchema>
+
+// Two to four scenarios with probabilities that sum to 100, scored once
+// the horizon passes (blueprint 02 §2.1–2.2). Shocks are % moves.
+export const ScenarioSchema = z.object({
+  name: z.string(),
+  probability: z.number().min(0).max(100),
+  trigger: z.string(),
+  signals: z.string(),
+  shock: z.object({ tw: z.number(), us: z.number(), bond: z.number(), fx: z.number() }),
+  actions: z.string(),
+})
+export type Scenario = z.infer<typeof ScenarioSchema>
+export const ScenarioSetSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  question: z.string(),
+  horizon: z.string(),
+  premortem: z.string(),
+  scenarios: z.array(ScenarioSchema).min(2).max(4),
+  // Index of the scenario that happened, set at resolution.
+  outcome: z.number().int().optional(),
+  resolvedAt: z.string().optional(),
+})
+export type ScenarioSet = z.infer<typeof ScenarioSetSchema>
+
 export function createDefaultDipLadder(): DipLadder {
   return {
     steps: [-10, -20, -30, -40].map((drawdownPercent) => ({ drawdownPercent, amountTwd: 0, executedAt: null })),
@@ -989,6 +1034,8 @@ export const AppDataSchema = z.object({
   regimeParams: RegimeParamsSchema.default(createDefaultRegimeParams),
   dipLadder: DipLadderSchema.default(createDefaultDipLadder),
   pauseReviews: z.array(PauseReviewSchema).default([]),
+  decisions: z.array(DecisionSchema).default([]),
+  scenarioSets: z.array(ScenarioSetSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -1048,5 +1095,7 @@ export function createDefaultAppData(): AppData {
     regimeParams: createDefaultRegimeParams(),
     dipLadder: createDefaultDipLadder(),
     pauseReviews: [],
+    decisions: [],
+    scenarioSets: [],
   }
 }

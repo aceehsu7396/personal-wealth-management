@@ -219,3 +219,71 @@ export function netFlowsBySleeve(
   }
   return flows
 }
+
+// --- Time- and money-weighted returns (blueprint 02 §6.3) --------------------
+
+// Annual rate r with Σ cf × (1 + r)^(−years from the first flow) = 0.
+// Contributions are negative, the ending value positive. Newton's method,
+// falling back to bisection when it does not settle.
+export function xirr(flows: { date: string; amount: number }[]): number | null {
+  if (flows.length < 2 || !flows.some((f) => f.amount > 0) || !flows.some((f) => f.amount < 0)) return null
+  const t0 = Date.parse(flows[0].date)
+  const years = flows.map((f) => (Date.parse(f.date) - t0) / (365.25 * 86400000))
+  const npv = (r: number) => flows.reduce((a, f, i) => a + f.amount / (1 + r) ** years[i], 0)
+  const dnpv = (r: number) => flows.reduce((a, f, i) => a - (years[i] * f.amount) / (1 + r) ** (years[i] + 1), 0)
+  let r = 0.1
+  for (let i = 0; i < 50; i++) {
+    const d = dnpv(r)
+    if (d === 0 || !Number.isFinite(d)) break
+    const next = r - npv(r) / d
+    if (!Number.isFinite(next) || next <= -0.99) break
+    if (Math.abs(next - r) < 1e-9) return next
+    r = next
+  }
+  let lo = -0.99
+  let hi = 10
+  if (npv(lo) * npv(hi) > 0) return null
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2
+    if (npv(lo) * npv(mid) <= 0) hi = mid
+    else lo = mid
+  }
+  return (lo + hi) / 2
+}
+
+export interface WeightedReturns {
+  from: string
+  to: string
+  // Chained period returns, total and per year.
+  twr: number
+  twrAnnual: number | null
+  // The investor's own rate, counting when money went in.
+  mwrAnnual: number | null
+}
+
+const midDate = (a: string, b: string) => new Date((Date.parse(a) + Date.parse(b)) / 2).toISOString().slice(0, 10)
+
+export function weightedReturns(reviews: PerformanceReview[]): WeightedReturns | null {
+  const sorted = [...reviews].sort((a, b) => a.periodEnd.localeCompare(b.periodEnd))
+  if (sorted.length === 0) return null
+  let index = 1
+  const flows: { date: string; amount: number }[] = []
+  sorted.forEach((r, i) => {
+    const t = aggregate(r.sleeves)
+    index *= 1 + modifiedDietz(t.start, t.end, t.flow)
+    if (i === 0) flows.push({ date: r.periodStart, amount: -t.start })
+    if (t.flow !== 0) flows.push({ date: midDate(r.periodStart, r.periodEnd), amount: -t.flow })
+  })
+  const last = sorted[sorted.length - 1]
+  flows.push({ date: last.periodEnd, amount: aggregate(last.sleeves).end })
+  flows.sort((a, b) => a.date.localeCompare(b.date))
+  const from = sorted[0].periodStart
+  const years = daysBetween(from, last.periodEnd) / 365.25
+  return {
+    from,
+    to: last.periodEnd,
+    twr: index - 1,
+    twrAnnual: years >= 0.5 ? index ** (1 / years) - 1 : null,
+    mwrAnnual: years >= 0.5 ? xirr(flows) : null,
+  }
+}

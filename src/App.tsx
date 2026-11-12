@@ -18,6 +18,7 @@ import { PortfolioPage } from './pages/PortfolioPage'
 import { TradesPage } from './pages/TradesPage'
 import { TradePlansPage } from './pages/TradePlansPage'
 import { RiskPage } from './pages/RiskPage'
+import { CalibrationPage } from './pages/CalibrationPage'
 import { PortfolioReviewPage } from './pages/PortfolioReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StrategiesPage } from './pages/StrategiesPage'
@@ -62,6 +63,7 @@ function App() {
             <Route path="/portfolio/risk" element={<RiskPage />} />
             <Route path="/portfolio/trades" element={<TradesPage />} />
             <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
+            <Route path="/portfolio/calibration" element={<CalibrationPage />} />
             {/* 交易心得已併入手冊附錄 E */}
             <Route path="/insights" element={<Navigate to="/handbook/附錄E" replace />} />
             <Route path="/blueprint/:slug?" element={<BlueprintPage />} />

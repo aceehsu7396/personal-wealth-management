@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
@@ -17,6 +18,7 @@ import { ReadinessChecklist } from '../components/ReadinessChecklist'
 import { EmergencyFundForm } from '../components/forms/EmergencyFundForm'
 import { RegimeParamsCard } from '../components/goals/RegimeParamsCard'
 import { DipLadderCard } from '../components/goals/DipLadderCard'
+import { DecisionPrompt } from '../components/calibration/DecisionPrompt'
 import { PageHeader, primaryButton, secondaryButton } from '../components/ui'
 
 const cardClass =
@@ -29,6 +31,7 @@ export function GoalsPage() {
   const setInvestmentPolicy = useAppStore((s) => s.setInvestmentPolicy)
   const addRuleVersion = useAppStore((s) => s.addRuleVersion)
   const readiness = useTraderReadiness()
+  const [justSigned, setJustSigned] = useState(false)
 
   const projection = computeFireProjection(profile, assumptions)
   const required = computeRequiredReturn(
@@ -185,6 +188,7 @@ export function GoalsPage() {
               setInvestmentPolicy({ signedAt })
               // Each signing keeps a copy, so later changes can be traced.
               addRuleVersion({ kind: 'policy', reason: policy.signedAt ? '年度檢討後重新簽署' : '第一次簽署', snapshot: { ...policy, signedAt } })
+              setJustSigned(true)
             }}
             className={secondaryButton}
           >
@@ -194,6 +198,7 @@ export function GoalsPage() {
             <span className="text-sm text-indigo-700 dark:text-indigo-400">✓ 已於 {policy.signedAt} 簽署</span>
           )}
         </div>
+        {justSigned && <DecisionPrompt kind="policy" title="簽署投資政策聲明" reasons="年度檢討後確認目標、風險與配置" />}
       </div>
 
       <RegimeParamsCard />

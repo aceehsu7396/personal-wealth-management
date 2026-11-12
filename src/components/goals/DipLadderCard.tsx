@@ -6,6 +6,7 @@ import { fullTimeTarget } from '../../lib/calculations/traderReadiness'
 import { todayIsoDate } from '../../lib/market/twse'
 import { inputClass } from '../forms/FormField'
 import { Badge, Card, secondaryButton, textLink } from '../ui'
+import { DecisionPrompt } from '../calibration/DecisionPrompt'
 
 const thClass = 'py-2 pr-4 text-left text-xs font-medium text-gray-600 dark:text-gray-400'
 const tdClass = 'py-2 pr-4 text-sm text-gray-800 dark:text-gray-200'
@@ -23,6 +24,7 @@ export function DipLadderCard() {
   const [amounts, setAmounts] = useState<string[] | null>(null)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [signedReason, setSignedReason] = useState<string | null>(null)
 
   const buffer = { amount: foundation.emergencyFundAmount, target: fullTimeTarget(assumptions, foundation).bufferTarget }
   const status = dipLadderStatus(ladder, drawdown, lastHigh, buffer)
@@ -35,6 +37,7 @@ export function DipLadderCard() {
       ladder.steps.map((s, i) => ({ ...s, amountTwd: values[i] })),
       reason.trim(),
     )
+    setSignedReason(reason.trim())
     setAmounts(null)
     setReason('')
     setError(null)
@@ -58,6 +61,7 @@ export function DipLadderCard() {
         {ladder.signedAt ? `階梯已於 ${ladder.signedAt.slice(0, 10)} 簽署。` : '階梯還沒填金額。'}
         {status.bufferShort && <span className="text-red-700 dark:text-red-400"> 生活費緩衝 {twd(buffer.amount)} 低於目標 {twd(buffer.target)}，先補緩衝。</span>}
       </p>
+      {signedReason && !amounts && <DecisionPrompt kind="other" title="修改大盤逢低階梯" reasons={signedReason} />}
       <table className="mt-3 w-full max-w-xl">
         <thead>
           <tr className="border-b border-gray-200 dark:border-gray-700">
