@@ -31,7 +31,7 @@ export function IndexChart({ name, points }: { name: string; points: IndexPoint[
   }, [points])
   const shown = rows.slice(-range)
 
-  if (rows.length === 0) return <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">尚無{name}資料</p>
+  if (rows.length === 0) return <p className="py-8 text-center text-sm text-gray-600 dark:text-gray-400">尚無{name}資料</p>
 
   return (
     <div>

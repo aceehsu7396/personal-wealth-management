@@ -6,7 +6,8 @@ import { evaluateThesis } from '../../lib/calculations/thesisScoring'
 import { analyzePortfolio } from '../../lib/calculations/portfolioRisk'
 import { riskLimitOf } from '../../lib/calculations/preTradeChecklist'
 import { useChecklistContext } from '../../lib/trades/useChecklistContext'
-import { planAdvice } from '../../lib/trades/tradePlan'
+import { backtestOf, planAdvice, sizeOptions } from '../../lib/trades/tradePlan'
+import { useAnnualVol } from '../../lib/useHoldingReturns'
 import { tradeLink } from '../../lib/trades/tradeLink'
 import { todayIsoDate } from '../../lib/market/twse'
 import type { PlanAdvice, TradePlan } from '../../lib/storage/schema'
@@ -75,6 +76,7 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
   const holdings = useAppStore((s) => s.holdings)
   const guardrails = useAppStore((s) => s.guardrails)
   const meta = useAppStore((s) => s.portfolioMeta)
+  const runs = useAppStore((s) => s.backtestRuns)
   const ctx = useChecklistContext()
   const signalsFor = useSignals()
   const thesis = plan.thesisId ? theses.find((t) => t.id === plan.thesisId) : undefined
@@ -89,6 +91,10 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
   const limit = riskLimitOf(strategy, ctx.policy)
   const budget = (((totalValueTwd * ctx.policy.satellitePercent) / 100) * limit.percent) / 100
   const risk = plan.entryPrice && plan.stopLoss && plan.shares ? (plan.entryPrice - plan.stopLoss) * plan.shares : null
+  const vol = useAnnualVol(plan.ticker, plan.market)
+  const sizing = plan.entryPrice
+    ? sizeOptions({ price: plan.entryPrice, stop: plan.stopLoss, totalValueTwd, policy: ctx.policy, strategyRisk: strategy?.riskPerTradePercent, annualVolPercent: vol, backtest: backtestOf(runs, plan.strategyId), multiplier: ctx.regime?.multiplier })
+    : null
 
   const saveDecision = (a: PlanAdvice) => set({ advice: [...plan.advice.filter((x) => x.text !== a.text), a] })
   const savedFor = (a: PlanAdvice) => plan.advice.find((x) => x.text === a.text)
@@ -227,6 +233,22 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
                 ? '填好進場價、停損與股數後，會算出停損時的虧損。'
                 : `停損時虧損約 ${fmt(Math.round(risk))} 元，占每筆上限 ${budget > 0 ? Math.round((risk / budget) * 100) : '—'}%（上限 ${fmt(Math.round(budget))} 元，${limit.source} ${limit.percent}%）。`}
             </p>
+            {sizing && (
+              <Disclosure summary={`部位大小三法：建議 ${sizing.shares === null ? '—' : `${fmt(sizing.shares)} 股`}`}>
+                <ul className="mt-2 space-y-1 text-xs text-gray-700 dark:text-gray-300">
+                  {sizing.options.map((o) => (
+                    <li key={o.key}>
+                      <span className="font-medium">{o.label}</span>：{o.shares === null ? '—' : `${fmt(o.shares)} 股`}
+                      {sizing.chosen === o.key && <span className="ml-1 text-indigo-700 dark:text-indigo-400">（最保守，採用）</span>}
+                      <span className="block text-gray-600 dark:text-gray-400">{o.basis}</span>
+                    </li>
+                  ))}
+                  <li className="text-gray-600 dark:text-gray-400">
+                    最保守者 × 局勢倍數 {ctx.regime?.multiplier ?? 1}，再受單一部位上限 {fmt(sizing.capShares)} 股限制。
+                  </li>
+                </ul>
+              </Disclosure>
+            )}
           </Section>
           <Section step={6} title="委託：怎麼下單">
             <div className="grid grid-cols-[8rem_1fr] gap-3">

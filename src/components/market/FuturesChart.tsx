@@ -56,7 +56,7 @@ export function FuturesChart({ bars, taiex }: { bars: FuturesBar[]; taiex: Index
   const shown = rows.slice(-range)
   const showDots = range <= 44
 
-  if (rows.length === 0) return <p className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">尚無{FUTURES_NAME}資料</p>
+  if (rows.length === 0) return <p className="py-8 text-center text-sm text-gray-600 dark:text-gray-400">尚無{FUTURES_NAME}資料</p>
 
   return (
     <div>

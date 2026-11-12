@@ -22,7 +22,7 @@ const RELIABILITY_TONE: Record<Reliability['status'], Tone> = { verified: 'good'
 const num = new Intl.NumberFormat('zh-TW', { maximumFractionDigits: 2 })
 const signedPct = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : v < 0 ? '−' : ''}${num.format(Math.abs(v))}%`)
 const changeClass = (v: number | null) =>
-  v === null ? 'text-gray-500' : v >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-600 dark:text-red-400'
+  v === null ? 'text-gray-600 dark:text-gray-400' : v >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-red-700 dark:text-red-400'
 const yi = (v: number) => `${v >= 0 ? '+' : '−'}${num.format(Math.round(Math.abs(v) / 1e8))} 億`
 
 function Badge({ tone, children, title }: { tone: Tone; children: React.ReactNode; title?: string }) {
@@ -291,7 +291,7 @@ export function DailyMarketPanel() {
         依固定規則判讀趨勢與風險，不預測漲跌。核心部位不因每日走勢調整；交易部位參考 200 日線。
       </p>
 
-      {!m.data && m.loading && <p className="py-8 text-center text-sm text-gray-500">正在讀取指數資料…</p>}
+      {!m.data && m.loading && <p className="py-8 text-center text-sm text-gray-600 dark:text-gray-400">正在讀取指數資料…</p>}
       {m.data && (
         <>
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">

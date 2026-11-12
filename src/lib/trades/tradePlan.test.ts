@@ -7,6 +7,7 @@ import {
   positionScanItems,
   positionStatus,
   sharesByRisk,
+  sizeOptions,
   sortScan,
   scanItem,
   trailingStop,
@@ -132,6 +133,21 @@ describe('drafts', () => {
     const plan = planFromStrategy(strategy, { close: 1000, atr: 30 }, 10_000_000, policy)
     expect(plan).toMatchObject({ source: 'strategy', ticker: '2330', entryMethod: 'breakout', stopLoss: 910, trailing: 'chandelier', trailingParam: 3 })
     expect(plan.shares).toBe(sharesByRisk(1000, 910, 10_000_000, policy, 1))
+  })
+})
+
+describe('position size', () => {
+  it('takes the most conservative method, then the regime multiplier and the cap', () => {
+    // Total 10M, trading sleeve 3M. Risk: 30k ÷ 100 = 300 shares. Volatility:
+    // 3M × (15 ÷ 30) ÷ 8 = 187,500 ÷ 1000 = 187 shares. Kelly: p 0.5, payoff 2
+    // → 25%, quarter → 6.25% × 3M = 187,500 → 187 shares.
+    const r = sizeOptions({ price: 1000, stop: 900, totalValueTwd: 10_000_000, policy, annualVolPercent: 30, backtest: { winRate: 0.5, profitFactor: 2 }, multiplier: 0.5 })
+    expect(r.options.map((o) => o.shares)).toEqual([300, 187, 187])
+    expect(r.chosen).toBe('volatility')
+    expect(r.shares).toBe(93)
+    const capped = sizeOptions({ price: 100, stop: 99, totalValueTwd: 10_000_000, policy })
+    expect(capped.shares).toBe(capped.capShares)
+    expect(sizeOptions({ price: 1000, totalValueTwd: 1e7, policy }).shares).toBeNull()
   })
 })
 

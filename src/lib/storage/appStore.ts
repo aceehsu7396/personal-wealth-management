@@ -34,6 +34,7 @@ import {
   type RuleVersion,
   type RegimeParamRow,
   type DipLadder,
+  type PauseReview,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -185,6 +186,7 @@ interface AppStore extends AppData {
   signRegimeParams: (rows: RegimeParamRow[], reason: string) => void
   signDipLadder: (steps: DipLadder['steps'], reason: string) => void
   markDipStep: (drawdownPercent: number, executedAt: string | null) => void
+  addPauseReview: (entry: Omit<PauseReview, 'id'>) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -225,6 +227,7 @@ function toAppData(state: AppData): AppData {
     ruleVersions: state.ruleVersions,
     regimeParams: state.regimeParams,
     dipLadder: state.dipLadder,
+    pauseReviews: state.pauseReviews,
   }
 }
 
@@ -603,6 +606,8 @@ export const useAppStore = create<AppStore>()(
             steps: state.dipLadder.steps.map((s) => (s.drawdownPercent === drawdownPercent ? { ...s, executedAt } : s)),
           },
         })),
+
+      addPauseReview: (entry) => set((state) => ({ pauseReviews: [...state.pauseReviews, { ...entry, id: crypto.randomUUID() }] })),
 
       removePaperAccount: (id) =>
         set((state) => ({ paperAccounts: state.paperAccounts.filter((a) => a.id !== id) })),

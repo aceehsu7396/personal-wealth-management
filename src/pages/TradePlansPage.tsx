@@ -9,7 +9,9 @@ import type { PriceRow } from '../lib/research/etfProfile'
 import { atr } from '../lib/backtest/indicators'
 import { parseSymbol } from '../lib/backtest/templates'
 import { useRegime } from '../lib/market/useRegime'
-import { manualPlan, planFromStrategy, planFromThesis, type PlanDraft } from '../lib/trades/tradePlan'
+import { annualVolPercent, historyStart } from '../lib/useHoldingReturns'
+import { todayIsoDate } from '../lib/market/twse'
+import { backtestOf, manualPlan, planFromStrategy, planFromThesis, type PlanDraft } from '../lib/trades/tradePlan'
 import type { TradePlan } from '../lib/storage/schema'
 import { PlanEditor } from '../components/trades/PlanEditor'
 import { ENTRY_METHOD_LABELS, PLAN_STATUS } from '../components/trades/planLabels'
@@ -18,14 +20,14 @@ import { Badge, Card, DataTable, PageHeader, primaryButton, textLink } from '../
 const fmt = (v: number | undefined) => (v === undefined ? '—' : v.toLocaleString('zh-TW', { maximumFractionDigits: 2 }))
 const SOURCE_LABELS: Record<TradePlan['source'], string> = { thesis: '研究卡', strategy: '策略卡', core: '核心', manual: '手動' }
 
-// Last close and 14-day ATR for a strategy draft's stop and size.
-async function lastCloseAndAtr(ticker: string): Promise<{ close?: number; atr?: number }> {
+// Last close, 14-day ATR and a year's volatility for a draft's stop and
+// size; the year of bars shares its cache with the risk page.
+async function lastCloseAndAtr(ticker: string): Promise<{ close?: number; atr?: number; vol?: number }> {
   try {
-    const start = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10)
-    const rows = (await fetchDataset<PriceRow>('TaiwanStockPrice', ticker, start)).filter((r) => r.close > 0)
+    const rows = (await fetchDataset<PriceRow>('TaiwanStockPrice', ticker, historyStart(todayIsoDate()))).filter((r) => r.close > 0)
     const bars = rows.map((r) => ({ date: r.date, open: r.open, high: r.max, low: r.min, close: r.close, volume: 0 }))
     const a = atr(bars).at(-1)
-    return { close: bars.at(-1)?.close, atr: a && Number.isFinite(a) ? a : undefined }
+    return { close: bars.at(-1)?.close, atr: a && Number.isFinite(a) ? a : undefined, vol: bars.length >= 60 ? annualVolPercent(bars) : undefined }
   } catch {
     return {}
   }
@@ -74,6 +76,7 @@ export function TradePlansPage() {
   const guardrails = useAppStore((s) => s.guardrails)
   const meta = useAppStore((s) => s.portfolioMeta)
   const addTradePlan = useAppStore((s) => s.addTradePlan)
+  const runs = useAppStore((s) => s.backtestRuns)
   const signalsFor = useSignals()
   const { ctx: regime, loading: regimeLoading } = useRegime()
   const [creating, setCreating] = useState(false)
@@ -102,7 +105,11 @@ export function TradePlansPage() {
         return
       }
       const report = signalsFor(thesis, evaluateThesis(thesis, policy))
-      open(addTradePlan(planFromThesis(thesis, report, policy, regime)))
+      const total = analyzePortfolio(holdings, theses, policy, guardrails, meta).totalValueTwd
+      setCreating(true)
+      void (thesis.market === 'TW' ? lastCloseAndAtr(thesis.ticker) : Promise.resolve({ vol: undefined })).then((q) => {
+        open(addTradePlan(planFromThesis(thesis, report, policy, regime, { annualVolPercent: q.vol, totalValueTwd: total })))
+      })
       return
     }
     const strategy = strategies.find((s) => s.id === strategyId)
@@ -113,11 +120,11 @@ export function TradePlansPage() {
     setCreating(true)
     const { market, code } = parseSymbol(strategy.symbols[0] ?? '')
     const total = analyzePortfolio(holdings, theses, policy, guardrails, meta).totalValueTwd
-    void (market === 'TW' && code ? lastCloseAndAtr(code) : Promise.resolve({})).then((quote) => {
-      const draft: PlanDraft = planFromStrategy(strategy, quote, total, policy, regime)
+    void (market === 'TW' && code ? lastCloseAndAtr(code) : Promise.resolve({} as { close?: number; atr?: number; vol?: number })).then((quote) => {
+      const draft: PlanDraft = planFromStrategy(strategy, quote, total, policy, regime, { annualVolPercent: quote.vol, backtest: backtestOf(runs, strategy.id) })
       open(addTradePlan(draft))
     })
-  }, [thesisId, strategyId, plans, theses, strategies, holdings, policy, guardrails, meta, signalsFor, addTradePlan, navigate, setSearch, regime, regimeLoading])
+  }, [thesisId, strategyId, plans, theses, strategies, holdings, policy, guardrails, meta, signalsFor, addTradePlan, navigate, setSearch, regime, regimeLoading, runs])
 
   const plan = planId ? plans.find((p) => p.id === planId) : undefined
   const newManual = () => {

@@ -11,6 +11,7 @@ import { dipLadderStatus } from '../market/dipLadder'
 import { fullTimeTarget } from '../calculations/traderReadiness'
 import { ENTRY_METHOD_LABELS, positionScanItems, scanItem, sortScan, type ScanItem } from './tradePlan'
 import { useOpenPlanStatus } from './useOpenPlanStatus'
+import { usePauseStatus } from './usePauseStatus'
 
 // Research cards should be refreshed after every quarterly report.
 const THESIS_STALE_MONTHS = 4
@@ -28,6 +29,7 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   const assumptions = useAppStore((s) => s.assumptions)
   const foundation = useAppStore((s) => s.foundation)
   const regime = useRegime()
+  const pause = usePauseStatus()
   const { policy, journey } = useJourney()
   const signalsFor = useSignals()
   const { items: open, loading } = useOpenPlanStatus()
@@ -35,6 +37,14 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
 
   const items: ScanItem[] = []
   for (const { plan, status } of open) if (status) items.push(...positionScanItems(plan, status))
+
+  // Pause rules come before any new risk (blueprint 02 §5.5).
+  if (pause.streakPaused) {
+    items.push(scanItem('pause', `連續虧損 ${pause.streak} 筆：交易部位暫停新建倉，先完成暫停檢討`, `投資政策：連續虧損 ${pause.streakLimit} 筆就暫停`, '/portfolio/risk'))
+  }
+  if (pause.monthPaused) {
+    items.push(scanItem('pause', `本月已實現虧損 ${pause.monthPercent.toFixed(1)}%：本月暫停新建倉`, `投資政策：單月虧損上限 ${pause.monthLimit}%`, '/portfolio/risk'))
+  }
 
   // Regime: a change, and open trades the new regime no longer allows.
   const ctx = regime.ctx

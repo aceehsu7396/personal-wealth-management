@@ -11,6 +11,7 @@ import type {
 } from '../storage/schema'
 import type { MacroAssessment } from './macroRegime'
 import type { RegimeContext } from '../market/regime'
+import type { PauseStatus } from './tradingPause'
 import { analyzePortfolio, isSatellite } from './portfolioRisk'
 import { evaluateThesis } from './thesisScoring'
 import { isFund } from './fundRules'
@@ -54,6 +55,8 @@ export interface ChecklistContext {
   strategies?: TradingStrategy[]
   // Action-roadmap gate for satellite buys; omitted means no gate.
   satelliteGate?: { unlocked: boolean; missingSteps: string[] }
+  // Losing-streak and monthly-loss pauses; omitted means not checked.
+  pause?: PauseStatus
 }
 
 export const TRADE_REASON_LABELS: Record<TradeReason, string> = {
@@ -182,6 +185,26 @@ export function buildPreTradeChecklist(
           'usdCap',
           `交易後美元曝險 ${after.usdExposurePercent.toFixed(1)}% ≤ 上限 ${policy.maxUsdExposurePercent}%`,
           after.usdExposurePercent <= policy.maxUsdExposurePercent,
+        ),
+      )
+    }
+
+    if (isSatellite(trade.sleeve) && trade.side === 'buy' && ctx.pause) {
+      const p = ctx.pause
+      items.push(
+        check(
+          'lossStreak',
+          p.streakPaused
+            ? `連續虧損 ${p.streak} 筆，達到 ${p.streakLimit} 筆上限：先到「風險」頁完成暫停檢討`
+            : `連續虧損未達暫停門檻（目前 ${p.streak}／${p.streakLimit} 筆）`,
+          !p.streakPaused,
+        ),
+        check(
+          'monthlyLoss',
+          p.monthPaused
+            ? `本月已實現虧損 ${p.monthPercent.toFixed(1)}%，達到上限 ${p.monthLimit}%：本月暫停新建倉`
+            : `本月虧損未達上限（目前 ${p.monthPercent.toFixed(1)}%，上限 −${p.monthLimit}%）`,
+          !p.monthPaused,
         ),
       )
     }

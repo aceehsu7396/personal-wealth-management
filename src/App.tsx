@@ -17,6 +17,7 @@ import { StocksPage } from './pages/StocksPage'
 import { PortfolioPage } from './pages/PortfolioPage'
 import { TradesPage } from './pages/TradesPage'
 import { TradePlansPage } from './pages/TradePlansPage'
+import { RiskPage } from './pages/RiskPage'
 import { PortfolioReviewPage } from './pages/PortfolioReviewPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { StrategiesPage } from './pages/StrategiesPage'
@@ -58,6 +59,7 @@ function App() {
             <Route path="/goals" element={<GoalsPage />} />
             <Route path="/portfolio" element={<PortfolioPage />} />
             <Route path="/portfolio/plans" element={<TradePlansPage />} />
+            <Route path="/portfolio/risk" element={<RiskPage />} />
             <Route path="/portfolio/trades" element={<TradesPage />} />
             <Route path="/portfolio/review" element={<PortfolioReviewPage />} />
             {/* 交易心得已併入手冊附錄 E */}

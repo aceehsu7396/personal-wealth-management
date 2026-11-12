@@ -449,6 +449,12 @@ export const InvestmentPolicySchema = z.object({
   riskPerTradePercent: z.number().default(1),
   maxOpenPositions: z.number().default(8),
   requireStopLoss: z.boolean().default(true),
+  // Pause rules and sizing (stage 3): stop new trading positions after this
+  // many losing trades in a row, or this % monthly loss of the trading
+  // budget (Elder's 6% rule); target volatility for position sizing.
+  maxConsecutiveLosses: z.number().default(3),
+  monthlyLossLimitPercent: z.number().default(6),
+  targetVolatilityPercent: z.number().default(15),
   signedAt: z.string().optional(),
   updatedAt: z.string(),
 })
@@ -607,6 +613,9 @@ export function createDefaultInvestmentPolicy(): InvestmentPolicy {
     riskPerTradePercent: 1,
     maxOpenPositions: 8,
     requireStopLoss: true,
+    maxConsecutiveLosses: 3,
+    monthlyLossLimitPercent: 6,
+    targetVolatilityPercent: 15,
     updatedAt: new Date().toISOString(),
   }
 }
@@ -925,6 +934,22 @@ export const DipLadderSchema = z.object({
 })
 export type DipLadder = z.infer<typeof DipLadderSchema>
 
+// A review written after a losing streak paused new trading positions; the
+// streak counts again from its date (blueprint 02 §5.5).
+export const PauseReviewSchema = z.object({
+  id: z.string(),
+  date: z.string(),
+  streak: z.number(),
+  checks: z.object({
+    followedStops: z.boolean(),
+    regimeChanged: z.boolean(),
+    strategyStillValid: z.boolean(),
+    sizeTooLarge: z.boolean(),
+  }),
+  notes: z.string(),
+})
+export type PauseReview = z.infer<typeof PauseReviewSchema>
+
 export function createDefaultDipLadder(): DipLadder {
   return {
     steps: [-10, -20, -30, -40].map((drawdownPercent) => ({ drawdownPercent, amountTwd: 0, executedAt: null })),
@@ -963,6 +988,7 @@ export const AppDataSchema = z.object({
   ruleVersions: z.array(RuleVersionSchema).default([]),
   regimeParams: RegimeParamsSchema.default(createDefaultRegimeParams),
   dipLadder: DipLadderSchema.default(createDefaultDipLadder),
+  pauseReviews: z.array(PauseReviewSchema).default([]),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -1021,5 +1047,6 @@ export function createDefaultAppData(): AppData {
     ruleVersions: [],
     regimeParams: createDefaultRegimeParams(),
     dipLadder: createDefaultDipLadder(),
+    pauseReviews: [],
   }
 }

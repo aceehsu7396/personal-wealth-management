@@ -3,6 +3,7 @@ import type { SignalReport } from '../research/signals'
 import { VERDICT_LABELS } from '../calculations/thesisScoring'
 import { buildPreTradeChecklist, riskLimitOf, type ChecklistContext, type PendingTrade } from '../calculations/preTradeChecklist'
 import { addMonths, lateStopExits } from '../calculations/disciplineScore'
+import { SATELLITE_ENTRIES } from '../calculations/tradingPause'
 import { atr, sma } from '../backtest/indicators'
 import { parseSymbol, resolveParams, STRATEGY_TEMPLATES } from '../backtest/templates'
 import type { Bar } from '../market/priceHistory'
@@ -68,8 +69,28 @@ export function manualPlan(policy: InvestmentPolicy): PlanDraft {
   return blank({ source: 'manual', ticker: '', rules: [`投資政策：每筆停損風險 ${policy.riskPerTradePercent}%（占交易部位）`] })
 }
 
-export function planFromThesis(thesis: StockThesis, report: SignalReport, policy: InvestmentPolicy, regime?: RegimeContext | null): PlanDraft {
-  return applyRegime(thesisDraft(thesis, report, policy), regime)
+export function planFromThesis(
+  thesis: StockThesis,
+  report: SignalReport,
+  policy: InvestmentPolicy,
+  regime?: RegimeContext | null,
+  sizing?: { annualVolPercent?: number | null; totalValueTwd: number },
+): PlanDraft {
+  const draft = thesisDraft(thesis, report, policy)
+  // The research card's size, unless target volatility asks for fewer.
+  if (sizing && draft.shares && draft.entryPrice) {
+    const vol = sizeOptions({ price: draft.entryPrice, totalValueTwd: sizing.totalValueTwd, policy, annualVolPercent: sizing.annualVolPercent }).options.find((o) => o.key === 'volatility')
+    if (vol?.shares != null && vol.shares < draft.shares) {
+      draft.shares = vol.shares
+      draft.rules = [...draft.rules, `部位大小：目標波動度 ${policy.targetVolatilityPercent}% 給 ${vol.shares} 股，少於研究卡建議`]
+    }
+  }
+  return applyRegime(draft, regime)
+}
+
+export const backtestOf = (runs: { strategyId?: string; stats: { full: { winRate: number | null; profitFactor: number | null }; outOfSample: { winRate: number | null; profitFactor: number | null } | null } }[], strategyId?: string) => {
+  const run = strategyId ? [...runs].reverse().find((r) => r.strategyId === strategyId) : undefined
+  return run ? (run.stats.outOfSample ?? run.stats.full) : null
 }
 
 function thesisDraft(thesis: StockThesis, report: SignalReport, policy: InvestmentPolicy): PlanDraft {
@@ -149,12 +170,81 @@ export function sharesByRisk(price: number, stop: number, totalValueTwd: number,
   return Math.floor(budget / (price - stop))
 }
 
+// --- Position size (blueprint 02 §5.3) ---------------------------------------
+
+export interface SizeOption {
+  key: 'risk' | 'volatility' | 'kelly'
+  label: string
+  shares: number | null
+  basis: string
+}
+
+export interface SizeInput {
+  price: number
+  stop?: number
+  totalValueTwd: number
+  policy: InvestmentPolicy
+  strategyRisk?: number
+  // Annualised volatility of the stock, in %.
+  annualVolPercent?: number | null
+  // The strategy card's latest backtest.
+  backtest?: { winRate: number | null; profitFactor: number | null } | null
+  multiplier?: number
+}
+
+export interface SizeResult {
+  options: SizeOption[]
+  chosen: SizeOption['key'] | null
+  // The smallest option × the regime multiplier, within the single-position cap.
+  shares: number | null
+  capShares: number
+}
+
+// Fixed risk, target volatility and quarter Kelly side by side; the most
+// conservative wins, then the regime multiplier and the single-position cap.
+export function sizeOptions(input: SizeInput): SizeResult {
+  const { price, stop, totalValueTwd, policy } = input
+  const sleeve = (totalValueTwd * policy.satellitePercent) / 100
+  const options: SizeOption[] = []
+  const risk = stop !== undefined ? sharesByRisk(price, stop, totalValueTwd, policy, input.strategyRisk) : undefined
+  options.push({ key: 'risk', label: '固定風險', shares: risk ?? null, basis: risk !== undefined ? `停損虧損 = 交易部位 × 每筆風險` : '沒有停損，無法計算' })
+
+  const vol = input.annualVolPercent
+  if (vol && vol > 0 && price > 0) {
+    const value = (sleeve * (policy.targetVolatilityPercent / vol)) / policy.maxOpenPositions
+    options.push({ key: 'volatility', label: '目標波動度', shares: Math.floor(value / price), basis: `交易部位 ×（目標 ${policy.targetVolatilityPercent}% ÷ 年化波動 ${vol.toFixed(0)}%）÷ ${policy.maxOpenPositions} 檔` })
+  } else options.push({ key: 'volatility', label: '目標波動度', shares: null, basis: '沒有價格歷史，無法計算波動' })
+
+  const p = input.backtest?.winRate
+  const pf = input.backtest?.profitFactor
+  if (p && pf && p > 0 && p < 1 && price > 0) {
+    const payoff = (pf * (1 - p)) / p
+    const kelly = Math.max(0, p - (1 - p) / payoff)
+    options.push({ key: 'kelly', label: '1/4 凱利', shares: Math.floor((sleeve * kelly) / 4 / price), basis: `回測勝率 ${(p * 100).toFixed(0)}%、盈虧比 ${payoff.toFixed(2)}，凱利值 ${(kelly * 100).toFixed(1)}% 取 1/4` })
+  } else options.push({ key: 'kelly', label: '1/4 凱利', shares: null, basis: '資料不足：需要策略卡的回測勝率與獲利因子' })
+
+  const capShares = price > 0 ? Math.floor((totalValueTwd * policy.maxSinglePositionPercent) / 100 / price) : 0
+  const usable = options.filter((o) => o.shares !== null)
+  if (usable.length === 0) return { options, chosen: null, shares: null, capShares }
+  const best = usable.reduce((a, b) => (b.shares! < a.shares! ? b : a))
+  const shares = Math.min(Math.floor(best.shares! * (input.multiplier ?? 1)), capShares)
+  return { options, chosen: best.key, shares, capShares }
+}
+
+// The smallest of the three sizing methods before the regime multiplier,
+// which applyRegime adds.
+function strategyShares(close: number, stop: number, totalValueTwd: number, policy: InvestmentPolicy, strategyRisk: number | undefined, sizing: { annualVolPercent?: number | null; backtest?: SizeInput['backtest'] } | undefined): number | undefined {
+  if (!sizing) return sharesByRisk(close, stop, totalValueTwd, policy, strategyRisk)
+  return sizeOptions({ price: close, stop, totalValueTwd, policy, strategyRisk, ...sizing }).shares ?? undefined
+}
+
 export function planFromStrategy(
   strategy: TradingStrategy,
   market: { close?: number; atr?: number },
   totalValueTwd: number,
   policy: InvestmentPolicy,
   regime?: RegimeContext | null,
+  sizing?: { annualVolPercent?: number | null; backtest?: SizeInput['backtest'] },
 ): PlanDraft {
   const def = STRATEGY_TEMPLATES[strategy.template]
   const { market: mkt, code } = parseSymbol(strategy.symbols[0] ?? '')
@@ -176,7 +266,7 @@ export function planFromStrategy(
     stopLoss: stop,
     stopMethod: stop ? 'atr' : 'manual',
     entryPrice: close,
-    shares: close && stop ? sharesByRisk(close, stop, totalValueTwd, policy, strategy.riskPerTradePercent) : undefined,
+    shares: close && stop ? strategyShares(close, stop, totalValueTwd, policy, strategy.riskPerTradePercent, sizing) : undefined,
     orderType: 'limit',
     orderNote: stop ? `隔日開盤限價買進；成交後設觸價停損 ${fmt(stop)}` : '隔日開盤限價買進；成交後設停損',
     trailing: k > 0 ? 'chandelier' : 'none',
@@ -366,6 +456,7 @@ export interface ScanItem {
 // before anything that adds risk.
 export const SCAN_PRIORITY = {
   stop_hit: 1,
+  pause: 2,
   thesis_exit: 2,
   regime_exit: 3,
   regime_change: 4,
@@ -411,7 +502,6 @@ export interface ExecutionStats {
   lateStops: number
 }
 
-const SATELLITE_ENTRIES: Trade['reason'][] = ['tranche_1', 'tranche_2', 'tranche_3', 'strategy_entry']
 
 export function slippageOf(trade: Pick<Trade, 'side' | 'price'>, plan: Pick<TradePlan, 'entryPrice'> | undefined): number | null {
   if (!plan?.entryPrice || trade.side !== 'buy') return null

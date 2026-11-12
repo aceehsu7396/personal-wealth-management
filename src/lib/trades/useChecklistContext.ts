@@ -1,6 +1,7 @@
 import { useAppStore } from '../storage/appStore'
 import { useJourney } from '../useJourney'
 import { useLatestMacro, useRegime } from '../market/useRegime'
+import { usePauseStatus } from './usePauseStatus'
 import type { ChecklistContext } from '../calculations/preTradeChecklist'
 
 // Everything the pre-trade checklist reads, shared by the trade log and the
@@ -13,6 +14,7 @@ export function useChecklistContext(): ChecklistContext {
   const meta = useAppStore((s) => s.portfolioMeta)
   const macro = useLatestMacro()
   const { ctx: regime } = useRegime()
+  const pause = usePauseStatus()
   const { policy, journey } = useJourney()
   return {
     holdings,
@@ -22,6 +24,7 @@ export function useChecklistContext(): ChecklistContext {
     meta,
     macro,
     regime,
+    pause,
     strategies,
     satelliteGate: {
       unlocked: journey.satelliteUnlocked,
