@@ -6,6 +6,8 @@ import { DecisionKindSchema, type Decision, type DecisionKind } from '../../lib/
 import { Field, inputClass } from '../forms/FormField'
 import { Badge, Card, DataTable, secondaryButton } from '../ui'
 import { DECISION_KIND_LABELS } from './labels'
+import { redTeamPrompt } from '../../lib/ai/prompts/agents'
+import { PromptPanel } from '../ai/PromptPanel'
 
 const addMonths = (iso: string, n: number) => {
   const d = new Date(`${iso}T00:00:00Z`)
@@ -159,6 +161,20 @@ export function DecisionJournal() {
                 <p className="text-xs text-gray-600 dark:text-gray-400">{d.judgment}</p>
                 {d.reviewedAt && <p className="mt-1 text-xs text-gray-700 dark:text-gray-300">結果：{d.outcome}{d.lesson ? `；心得：${d.lesson}` : ''}</p>}
                 {reviewing === d.id && <ReviewForm decision={d} onDone={() => setReviewing(null)} />}
+                {!d.reviewedAt && (
+                  <div className="mt-1">
+                    <PromptPanel
+                      label="AI 唱反調"
+                      build={() =>
+                        redTeamPrompt({
+                          kind: 'decision',
+                          title: d.title,
+                          lines: [`類型：${DECISION_KIND_LABELS[d.kind]}`, `判斷：${d.judgment}`, `理由：${d.reasons}`, `信心：${d.confidence}%`, `事前驗屍：${d.premortem}`, `檢討日：${d.reviewDate}`],
+                        })
+                      }
+                    />
+                  </div>
+                )}
               </div>
             ),
           },

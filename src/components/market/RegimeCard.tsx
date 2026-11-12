@@ -1,8 +1,10 @@
 import { Link } from 'react-router-dom'
 import { useRegime } from '../../lib/market/useRegime'
-import { ADD_ON_LABELS, REGIME_LABELS, REGIME_RULE_LIST, REGIME_TONE, REGIME_RULES, type Facet, type RegimeSegment } from '../../lib/market/regime'
+import { ADD_ON_LABELS, REGIME_LABELS, REGIME_RULE_LIST, REGIME_RULE_TEXT, REGIME_TONE, REGIME_RULES, type Facet, type RegimeSegment } from '../../lib/market/regime'
 import { ENTRY_METHOD_LABELS } from '../../lib/trades/tradePlan'
 import { FRED_NOTICE } from '../../lib/macro/macroData'
+import { regimePrompt } from '../../lib/ai/prompts/agents'
+import { PromptPanel } from '../ai/PromptPanel'
 import { Badge, Card, DataTable, Disclosure, textLink, type Tone } from '../ui'
 
 const signed = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`)
@@ -75,6 +77,27 @@ export function RegimeCard() {
               看局勢參數表
             </Link>
           </p>
+          <div className="mt-3">
+            <PromptPanel
+              label="AI 解讀局勢"
+              build={() =>
+                regimePrompt({
+                  regime: {
+                    label: ctx.label,
+                    since: ctx.since,
+                    pending: ctx.pending ? REGIME_LABELS[ctx.pending] : null,
+                    multiplier: ctx.multiplier,
+                    allowed: row.allowedEntries.length > 0 && ctx.multiplier > 0 ? row.allowedEntries.map((m) => ENTRY_METHOD_LABELS[m]).join('、') : '暫停新建倉',
+                    stopAtr: row.stopAtr,
+                    addOn: ADD_ON_LABELS[row.addOn],
+                  },
+                  rule: REGIME_RULE_TEXT[ctx.regime],
+                  facets,
+                  history: segments.slice(0, 6).map((s) => ({ label: REGIME_LABELS[s.regime], start: s.start, end: s.end, m3: s.after.m3 })),
+                })
+              }
+            />
+          </div>
         </div>
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">依據：各面向分數（−2 到 +2）</h3>

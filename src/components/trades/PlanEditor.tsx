@@ -9,11 +9,13 @@ import { useChecklistContext } from '../../lib/trades/useChecklistContext'
 import { backtestOf, planAdvice, sizeOptions } from '../../lib/trades/tradePlan'
 import { useAnnualVol } from '../../lib/useHoldingReturns'
 import { useEvents } from '../../lib/market/events'
+import { planPrompt, redTeamPrompt, type PlanInput } from '../../lib/ai/prompts/agents'
+import { PromptPanel } from '../ai/PromptPanel'
 import { tradeLink } from '../../lib/trades/tradeLink'
 import { todayIsoDate } from '../../lib/market/twse'
 import type { PlanAdvice, TradePlan } from '../../lib/storage/schema'
 import { inputClass, labelClass } from '../forms/FormField'
-import { AdviceList, Badge, Card, Disclosure, primaryButton, secondaryButton, textLink } from '../ui'
+import { ADVICE_LABELS, AdviceList, Badge, Card, Disclosure, primaryButton, secondaryButton, textLink } from '../ui'
 import { ENTRY_METHOD_LABELS, PLAN_STATUS, STOP_METHOD_LABELS, TRAILING_LABELS } from './planLabels'
 
 const fmt = (v: number | undefined) => (v === undefined ? '—' : v.toLocaleString('zh-TW', { maximumFractionDigits: 2 }))
@@ -122,6 +124,22 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
     shares: plan.shares,
   })
   const required = advice.filter((a) => a.level === 'required').length
+  const aiPlan: PlanInput['plan'] = {
+    ticker: plan.ticker,
+    name: plan.name,
+    status: PLAN_STATUS[plan.status].label,
+    method: ENTRY_METHOD_LABELS[plan.entryMethod],
+    setup: plan.setup,
+    trigger: plan.trigger,
+    confirmation: plan.confirmation,
+    entry: plan.fillPrice ?? plan.entryPrice,
+    stop: plan.stopLoss,
+    currentStop: plan.currentStop,
+    shares: plan.shares,
+    targets: plan.targets.map((t) => `${fmt(t.price)} 出 ${t.fraction >= 1 ? '全部' : `${Math.round(t.fraction * 100)}%`}`).join('、'),
+    exit: plan.thesisExit,
+    regime: plan.regimeSnapshot,
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
@@ -156,6 +174,34 @@ export function PlanEditor({ plan }: { plan: TradePlan }) {
             <Link to="/portfolio/plans" className={textLink}>
               回到清單
             </Link>
+          </div>
+          <div className="mt-4 space-y-2">
+            <PromptPanel
+              amounts
+              build={(includeAmounts) =>
+                planPrompt({
+                  plan: aiPlan,
+                  includeAmounts,
+                  advice: advice.map((a) => {
+                    const saved = savedFor(a)
+                    return { level: ADVICE_LABELS[a.level], text: a.text, basis: a.basis, decision: saved?.decision === 'accepted' ? '採納' : saved?.decision === 'declined' ? `不採納：${saved.reason}` : undefined }
+                  }),
+                  sizing: sizing ? [...sizing.options.map((o) => `${o.label}：${o.shares === null ? '無法計算' : `${o.shares} 股`}（${o.basis}）`), `採用：${sizing.shares ?? '—'} 股`] : [],
+                })
+              }
+            />
+            <PromptPanel
+              label="AI 唱反調"
+              amounts
+              build={(includeAmounts) =>
+                redTeamPrompt({
+                  kind: 'plan',
+                  includeAmounts,
+                  title: `${plan.ticker} ${plan.name}：${ENTRY_METHOD_LABELS[plan.entryMethod]}`,
+                  lines: [`設定：${plan.setup}`, `觸發：${plan.trigger}`, `確認：${plan.confirmation}`, `進場 ${fmt(aiPlan.entry)}、停損 ${fmt(plan.stopLoss)}、${fmt(plan.shares)} 股`, `出場：${plan.thesisExit}`, `局勢：${plan.regimeSnapshot ?? '—'}`],
+                })
+              }
+            />
           </div>
           {plan.rules.length > 0 && (
             <Disclosure summary={`依據的規則（${plan.rules.length}）`}>

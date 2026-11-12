@@ -56,6 +56,10 @@ jobs:
       - name: Fetch stock data
         run: npx tsx scripts/stocks-data.mts
         continue-on-error: true
+      # The market-wide part of the daily push notification.
+      - name: Build push brief
+        run: npx tsx scripts/brief-data.mts
+        continue-on-error: true
       # TWSE-wide P/E, one point per day on top of the published history.
       - name: Update valuation history
         run: npx tsx scripts/valuation-data.mts

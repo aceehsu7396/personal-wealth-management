@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 public/data/
+
+# Cloudflare Worker local files
+worker/.dev.vars
+worker/.wrangler/

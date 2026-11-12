@@ -13,6 +13,8 @@ import { adviceUptake, closedResults, groupR } from '../../lib/trades/rStats'
 import { todayIsoDate } from '../../lib/market/twse'
 import { useRegimeReview } from '../../lib/useRegimeReview'
 import { Card, secondaryButton } from '../ui'
+import { reviewerPrompt } from '../../lib/ai/prompts/agents'
+import { PromptPanel } from '../ai/PromptPanel'
 
 // The yearly review (blueprint 02 §6.4), copyable as Markdown.
 export function AnnualReport() {
@@ -113,6 +115,9 @@ export function AnnualReport() {
               <li key={l}>{l}</li>
             ))}
           </ul>
+        </section>
+        <section className="lg:col-span-2">
+          <PromptPanel label="AI 檢討員" amounts build={(includeAmounts) => reviewerPrompt({ markdown: report.markdown, includeAmounts })} />
         </section>
       </div>
     </Card>

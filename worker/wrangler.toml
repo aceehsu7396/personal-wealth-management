@@ -1,0 +1,21 @@
+# Cloudflare Worker for sync and push (stage 6). Deploy steps:
+# docs/backend-setup.md. Free plan: 100,000 requests/day, KV 1,000
+# writes/day, 5 cron triggers.
+name = "pfm-sync"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+
+[vars]
+SITE_ORIGIN = "https://aceehsu7396.github.io"
+VAPID_SUBJECT = "mailto:change-me@example.com"
+# Paste the public key printed by `node scripts/vapid.mjs`.
+VAPID_PUBLIC_KEY = ""
+
+# Fill in the id printed by `npx wrangler kv namespace create VAULT`.
+[[kv_namespaces]]
+binding = "VAULT"
+id = "REPLACE_WITH_KV_ID"
+
+# 15:30 Taipei (07:30 UTC), Monday to Friday, after the TWSE close.
+[triggers]
+crons = ["30 7 * * 1-5"]

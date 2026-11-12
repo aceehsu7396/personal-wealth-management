@@ -3,6 +3,8 @@ import { weightedReturns } from '../lib/calculations/attribution'
 import { adviceUptake, closedResults, groupR, MIN_GROUP, regimeOfPlan, type RGroup } from '../lib/trades/rStats'
 import { ENTRY_METHOD_LABELS, executionStats } from '../lib/trades/tradePlan'
 import { ADVICE_LABELS, Card, DataTable, StatTile } from './ui'
+import { coachPrompt } from '../lib/ai/prompts/agents'
+import { PromptPanel } from './ai/PromptPanel'
 
 const pct = (v: number | null | undefined, digits = 1) => (v === null || v === undefined ? '—' : `${(v * 100).toFixed(digits)}%`)
 const r2 = (v: number | null) => (v === null ? '—' : `${v >= 0 ? '+' : ''}${v.toFixed(2)}R`)
@@ -33,6 +35,7 @@ function RTable({ rows, title }: { rows: RGroup[]; title: string }) {
 // whether following the assistant paid (blueprint 02 §6.3, §3.8).
 export function ReturnsAndExecution() {
   const reviews = useAppStore((s) => s.performanceReviews)
+  const pauseReviews = useAppStore((s) => s.pauseReviews)
   const plans = useAppStore((s) => s.tradePlans)
   const trades = useAppStore((s) => s.trades)
   const w = weightedReturns(reviews)
@@ -90,6 +93,27 @@ export function ReturnsAndExecution() {
         <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">
           紀律要求全部採納的計畫單平均 {r2(uptake.followedR)}（{uptake.followedCount} 筆）；有不採納的平均 {r2(uptake.declinedR)}（{uptake.declinedCount} 筆）。
         </p>
+        <div className="mt-3">
+          <PromptPanel
+            label="AI 交易教練"
+            build={() =>
+              coachPrompt({
+                groups: [
+                  ...groupR(results, (p) => ENTRY_METHOD_LABELS[p.entryMethod]).map((g) => ({ ...g, by: '進場方法' })),
+                  ...groupR(results, regimeOfPlan).map((g) => ({ ...g, by: '局勢' })),
+                ],
+                execution: [
+                  `有計畫單的買進 ${exec.planned}／${exec.satelliteBuys} 筆`,
+                  `平均滑價 ${pct(exec.avgSlippage, 2)}`,
+                  `停損延遲 ${exec.lateStops} 次`,
+                  ...(['required', 'suggest', 'notice'] as const).map((l) => `${ADVICE_LABELS[l]}採納率：${uptake.byLevel[l].decided ? pct(uptake.byLevel[l].accepted / uptake.byLevel[l].decided, 0) : '—'}（${uptake.byLevel[l].decided} 條）`),
+                  `紀律要求全部採納的平均 ${r2(uptake.followedR)}（${uptake.followedCount} 筆）；有不採納的 ${r2(uptake.declinedR)}（${uptake.declinedCount} 筆）`,
+                ],
+                pauses: pauseReviews.map((r) => `${r.date} 連續 ${r.streak} 筆暫停並檢討：${r.notes}`),
+              })
+            }
+          />
+        </div>
       </Card>
     </div>
   )

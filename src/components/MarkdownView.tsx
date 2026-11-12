@@ -72,7 +72,7 @@ function makeComponents(resolveLink?: (href: string) => string | null): Componen
     const classes = first?.properties?.className
     if (Array.isArray(classes) && classes.includes('language-architecture-map')) return <ArchitectureMap />
     return (
-      <pre className="mt-4 overflow-x-auto rounded-md bg-gray-100 p-4 font-mono text-[13px] leading-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200 [&>code]:bg-transparent [&>code]:p-0">
+      <pre className="mt-4 overflow-x-auto rounded-md bg-gray-100 p-4 font-mono text-[13px] leading-6 text-gray-800 dark:bg-gray-900 dark:text-gray-200 [&>code]:bg-transparent [&>code]:p-0 [&>code]:text-[1em]">
         {children}
       </pre>
     )
