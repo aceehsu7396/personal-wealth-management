@@ -8,6 +8,7 @@ import { fetchDataset } from '../lib/research/finmind'
 import type { PriceRow } from '../lib/research/etfProfile'
 import { atr } from '../lib/backtest/indicators'
 import { parseSymbol } from '../lib/backtest/templates'
+import { useRegime } from '../lib/market/useRegime'
 import { manualPlan, planFromStrategy, planFromThesis, type PlanDraft } from '../lib/trades/tradePlan'
 import type { TradePlan } from '../lib/storage/schema'
 import { PlanEditor } from '../components/trades/PlanEditor'
@@ -74,6 +75,7 @@ export function TradePlansPage() {
   const meta = useAppStore((s) => s.portfolioMeta)
   const addTradePlan = useAppStore((s) => s.addTradePlan)
   const signalsFor = useSignals()
+  const { ctx: regime, loading: regimeLoading } = useRegime()
   const [creating, setCreating] = useState(false)
   const started = useRef(false)
 
@@ -82,7 +84,8 @@ export function TradePlansPage() {
   const planId = search.get('id')
 
   useEffect(() => {
-    if (started.current || (!thesisId && !strategyId)) return
+    // Drafts wait for the regime so their size carries its multiplier.
+    if (started.current || (!thesisId && !strategyId) || regimeLoading) return
     started.current = true
     const open = (id: string) => {
       void navigate(`/portfolio/plans?id=${id}`, { replace: true })
@@ -99,7 +102,7 @@ export function TradePlansPage() {
         return
       }
       const report = signalsFor(thesis, evaluateThesis(thesis, policy))
-      open(addTradePlan(planFromThesis(thesis, report, policy)))
+      open(addTradePlan(planFromThesis(thesis, report, policy, regime)))
       return
     }
     const strategy = strategies.find((s) => s.id === strategyId)
@@ -111,10 +114,10 @@ export function TradePlansPage() {
     const { market, code } = parseSymbol(strategy.symbols[0] ?? '')
     const total = analyzePortfolio(holdings, theses, policy, guardrails, meta).totalValueTwd
     void (market === 'TW' && code ? lastCloseAndAtr(code) : Promise.resolve({})).then((quote) => {
-      const draft: PlanDraft = planFromStrategy(strategy, quote, total, policy)
+      const draft: PlanDraft = planFromStrategy(strategy, quote, total, policy, regime)
       open(addTradePlan(draft))
     })
-  }, [thesisId, strategyId, plans, theses, strategies, holdings, policy, guardrails, meta, signalsFor, addTradePlan, navigate, setSearch])
+  }, [thesisId, strategyId, plans, theses, strategies, holdings, policy, guardrails, meta, signalsFor, addTradePlan, navigate, setSearch, regime, regimeLoading])
 
   const plan = planId ? plans.find((p) => p.id === planId) : undefined
   const newManual = () => {

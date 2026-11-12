@@ -10,6 +10,7 @@ import type {
   TradeSide,
 } from '../storage/schema'
 import type { MacroAssessment } from './macroRegime'
+import type { RegimeContext } from '../market/regime'
 import { analyzePortfolio, isSatellite } from './portfolioRisk'
 import { evaluateThesis } from './thesisScoring'
 import { isFund } from './fundRules'
@@ -48,6 +49,8 @@ export interface ChecklistContext {
   guardrails: AdviceGuardrails
   meta: PortfolioMeta
   macro: MacroAssessment | null
+  // Market regime and its signed parameter row; null while index data loads.
+  regime: RegimeContext | null
   strategies?: TradingStrategy[]
   // Action-roadmap gate for satellite buys; omitted means no gate.
   satelliteGate?: { unlocked: boolean; missingSteps: string[] }
@@ -207,11 +210,11 @@ export function buildPreTradeChecklist(
           !before.circuitBreakerActive,
         ),
         check(
-          'macro',
-          ctx.macro
-            ? `總經判斷允許衛星新建倉（目前：${ctx.macro.satelliteNewPositionsAllowed ? '允許' : '暫停'}）`
-            : '總經判斷允許衛星新建倉（尚無總經檢視，請先到「研究分析 → 市場」新增）',
-          ctx.macro?.satelliteNewPositionsAllowed ?? false,
+          'regime',
+          ctx.regime
+            ? `局勢參數允許衛星新建倉（目前：${ctx.regime.label}，部位倍數 ${ctx.regime.multiplier}${ctx.regime.macroHalved ? '，總經強烈逆風已減半' : ''}）`
+            : '局勢參數允許衛星新建倉（大盤資料還沒載入，無法判斷局勢）',
+          (ctx.regime?.multiplier ?? 0) > 0,
         ),
       )
       // Active funds skip the individual-stock checks (research card,

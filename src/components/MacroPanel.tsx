@@ -258,7 +258,7 @@ export function MacroPanel() {
               <div>
                 <dt className="font-medium text-gray-700 dark:text-gray-300">衛星新建倉</dt>
                 <dd className="text-gray-600 dark:text-gray-400">
-                  {assessment.satelliteNewPositionsAllowed ? '允許' : '暫停（交易前檢核會標示）'}
+                  {assessment.stance === 'strong_headwind' ? '局勢參數的部位倍數減半' : assessment.satelliteNewPositionsAllowed ? '依局勢參數' : '依局勢參數，建議縮小部位'}
                 </dd>
               </div>
               {latest.policyNote && (

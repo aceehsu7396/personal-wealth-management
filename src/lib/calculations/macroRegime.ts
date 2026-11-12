@@ -46,8 +46,8 @@ const STANCE_ACTIONS: Record<MacroStance, string> = {
   strong_tailwind: '新資金優先投入股票，衛星可正常建倉。',
   tailwind: '照常執行定期定額與建倉計畫。',
   neutral: '維持策略配置，不做方向性調整。',
-  headwind: '新資金優先補債券/現金，衛星暫停新建倉。',
-  strong_headwind: '股票傾斜至下限（不得低於股票配置下限），衛星暫停新建倉。',
+  headwind: '新資金優先補債券/現金；交易部位依局勢參數，建議縮小部位。',
+  strong_headwind: '股票傾斜至下限（不得低於股票配置下限）；局勢參數的部位倍數再減半。',
   panic_opportunity: '情緒極度恐慌：啟用閒置現金分 3 批進場，優先檢查觀察名單中進入強力買進區的標的。',
 }
 

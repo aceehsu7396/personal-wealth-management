@@ -15,7 +15,8 @@ import {
 import type { SignalReport } from '../research/signals'
 import type { ChecklistContext } from '../calculations/preTradeChecklist'
 import type { MacroAssessment } from '../calculations/macroRegime'
-import { createDefaultInvestmentPolicy, type StockThesis, type Trade, type TradePlan, type TradingStrategy } from '../storage/schema'
+import { rowOf, type RegimeContext } from '../market/regime'
+import { createDefaultInvestmentPolicy, createDefaultRegimeParams, type StockThesis, type Trade, type TradePlan, type TradingStrategy } from '../storage/schema'
 import type { Bar } from '../market/priceHistory'
 
 const policy = createDefaultInvestmentPolicy()
@@ -53,6 +54,24 @@ const report = (over: Partial<SignalReport> = {}): SignalReport => ({
   ...over,
 })
 
+const regimeOf = (regime: RegimeContext['regime'], over: Partial<RegimeContext> = {}): RegimeContext => {
+  const row = rowOf(createDefaultRegimeParams(), regime)
+  return {
+    regime,
+    label: regime,
+    since: '2026-10-01',
+    pending: null,
+    changedRecently: false,
+    row,
+    multiplier: row.sizeMultiplier,
+    macroHalved: false,
+    macroHeadwind: false,
+    coolingOff: false,
+    basis: `局勢參數：${regime}`,
+    ...over,
+  }
+}
+
 const ctx: ChecklistContext = {
   holdings: [],
   theses: [],
@@ -60,6 +79,7 @@ const ctx: ChecklistContext = {
   guardrails: { rebalancingBandPercent: 50, maxTiltPercent: 10, minEquityFloorPercent: 30, reviewCadenceMonths: 3 },
   meta: { fxUsdTwd: 30, peakValueTwd: 0, peakDate: null },
   macro: { satelliteNewPositionsAllowed: true } as MacroAssessment,
+  regime: regimeOf('bull'),
 }
 
 const bar = (date: string, close: number, high = close, low = close): Bar => ({ date, open: close, high, low, close, volume: 1 })
@@ -112,6 +132,33 @@ describe('drafts', () => {
     const plan = planFromStrategy(strategy, { close: 1000, atr: 30 }, 10_000_000, policy)
     expect(plan).toMatchObject({ source: 'strategy', ticker: '2330', entryMethod: 'breakout', stopLoss: 910, trailing: 'chandelier', trailingParam: 3 })
     expect(plan.shares).toBe(sharesByRisk(1000, 910, 10_000_000, policy, 1))
+  })
+})
+
+describe('regime parameters', () => {
+  it('scales a draft by the regime and records the snapshot', () => {
+    const plan = planFromThesis(thesis, report(), policy, regimeOf('correction'))
+    expect(plan.shares).toBe(86)
+    expect(plan.regimeMultiplier).toBe(0.5)
+    expect(plan.rules.at(-1)).toContain('局勢參數')
+  })
+
+  it('uses the row stop width for a strategy draft', () => {
+    const strategy = { id: 's', name: '均線', template: 'ma_cross', params: { atrStop: 3 }, symbols: ['TW:2330'], entryRules: '', exitRules: '', riskPerTradePercent: 1 } as unknown as TradingStrategy
+    const plan = planFromStrategy(strategy, { close: 1000, atr: 30 }, 10_000_000, policy, regimeOf('overheated'))
+    expect(plan.stopLoss).toBe(940)
+    expect(plan.trailingParam).toBe(2)
+  })
+
+  it('requires an allowed entry method and a size within the regime cap', () => {
+    const required = (r: RegimeContext, shares = 86) =>
+      planAdvice({ ...planFromThesis(thesis, report(), policy), shares }, { ctx: { ...ctx, regime: r }, report: report(), today: '2026-11-12' })
+        .filter((a) => a.level === 'required')
+        .map((a) => a.text)
+    expect(required(regimeOf('range')).some((t) => t.includes('不允許'))).toBe(true)
+    expect(required(regimeOf('correction'), 173).some((t) => t.includes('超過局勢上限 86'))).toBe(true)
+    expect(required(regimeOf('correction')).filter((t) => /局勢|不允許|暫停/.test(t))).toEqual([])
+    expect(required(regimeOf('crash')).some((t) => t.includes('暫停新建倉'))).toBe(true)
   })
 })
 
@@ -169,7 +216,7 @@ describe('open positions', () => {
     const plan = openPlan({ trailing: 'none' })
     const items = positionScanItems(plan, positionStatus(plan, [bar('2026-10-31', 880)])!)
     const all = sortScan([scanItem('buy_zone', '買點', '研究卡', '/'), ...items, scanItem('review_due', '檢討', '日誌', '/')])
-    expect(all.map((i) => i.priority)).toEqual([1, 6, 7])
+    expect(all.map((i) => i.priority)).toEqual([1, 8, 9])
     expect(all[0].level).toBe('required')
     expect(all[1].level).toBe('suggest')
     expect(all[2].level).toBe('notice')

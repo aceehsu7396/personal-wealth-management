@@ -17,6 +17,7 @@ import { atr } from '../src/lib/backtest/indicators.ts'
 import { placeOrder, updatePrices } from '../src/lib/paper/paperAccount.ts'
 import { buildPreTradeChecklist, type PendingTrade } from '../src/lib/calculations/preTradeChecklist.ts'
 import { assessMacro } from '../src/lib/calculations/macroRegime.ts'
+import { regimeContext, regimeHistory } from '../src/lib/market/regime.ts'
 
 const OUT = 'src/lib/demo/demo-data.json'
 const END = '2026-10-30'
@@ -60,6 +61,8 @@ const round = (v: number, d = 2) => Math.round(v * 10 ** d) / 10 ** d
 const iso = (date: string, h = '06:00:00') => `${date}T${h}.000Z`
 
 const stock = await series(STOCK)
+// The TAIEX for the regime each trade was checked against.
+const taiex = (await requestDataset<{ date: string; close: number }>('TaiwanStockPrice', 'TAIEX', '2021-01-01')).map((r) => ({ date: r.date, close: r.close }))
 const core = Object.fromEntries(await Promise.all(CORE.map(async (c) => [c.code, await series(c.code)] as const)))
 const flows = await loadChipFlows(STOCK, '2013-06-01')
 const chips: Record<string, ChipSeries> = { [SYMBOL]: Object.fromEntries(flows.map(([d, f]) => [d, f])) }
@@ -280,6 +283,7 @@ function record(date: string, pendingIn: PendingTrade, emotion: number, biasNote
     guardrails: data.guardrails,
     meta: data.portfolioMeta,
     macro: macroAt(date),
+    regime: regimeContext(regimeHistory(taiex.filter((p) => p.date <= date)), data.regimeParams, macroAt(date), date),
     strategies: data.tradingStrategies,
   }
   const checklist = buildPreTradeChecklist(pending, ctx, manualFor(pending, ctx))

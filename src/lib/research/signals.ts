@@ -290,7 +290,10 @@ function decideStock(input: SignalInput, price: number, t: TechnicalSnapshot | n
   const reasons: string[] = []
   const trendDown = !!t && t.sma120 !== null && t.close < t.sma120 && (t.sma20 ?? t.close) < t.sma120
   const breakingDown = !!t && t.low20 !== null && t.close < t.low20
-  const macroBlocks = macro !== null && !macro.satelliteNewPositionsAllowed
+  // A macro headwind no longer blocks a buy by itself (stage 2): the regime
+  // parameters decide whether new positions are allowed; this only advises.
+  const headwind = macro !== null && !macro.satelliteNewPositionsAllowed
+  const HEADWIND_NOTE = '總經逆風：建議縮小部位或只買第 1 批；能不能建倉由局勢參數決定'
 
   if (price <= 0 || buy <= 0 || bull <= 0) {
     return { action: 'wait' as const, headline: '缺少現價或合理價，先完成自動體檢', reasons }
@@ -311,7 +314,7 @@ function decideStock(input: SignalInput, price: number, t: TechnicalSnapshot | n
     if (t && t.sma200 !== null && t.close < t.sma200 && t.cross === 'death') reasons.push('跌破 200 日線且出現死亡交叉')
     if (reasons.length > 0) return { action: 'review' as const, headline: '持股出現警訊，重新檢查投資理由', reasons }
     if (price <= buy && holding.weightPercent < evaluation.positionCapPercent) {
-      if (macroBlocks) return { action: 'hold' as const, headline: '價位可加碼，但總經逆風，暫停加碼', reasons }
+      if (headwind) reasons.push(HEADWIND_NOTE)
       return {
         action: 'add' as const,
         headline: `現價在第 1 批價位 ${round2(buy)} 以下，部位 ${holding.weightPercent.toFixed(1)}% 未達上限 ${evaluation.positionCapPercent}%，可加碼下一批`,
@@ -333,9 +336,7 @@ function decideStock(input: SignalInput, price: number, t: TechnicalSnapshot | n
       ? { action: 'wait' as const, headline: '已進入買進區；結論改為「值得投資」即可分批進場', reasons }
       : { action: 'wait' as const, headline: `結論為觀察，離第 1 批價位還差 ${Math.abs(gap(price, buy)).toFixed(1)}%`, reasons }
   }
-  if (macroBlocks && price <= bull) {
-    return { action: 'wait' as const, headline: '總經逆風，交易部位暫停新建倉', reasons: inBuyZone ? ['價位已在買進區，等總經轉為中性以上'] : [] }
-  }
+  if (headwind && inBuyZone) reasons.push(HEADWIND_NOTE)
   if (price <= bear) {
     return { action: 'buy' as const, headline: `跌破第 3 批價位 ${round2(bear)}，進入強力買進區，可加速完成三批`, reasons }
   }

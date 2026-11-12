@@ -1,16 +1,7 @@
 import type { TradePlan } from '../../lib/storage/schema'
 import type { Tone } from '../ui'
 
-export const ENTRY_METHOD_LABELS: Record<TradePlan['entryMethod'], string> = {
-  value_batches: '價值區間分批',
-  breakout: '突破',
-  pullback: '拉回',
-  mean_reversion: '均值回歸',
-  momentum: '動能輪動',
-  event: '事件與財報',
-  dca: '定期定額',
-  other: '其他',
-}
+export { ENTRY_METHOD_LABELS } from '../../lib/trades/tradePlan'
 
 export const STOP_METHOD_LABELS: Record<TradePlan['stopMethod'], string> = {
   structure: '結構（前低、支撐）',

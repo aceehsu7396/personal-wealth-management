@@ -7,6 +7,7 @@ import {
   type PendingTrade,
 } from './preTradeChecklist'
 import type { MacroAssessment } from './macroRegime'
+import type { RegimeContext } from '../market/regime'
 import {
   createDefaultInvestmentPolicy,
   type Holding,
@@ -91,6 +92,8 @@ const core: Holding = {
 
 const allowingMacro = { satelliteNewPositionsAllowed: true } as MacroAssessment
 
+const allowingRegime = { label: '多頭延續', multiplier: 1, macroHalved: false } as RegimeContext
+
 function ctx(overrides: Partial<ChecklistContext> = {}): ChecklistContext {
   return {
     holdings: [core],
@@ -99,6 +102,7 @@ function ctx(overrides: Partial<ChecklistContext> = {}): ChecklistContext {
     guardrails: { rebalancingBandPercent: 50, maxTiltPercent: 10, minEquityFloorPercent: 30, reviewCadenceMonths: 3 },
     meta: { fxUsdTwd: 30, peakValueTwd: 0, peakDate: null },
     macro: allowingMacro,
+    regime: allowingRegime,
     ...overrides,
   }
 }
@@ -146,11 +150,11 @@ describe('buildPreTradeChecklist', () => {
     expect(items.find((i) => i.key === 'thesis.price')?.passed).toBe(false)
   })
 
-  it('blocks satellite buys when macro is a headwind or missing', () => {
-    const blocked = buildPreTradeChecklist(buy, ctx({ macro: { satelliteNewPositionsAllowed: false } as MacroAssessment }), {})
-    expect(blocked.find((i) => i.key === 'macro')?.passed).toBe(false)
-    const missing = buildPreTradeChecklist(buy, ctx({ macro: null }), {})
-    expect(missing.find((i) => i.key === 'macro')?.passed).toBe(false)
+  it('blocks satellite buys when the regime pauses new positions or is unknown', () => {
+    const paused = buildPreTradeChecklist(buy, ctx({ regime: { label: '崩跌與流動性危機', multiplier: 0, macroHalved: false } as RegimeContext }), {})
+    expect(paused.find((i) => i.key === 'regime')?.passed).toBe(false)
+    const missing = buildPreTradeChecklist(buy, ctx({ regime: null }), {})
+    expect(missing.find((i) => i.key === 'regime')?.passed).toBe(false)
   })
 
   it('flags satellite buys before the action roadmap is unlocked', () => {
@@ -183,7 +187,7 @@ describe('buildPreTradeChecklist', () => {
       {},
     )
     const keys = items.map((i) => i.key)
-    expect(keys).toEqual(expect.arrayContaining(['journeyUnlocked', 'satelliteCap', 'macro', 'bias']))
+    expect(keys).toEqual(expect.arrayContaining(['journeyUnlocked', 'satelliteCap', 'regime', 'bias']))
     expect(keys.some((k) => k === 'thesisLinked' || k.startsWith('thesis.') || k === 'positionCap' || k === 'sectorCap')).toBe(false)
     expect(items.filter((i) => !i.passed)).toEqual([])
   })

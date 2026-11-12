@@ -56,18 +56,18 @@ function IndexTile({ k, t, selected, onSelect }: { k: IndexKey; t: IndexTrend; s
       aria-pressed={selected}
       className={`rounded-md border p-3 text-left transition-colors ${
         selected
-          ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30'
+          ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-gray-900'
           : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/40'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-gray-500 dark:text-gray-400">{indexDef(k).name}</span>
+        <span className="text-xs text-gray-600 dark:text-gray-400">{indexDef(k).name}</span>
         {stateBadge(k, t)}
       </div>
       <p className="mt-1 text-lg font-semibold text-gray-900 dark:text-gray-100">{num.format(t.close)}</p>
       <p className="text-xs">
         <span className={changeClass(t.changePct)}>{signedPct(t.changePct)}</span>
-        {k !== 'VIX' && <span className="ml-2 text-gray-500 dark:text-gray-400">距高點 {signedPct(t.drawdown)}</span>}
+        {k !== 'VIX' && <span className="ml-2 text-gray-600 dark:text-gray-400">距高點 {signedPct(t.drawdown)}</span>}
       </p>
       {flags.length > 0 && (
         <div className="mt-1 flex flex-wrap gap-1">
@@ -90,12 +90,12 @@ function FuturesTile({ r, selected, onSelect }: { r: NightReading; selected: boo
       aria-pressed={selected}
       className={`rounded-md border p-3 text-left transition-colors ${
         selected
-          ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-indigo-900/30'
+          ? 'border-indigo-500 bg-indigo-50 dark:border-indigo-400 dark:bg-gray-900'
           : 'border-gray-200 hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-700/40'
       }`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-gray-500 dark:text-gray-400">{FUTURES_NAME}夜盤</span>
+        <span className="text-xs text-gray-600 dark:text-gray-400">{FUTURES_NAME}夜盤</span>
         <Badge tone="info" title={`${r.span}，近月 ${r.bar.contract}`}>
           {r.bar.date.slice(5)}
         </Badge>
@@ -104,7 +104,7 @@ function FuturesTile({ r, selected, onSelect }: { r: NightReading; selected: boo
       <p className="text-xs">
         <span className={changeClass(r.changePct)}>{signedPct(Math.round(r.changePct * 100) / 100)}</span>
         {r.vsSpot !== null && (
-          <span className="ml-2 text-gray-500 dark:text-gray-400">
+          <span className="ml-2 text-gray-600 dark:text-gray-400">
             較現貨 {r.vsSpot >= 0 ? '+' : '−'}
             {num.format(Math.round(Math.abs(r.vsSpot)))}
           </span>
@@ -129,7 +129,7 @@ function MarketColumn({ market, m, selected, onSelect }: { market: IndexMarket; 
     <div className="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
       <div className="flex items-baseline justify-between">
         <h3 className="font-semibold text-gray-900 dark:text-gray-100">{market === 'TW' ? '台股' : '美股'}</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">最新交易日 {m.trends[MARKET_KEYS[market][0]]?.date ?? '—'}</span>
+        <span className="text-xs text-gray-600 dark:text-gray-400">最新交易日 {m.trends[MARKET_KEYS[market][0]]?.date ?? '—'}</span>
       </div>
       <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
         {lines.map((l) => (
@@ -161,10 +161,10 @@ function FlowsTable({ m }: { m: DailyMarket }) {
     <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
       <div>
         <p className="font-medium text-gray-800 dark:text-gray-200">
-          台股三大法人買賣超 <span className="text-xs font-normal text-gray-500">（至 {data.flows.at(-1)?.date ?? '—'}）</span>
+          台股三大法人買賣超 <span className="text-xs font-normal text-gray-600 dark:text-gray-400">（至 {data.flows.at(-1)?.date ?? '—'}）</span>
         </p>
         <table className="mt-1 w-full text-right text-gray-700 dark:text-gray-300">
-          <thead className="text-xs text-gray-500 dark:text-gray-400">
+          <thead className="text-xs text-gray-600 dark:text-gray-400">
             <tr>
               <th className="py-1 text-left font-medium"></th>
               <th className="py-1 font-medium">近 5 日</th>
@@ -215,7 +215,7 @@ function SourcesTable({ m }: { m: DailyMarket }) {
       </summary>
       <div className="mt-2 overflow-x-auto">
         <table className="w-full text-left text-xs text-gray-700 dark:text-gray-300">
-          <thead className="text-gray-500 dark:text-gray-400">
+          <thead className="text-gray-600 dark:text-gray-400">
             <tr>
               <th className="py-1 pr-3 font-medium">指數</th>
               <th className="py-1 pr-3 font-medium">資料日期</th>
@@ -250,7 +250,7 @@ function SourcesTable({ m }: { m: DailyMarket }) {
             </tr>
           </tbody>
         </table>
-        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
           每天由 GitHub 自動抓取並與官方來源比對（台股 14:30；美股與台指期夜盤在收盤後的 07:00），差異超過 0.5% 時改用官方數字。網頁開啟時若有更新的收盤，會再向 FinMind 補抓。全部是免費公開資料，不需要金鑰。
         </p>
         {data.errors.length > 0 && (
@@ -287,7 +287,7 @@ export function DailyMarketPanel() {
           </button>
         </div>
       </div>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+      <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
         依固定規則判讀趨勢與風險，不預測漲跌。核心部位不因每日走勢調整；交易部位參考 200 日線。
       </p>
 

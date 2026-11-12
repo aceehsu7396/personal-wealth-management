@@ -836,6 +836,8 @@ export const TradePlanSchema = z.object({
   currentStop: z.number().optional(),
   rules: z.array(z.string()).default([]),
   regimeSnapshot: z.string().optional(),
+  // The regime's size multiplier when the plan was drafted (stage 2).
+  regimeMultiplier: z.number().optional(),
   advice: z.array(PlanAdviceSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -848,12 +850,88 @@ export type TradePlan = z.infer<typeof TradePlanSchema>
 // parameter table later): what it was, when, and why it changed.
 export const RuleVersionSchema = z.object({
   id: z.string(),
-  kind: z.enum(['policy', 'regime_params']),
+  kind: z.enum(['policy', 'regime_params', 'dip_ladder']),
   at: z.string(),
   reason: z.string(),
   snapshot: z.record(z.string(), z.unknown()),
 })
 export type RuleVersion = z.infer<typeof RuleVersionSchema>
+
+// Market regimes (01 §C6) and the signed table of what each one allows
+// (blueprint 02 §3.9). Parameters can only make trading more conservative.
+export const RegimeKeySchema = z.enum(['bull', 'overheated', 'correction', 'bear', 'crash', 'rebound', 'range'])
+export type RegimeKey = z.infer<typeof RegimeKeySchema>
+export const AddOnRuleSchema = z.enum(['allowed', 'scheduled', 'none'])
+export type AddOnRule = z.infer<typeof AddOnRuleSchema>
+
+export const RegimeParamRowSchema = z.object({
+  regime: RegimeKeySchema,
+  allowedEntries: z.array(EntryMethodSchema),
+  sizeMultiplier: z.number().min(0).max(1),
+  stopAtr: z.number().min(0.5).max(4),
+  addOn: AddOnRuleSchema,
+  takeProfit: z.string(),
+  core: z.string(),
+})
+export type RegimeParamRow = z.infer<typeof RegimeParamRowSchema>
+
+export const RegimeParamsSchema = z.object({
+  rows: z.array(RegimeParamRowSchema),
+  signedAt: z.string().nullable(),
+  updatedAt: z.string(),
+})
+export type RegimeParams = z.infer<typeof RegimeParamsSchema>
+
+const ALL_ENTRIES: EntryMethod[] = ['value_batches', 'breakout', 'pullback', 'mean_reversion', 'momentum', 'event', 'dca', 'other']
+
+// The example values of 01 §C6, until the trader signs their own.
+export function createDefaultRegimeParams(): RegimeParams {
+  const row = (regime: RegimeKey, allowedEntries: EntryMethod[], sizeMultiplier: number, stopAtr: number, addOn: AddOnRule, takeProfit: string, core: string): RegimeParamRow => ({
+    regime,
+    allowedEntries,
+    sizeMultiplier,
+    stopAtr,
+    addOn,
+    takeProfit,
+    core,
+  })
+  return {
+    rows: [
+      row('bull', ALL_ENTRIES, 1, 2.5, 'allowed', '移動停損為主，讓獲利奔跑', '照定期定額'),
+      row('overheated', ['breakout', 'pullback', 'dca'], 0.75, 2, 'none', '到 2R 先出一半', '觸及再平衡區間就賣出超標部分'),
+      row('correction', ['value_batches', 'mean_reversion', 'dca'], 0.5, 2.5, 'scheduled', '估值出場', '照常；可依逢低階梯投入'),
+      row('bear', ['value_batches', 'dca'], 0.25, 2.5, 'none', '估值出場', '依再平衡規則買進股票'),
+      row('crash', [], 0, 2.5, 'none', '優先確認保證金與生活費緩衝', '不動'),
+      row('rebound', ['breakout', 'value_batches', 'dca'], 0.5, 2.5, 'allowed', '移動停損', '照常'),
+      row('range', ['pullback', 'mean_reversion', 'dca'], 0.75, 2.5, 'none', '區間上緣先出', '照常'),
+    ],
+    signedAt: null,
+    updatedAt: new Date(0).toISOString(),
+  }
+}
+
+// Reserve cash to put in when the TAIEX falls from its high (blueprint
+// 02 §4.2). A step counts as done only after the last new high.
+export const DipLadderSchema = z.object({
+  steps: z.array(
+    z.object({
+      drawdownPercent: z.number().max(0),
+      amountTwd: z.number().min(0),
+      executedAt: z.string().nullable(),
+    }),
+  ),
+  signedAt: z.string().nullable(),
+  updatedAt: z.string(),
+})
+export type DipLadder = z.infer<typeof DipLadderSchema>
+
+export function createDefaultDipLadder(): DipLadder {
+  return {
+    steps: [-10, -20, -30, -40].map((drawdownPercent) => ({ drawdownPercent, amountTwd: 0, executedAt: null })),
+    signedAt: null,
+    updatedAt: new Date(0).toISOString(),
+  }
+}
 
 export const AppDataSchema = z.object({
   schemaVersion: z.number(),
@@ -883,6 +961,8 @@ export const AppDataSchema = z.object({
   ideaNotes: z.array(IdeaNoteSchema).default([]),
   tradePlans: z.array(TradePlanSchema).default([]),
   ruleVersions: z.array(RuleVersionSchema).default([]),
+  regimeParams: RegimeParamsSchema.default(createDefaultRegimeParams),
+  dipLadder: DipLadderSchema.default(createDefaultDipLadder),
 })
 export type AppData = z.infer<typeof AppDataSchema>
 
@@ -939,5 +1019,7 @@ export function createDefaultAppData(): AppData {
     ideaNotes: [],
     tradePlans: [],
     ruleVersions: [],
+    regimeParams: createDefaultRegimeParams(),
+    dipLadder: createDefaultDipLadder(),
   }
 }

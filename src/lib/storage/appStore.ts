@@ -32,6 +32,8 @@ import {
   type IdeaNote,
   type TradePlan,
   type RuleVersion,
+  type RegimeParamRow,
+  type DipLadder,
 } from './schema'
 
 // Keep localStorage bounded: only the most recent reports are stored.
@@ -179,6 +181,10 @@ interface AppStore extends AppData {
   removeTradePlan: (id: string) => void
   // Keeps the latest copy of a rule set each time it is signed or changed.
   addRuleVersion: (entry: Omit<RuleVersion, 'id' | 'at'>) => void
+  // Signing replaces the table and records a version with the reason.
+  signRegimeParams: (rows: RegimeParamRow[], reason: string) => void
+  signDipLadder: (steps: DipLadder['steps'], reason: string) => void
+  markDipStep: (drawdownPercent: number, executedAt: string | null) => void
   mergeMarketPriceHistory: (
     taiex: DailyClose[],
     tw0050: DailyClose[],
@@ -217,6 +223,8 @@ function toAppData(state: AppData): AppData {
     ideaNotes: state.ideaNotes,
     tradePlans: state.tradePlans,
     ruleVersions: state.ruleVersions,
+    regimeParams: state.regimeParams,
+    dipLadder: state.dipLadder,
   }
 }
 
@@ -570,6 +578,30 @@ export const useAppStore = create<AppStore>()(
       addRuleVersion: (entry) =>
         set((state) => ({
           ruleVersions: [...state.ruleVersions, { ...entry, id: crypto.randomUUID(), at: new Date().toISOString() }],
+        })),
+
+      signRegimeParams: (rows, reason) => {
+        const now = new Date().toISOString()
+        set((state) => ({
+          regimeParams: { rows, signedAt: now, updatedAt: now },
+          ruleVersions: [...state.ruleVersions, { id: crypto.randomUUID(), at: now, kind: 'regime_params', reason, snapshot: { rows } }],
+        }))
+      },
+
+      signDipLadder: (steps, reason) => {
+        const now = new Date().toISOString()
+        set((state) => ({
+          dipLadder: { steps, signedAt: now, updatedAt: now },
+          ruleVersions: [...state.ruleVersions, { id: crypto.randomUUID(), at: now, kind: 'dip_ladder', reason, snapshot: { steps } }],
+        }))
+      },
+
+      markDipStep: (drawdownPercent, executedAt) =>
+        set((state) => ({
+          dipLadder: {
+            ...state.dipLadder,
+            steps: state.dipLadder.steps.map((s) => (s.drawdownPercent === drawdownPercent ? { ...s, executedAt } : s)),
+          },
         })),
 
       removePaperAccount: (id) =>

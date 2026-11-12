@@ -15,6 +15,9 @@ import { formatCurrency, formatDate, formatYearsToFire } from '../lib/format'
 import { useTraderReadiness } from '../lib/useTraderReadiness'
 import { ReadinessChecklist } from '../components/ReadinessChecklist'
 import { EmergencyFundForm } from '../components/forms/EmergencyFundForm'
+import { RegimeParamsCard } from '../components/goals/RegimeParamsCard'
+import { DipLadderCard } from '../components/goals/DipLadderCard'
+import { PageHeader, primaryButton, secondaryButton } from '../components/ui'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -44,22 +47,33 @@ export function GoalsPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">目標與政策</h1>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        目標是財務獨立，全職經營自有資產：生活費來自資產提領，不靠交易收入。先算出全職門檻與所需報酬，再把目標、風險與配置寫成投資政策並簽署。完整說明見手冊{' '}
-        <Link to="/handbook/01" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          01 第一步
-        </Link>{' '}
-        與{' '}
-        <Link to="/handbook/02" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          02 投資政策聲明
-        </Link>
-        、
-        <Link to="/handbook/11" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          11 財務獨立與全職經營
-        </Link>
-        。
-      </p>
+      <PageHeader
+        title="目標與政策"
+        summary={
+          <>
+            目標是財務獨立，全職經營自有資產：生活費來自資產提領，不靠交易收入。先算出全職門檻與所需報酬，再把目標、風險、配置與局勢參數寫下並簽署。說明見手冊{' '}
+            <Link to="/handbook/01" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              01 第一步
+            </Link>
+            、
+            <Link to="/handbook/02" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              02 投資政策聲明
+            </Link>
+            、
+            <Link to="/handbook/11" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              11 財務獨立與全職經營
+            </Link>
+            。
+          </>
+        }
+        action={
+          policy.signedAt ? undefined : (
+            <button type="button" className={primaryButton} onClick={() => document.getElementById('policy-sign')?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+              前往簽署投資政策
+            </button>
+          )
+        }
+      />
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -148,7 +162,7 @@ export function GoalsPage() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           投資政策參數
         </h2>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
           修改後自動儲存。這些參數會套用在策略卡、研究卡、投資組合風控與交易前檢核；每筆交易都必須設停損（策略進場）。
         </p>
         <div className="mt-4">
@@ -156,7 +170,7 @@ export function GoalsPage() {
         </div>
       </div>
 
-      <div className={cardClass}>
+      <div id="policy-sign" className={cardClass}>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
           簽署投資政策聲明
         </h2>
@@ -172,7 +186,7 @@ export function GoalsPage() {
               // Each signing keeps a copy, so later changes can be traced.
               addRuleVersion({ kind: 'policy', reason: policy.signedAt ? '年度檢討後重新簽署' : '第一次簽署', snapshot: { ...policy, signedAt } })
             }}
-            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            className={secondaryButton}
           >
             {policy.signedAt ? '重新簽署（年度檢討後）' : '我已確認，簽署投資政策聲明'}
           </button>
@@ -181,6 +195,9 @@ export function GoalsPage() {
           )}
         </div>
       </div>
+
+      <RegimeParamsCard />
+      <DipLadderCard />
 
       <p className="mt-8 text-sm text-gray-600 dark:text-gray-400">
         策略原則見手冊{' '}

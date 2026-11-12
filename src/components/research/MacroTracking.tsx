@@ -132,12 +132,12 @@ function Timeline({
                         >
                           確定刪除
                         </button>
-                        <button type="button" onClick={() => setPendingDelete(null)} className="text-xs text-gray-500 hover:underline">
+                        <button type="button" onClick={() => setPendingDelete(null)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
                           取消
                         </button>
                       </>
                     ) : (
-                      <button type="button" onClick={() => setPendingDelete(r.checkIn.id)} className="text-xs text-gray-500 hover:underline">
+                      <button type="button" onClick={() => setPendingDelete(r.checkIn.id)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
                         刪除
                       </button>
                     )}

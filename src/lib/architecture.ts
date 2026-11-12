@@ -176,7 +176,7 @@ export const ARCH_EDGES: ArchEdge[] = [
   { from: 'ips', to: 'risk', label: '部位／產業／美元上限、回撤熔斷', kind: 'flow' },
   { from: 'macro', to: 'core', label: '股債比例傾斜（有上限）', kind: 'flow' },
   { from: 'macro', to: 'research', label: '本月順逆風訊號', kind: 'flow' },
-  { from: 'macro', to: 'checklist', label: '逆風時交易部位暫停新建倉', kind: 'gate' },
+  { from: 'macro', to: 'checklist', label: '經局勢參數決定部位倍數；強烈逆風減半', kind: 'gate' },
   { from: 'strategy', to: 'backtest', label: '範本、參數、標的', kind: 'flow' },
   { from: 'backtest', to: 'paper', label: '樣本外勝過買進持有（報酬或風險調整後）才進虛擬交易', kind: 'gate' },
   { from: 'paper', to: 'checklist', label: '虛擬交易 3 個月、10 筆才解鎖實單', kind: 'gate' },

@@ -6,6 +6,7 @@ import { addMonths, lateStopExits } from '../calculations/disciplineScore'
 import { atr, sma } from '../backtest/indicators'
 import { parseSymbol, resolveParams, STRATEGY_TEMPLATES } from '../backtest/templates'
 import type { Bar } from '../market/priceHistory'
+import { ADD_ON_LABELS, allows, type RegimeContext } from '../market/regime'
 
 // The entry-exit assistant's rule layer (blueprint 02 §3): drafts a trade
 // plan from a research card or a strategy card, checks it against the
@@ -37,14 +38,41 @@ const blank = (over: Partial<PlanDraft> & Pick<PlanDraft, 'source' | 'ticker'>):
   ...over,
 })
 
+export const ENTRY_METHOD_LABELS: Record<TradePlan['entryMethod'], string> = {
+  value_batches: '價值區間分批',
+  breakout: '突破',
+  pullback: '拉回',
+  mean_reversion: '均值回歸',
+  momentum: '動能輪動',
+  event: '事件與財報',
+  dca: '定期定額',
+  other: '其他',
+}
 // --- Drafts ------------------------------------------------------------------
+
+// The regime's multiplier on a draft's size, with the rule it rests on.
+function applyRegime(draft: PlanDraft, regime: RegimeContext | null | undefined): PlanDraft {
+  if (!regime) return draft
+  const shares = draft.shares !== undefined ? Math.floor(draft.shares * regime.multiplier) : undefined
+  return {
+    ...draft,
+    shares,
+    regimeSnapshot: `${regime.label}（${regime.since} 起）・部位倍數 ${regime.multiplier}`,
+    regimeMultiplier: regime.multiplier,
+    rules: [...draft.rules, regime.basis],
+  }
+}
 
 // A blank plan for a trade that starts from neither card.
 export function manualPlan(policy: InvestmentPolicy): PlanDraft {
   return blank({ source: 'manual', ticker: '', rules: [`投資政策：每筆停損風險 ${policy.riskPerTradePercent}%（占交易部位）`] })
 }
 
-export function planFromThesis(thesis: StockThesis, report: SignalReport, policy: InvestmentPolicy): PlanDraft {
+export function planFromThesis(thesis: StockThesis, report: SignalReport, policy: InvestmentPolicy, regime?: RegimeContext | null): PlanDraft {
+  return applyRegime(thesisDraft(thesis, report, policy), regime)
+}
+
+function thesisDraft(thesis: StockThesis, report: SignalReport, policy: InvestmentPolicy): PlanDraft {
   const level = (key: string) => report.levels.find((l) => l.key === key)?.price
   const verdict = thesis.verdict ? VERDICT_LABELS[thesis.verdict] : '待選'
   const stop = report.stopLoss ?? undefined
@@ -126,15 +154,17 @@ export function planFromStrategy(
   market: { close?: number; atr?: number },
   totalValueTwd: number,
   policy: InvestmentPolicy,
+  regime?: RegimeContext | null,
 ): PlanDraft {
   const def = STRATEGY_TEMPLATES[strategy.template]
   const { market: mkt, code } = parseSymbol(strategy.symbols[0] ?? '')
   const params = resolveParams(strategy.template, strategy.params)
-  const k = params.atrStop ?? 0
+  // The regime row's stop width replaces the card's when the card has one.
+  const k = params.atrStop ? (regime?.row.stopAtr ?? params.atrStop) : 0
   const close = market.close
   const stop = close && market.atr && k > 0 ? round2(close - k * market.atr) : undefined
   const limit = riskLimitOf(strategy, policy)
-  return blank({
+  return applyRegime(blank({
     source: 'strategy',
     strategyId: strategy.id,
     ticker: code,
@@ -152,8 +182,12 @@ export function planFromStrategy(
     trailing: k > 0 ? 'chandelier' : 'none',
     trailingParam: k > 0 ? k : undefined,
     thesisExit: strategy.exitRules || def.exit,
-    rules: [`${limit.source}：每筆停損風險 ${limit.percent}%`, `策略卡出場規則：${strategy.exitRules || def.exit}`],
-  })
+    rules: [
+      `${limit.source}：每筆停損風險 ${limit.percent}%`,
+      `策略卡出場規則：${strategy.exitRules || def.exit}`,
+      ...(regime && params.atrStop ? [`局勢參數：停損 ${regime.row.stopAtr} × ATR（策略卡 ${params.atrStop}）`] : []),
+    ],
+  }), regime)
 }
 
 // --- Three-level advice -------------------------------------------------------
@@ -198,6 +232,25 @@ export function planAdvice(plan: PlanDraft, input: AdviceInput): PlanAdvice[] {
       if (item.manual || item.key === 'bias' || item.passed) continue
       out.push(advice('required', item.label, '交易前檢核'))
     }
+  }
+
+  const regime = input.ctx.regime
+  if (regime) {
+    if (regime.multiplier === 0) out.push(advice('required', `${regime.label}：局勢參數暫停新建倉`, regime.basis))
+    else if (!allows(regime, plan.entryMethod)) {
+      out.push(advice('required', `${regime.label}不允許「${ENTRY_METHOD_LABELS[plan.entryMethod]}」進場`, `局勢參數：允許 ${regime.row.allowedEntries.map((m) => ENTRY_METHOD_LABELS[m]).join('、') || '無'}`))
+    }
+    const base = input.report?.suggestedShares ?? (plan.regimeMultiplier && plan.shares ? plan.shares / plan.regimeMultiplier : undefined)
+    const cap = base !== undefined ? Math.floor(base * regime.multiplier) : undefined
+    if (cap !== undefined && shares && regime.multiplier > 0 && shares > cap) {
+      out.push(advice('required', `股數 ${fmt(shares)} 超過局勢上限 ${fmt(cap)} 股（建議股數 × ${regime.multiplier}）`, regime.basis))
+    }
+    if (input.report?.action === 'add' && regime.row.addOn !== 'allowed') {
+      out.push(advice('suggest', `${regime.label}的加碼規則是「${ADD_ON_LABELS[regime.row.addOn]}」`, '局勢參數：加碼'))
+    }
+    if (regime.macroHeadwind) out.push(advice('suggest', '總經逆風：部位可以再小一點，或只買第 1 批', '總經三支柱：逆風'))
+    if (regime.coolingOff) out.push(advice('suggest', '局勢參數剛簽署，仍在 7 天冷靜期：照新規則前再確認一次', '紀律：修改規則後的冷靜期'))
+    if (regime.changedRecently) out.push(advice('notice', `局勢最近轉為「${regime.label}」（${regime.since} 起）`, '局勢狀態：確認期 3 個交易日'))
   }
 
   const report = input.report
@@ -314,17 +367,20 @@ export interface ScanItem {
 export const SCAN_PRIORITY = {
   stop_hit: 1,
   thesis_exit: 2,
-  target_hit: 3,
-  time_stop: 4,
-  raise_stop: 5,
-  buy_zone: 6,
-  review_due: 7,
-  housekeeping: 8,
+  regime_exit: 3,
+  regime_change: 4,
+  target_hit: 5,
+  time_stop: 6,
+  raise_stop: 7,
+  dip_ladder: 8,
+  buy_zone: 8,
+  review_due: 9,
+  housekeeping: 10,
 } as const
 
-export function scanItem(kind: keyof typeof SCAN_PRIORITY, text: string, basis: string, to: string): ScanItem {
+export function scanItem(kind: keyof typeof SCAN_PRIORITY, text: string, basis: string, to: string, level?: PlanAdvice['level']): ScanItem {
   const priority = SCAN_PRIORITY[kind]
-  return { priority, level: priority <= 2 ? 'required' : priority <= 6 ? 'suggest' : 'notice', text, basis, to }
+  return { priority, level: level ?? (priority <= 2 ? 'required' : priority <= 8 ? 'suggest' : 'notice'), text, basis, to }
 }
 
 export function positionScanItems(plan: TradePlan, status: PositionStatus): ScanItem[] {

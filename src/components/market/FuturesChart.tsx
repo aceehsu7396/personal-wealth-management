@@ -71,7 +71,7 @@ export function FuturesChart({ bars, taiex }: { bars: FuturesBar[]; taiex: Index
               aria-pressed={range === r.sessions}
               className={`rounded px-2 py-0.5 text-xs ${
                 range === r.sessions
-                  ? 'bg-indigo-600 text-white'
+                  ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900'
                   : 'border border-gray-300 text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
               }`}
             >

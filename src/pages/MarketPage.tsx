@@ -3,6 +3,8 @@ import { useAppStore } from '../lib/storage/appStore'
 import { fetchRecentTaiexAndTw0050, todayIsoDate } from '../lib/market/twse'
 import { DailyMarketPanel } from '../components/market/DailyMarketPanel'
 import { MacroPanel } from '../components/MacroPanel'
+import { RegimeCard } from '../components/market/RegimeCard'
+import { PageHeader } from '../components/ui'
 
 export function MarketPage() {
   const mergeMarketPriceHistory = useAppStore((s) => s.mergeMarketPriceHistory)
@@ -17,10 +19,11 @@ export function MarketPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">市場</h1>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        每天看大盤走勢，每月做一次總經三支柱檢視：景氣體制、流動性、情緒溫度。兩者都只調整比例與新建倉，不決定個股進出（行動路線第三階段）。
-      </p>
+      <PageHeader title="市場" summary="現在是什麼局勢、這個局勢下怎麼交易；下方是每日大盤與每月的總經三支柱檢視。局勢只調整部位與進場方式，不決定個股進出。" />
+
+      <div className="mt-6">
+        <RegimeCard />
+      </div>
 
       <DailyMarketPanel />
 
