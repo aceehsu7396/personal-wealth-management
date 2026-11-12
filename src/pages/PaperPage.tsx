@@ -23,6 +23,7 @@ import { StatCard } from '../components/StatCard'
 import { SimGuide } from '../components/SimGuide'
 import { PaperHowTo } from '../components/PaperHowTo'
 import { Field, inputClass } from '../components/forms/FormField'
+import { PageHeader, primaryButton, secondaryButton } from '../components/ui'
 import type { PaperAccount, PaperOrder } from '../lib/storage/schema'
 
 const cardClass =
@@ -239,21 +240,32 @@ export function PaperPage() {
   const ownRun = account?.strategyId ? [...runs].reverse().find((r) => r.strategyId === account.strategyId) : undefined
   const openOrders = account?.orders.filter((o) => o.status === 'open') ?? []
   const filled = account ? [...account.orders].filter((o) => o.status === 'filled').reverse() : []
+  // The day's one main action: strategy signals when the linked card can
+  // produce them, otherwise a price update.
+  const canSignal = !!strategy && STRATEGY_TEMPLATES[strategy.template].backtestable
+  const showAccount = !!account && !!stats && !creating
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">虛擬帳戶</h1>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        用虛擬資金照策略卡下單：市價單以最新收盤價成交，限價單與停損在之後的交易日觸價成交，成本與回測相同。連結策略卡的帳戶操作滿{' '}
-        {PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆成交，就完成行動路線 4.3。說明見手冊{' '}
-        <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          10 §7
-        </Link>
-        。
-      </p>
-
-      <SimGuide />
-      <PaperHowTo market={account?.market} />
+      <PageHeader
+        title="虛擬帳戶"
+        summary={
+          <>
+            用虛擬資金照策略卡下單，成本與回測相同。連結策略卡的帳戶操作滿 {PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆成交，就完成行動路線 4.3。說明見手冊{' '}
+            <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              10 §7
+            </Link>
+            。
+          </>
+        }
+        action={
+          showAccount ? (
+            <button type="button" disabled={busy !== null} onClick={() => void (canSignal ? makeSignals() : refreshPrices())} className={primaryButton}>
+              {canSignal ? '產生今日策略訊號' : '更新價格'}
+            </button>
+          ) : undefined
+        }
+      />
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
         {accounts.map((a) => (
@@ -265,7 +277,8 @@ export function PaperPage() {
               setCreating(false)
               setSignals(null)
             }}
-            className={`rounded-md px-3 py-1.5 text-sm ${a.id === selectedId && !creating ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700'}`}
+            aria-pressed={a.id === selectedId && !creating}
+            className={`rounded-md px-3 py-1.5 text-sm ${a.id === selectedId && !creating ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700'}`}
           >
             {a.name}
           </button>
@@ -298,7 +311,7 @@ export function PaperPage() {
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
       {busy && <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">{busy}</p>}
 
-      {account && stats && !creating && (
+      {showAccount && account && stats && (
         <>
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <StatCard label="帳戶權益" value={money(stats.equity)} hint={`現金 ${money(account.cash)}（${account.market === 'TW' ? '新台幣' : '美元'}）`} />
@@ -324,24 +337,14 @@ export function PaperPage() {
               </span>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void refreshPrices()}
-                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
-              >
-                更新價格（觸發停損與限價單）
-              </button>
-              {strategy && STRATEGY_TEMPLATES[strategy.template].backtestable && (
-                <button
-                  type="button"
-                  disabled={busy !== null}
-                  onClick={() => void makeSignals()}
-                  className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
-                >
-                  產生今日策略訊號
+              {canSignal && (
+                <button type="button" disabled={busy !== null} onClick={() => void refreshPrices()} className={secondaryButton}>
+                  更新價格（觸發停損與限價單）
                 </button>
               )}
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                {canSignal ? '每天收盤後：先更新價格（觸發停損與限價單），再按頁首「產生今日策略訊號」。' : '每天收盤後按頁首「更新價格」，觸發停損與限價單。'}
+              </span>
             </div>
 
             {account.market === 'US' && (
@@ -429,7 +432,7 @@ export function PaperPage() {
                           <td className={tdClass}>{p.avgCost.toFixed(2)}</td>
                           <td className={tdClass}>
                             {p.lastPrice}
-                            <span className="ml-1 text-xs text-gray-400">{p.lastPriceDate}</span>
+                            <span className="ml-1 text-xs text-gray-500 dark:text-gray-400">{p.lastPriceDate}</span>
                           </td>
                           <td className={`${tdClass} ${gain >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-orange-700 dark:text-orange-400'}`}>{pct(gain)}</td>
                           <td className={tdClass}>
@@ -506,7 +509,7 @@ export function PaperPage() {
               type="button"
               disabled={busy !== null}
               onClick={submitForm}
-              className="mt-3 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+              className={`mt-3 ${secondaryButton}`}
             >
               送出委託
             </button>
@@ -518,8 +521,8 @@ export function PaperPage() {
                   {openOrders.map((o) => (
                     <li key={o.id} className="flex flex-wrap items-center gap-3 text-gray-700 dark:text-gray-300">
                       {o.side === 'buy' ? '買進' : '賣出'} {formatSymbol(o.symbol)} {o.shares} 股・{o.type === 'limit' ? '限價' : '停損'} {o.price}
-                      <span className="text-xs text-gray-400">{o.createdAt.slice(0, 10)}</span>
-                      <button type="button" className="text-xs text-gray-500 hover:underline" onClick={() => save(cancelOrder(account, o.id))}>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">{o.createdAt.slice(0, 10)}</span>
+                      <button type="button" className="text-xs text-gray-600 hover:underline dark:text-gray-400" onClick={() => save(cancelOrder(account, o.id))}>
                         取消
                       </button>
                     </li>
@@ -586,12 +589,12 @@ export function PaperPage() {
                   >
                     確定刪除這個帳戶
                   </button>
-                  <button type="button" className="text-xs text-gray-500 hover:underline" onClick={() => setPendingDelete(false)}>
+                  <button type="button" className="text-xs text-gray-600 hover:underline dark:text-gray-400" onClick={() => setPendingDelete(false)}>
                     取消
                   </button>
                 </>
               ) : (
-                <button type="button" className="text-xs text-gray-500 hover:underline" onClick={() => setPendingDelete(true)}>
+                <button type="button" className="text-xs text-gray-600 hover:underline dark:text-gray-400" onClick={() => setPendingDelete(true)}>
                   刪除帳戶
                 </button>
               )}
@@ -599,6 +602,9 @@ export function PaperPage() {
           </div>
         </>
       )}
+
+      <SimGuide />
+      <PaperHowTo market={account?.market} />
     </div>
   )
 }

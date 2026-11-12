@@ -103,7 +103,7 @@ export function PaperHowTo({ market }: { market?: 'TW' | 'US' }) {
               </li>
             ))}
           </ol>
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
             {market === 'US' ? '美股帳戶的最新價需要在「最新價」欄位手動輸入。' : '台股帳戶的價格自動取自證交所（上櫃股票目前不支援）。'}
             {' '}原則：照策略卡執行，不臨時改規則；想改規則，回到回測重新驗證。更多說明見手冊{' '}
             <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
