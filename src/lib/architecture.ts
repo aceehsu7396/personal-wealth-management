@@ -203,6 +203,7 @@ export const PAGE_NODES: Record<string, string> = {
   '/sim/backtest': 'backtest',
   '/sim/paper': 'paper',
   '/portfolio': 'risk',
+  '/portfolio/plans': 'checklist',
   '/portfolio/trades': 'checklist',
   '/portfolio/review': 'review',
 }

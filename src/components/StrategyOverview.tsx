@@ -4,26 +4,20 @@ import { useJourney } from '../lib/useJourney'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
 import { computeRequiredReturn, FEASIBILITY_LABELS } from '../lib/calculations/requiredReturn'
 import { analyzePortfolio } from '../lib/calculations/portfolioRisk'
-import { addMonths, computeDiscipline } from '../lib/calculations/disciplineScore'
+import { computeDiscipline } from '../lib/calculations/disciplineScore'
 import { todayIsoDate } from '../lib/market/twse'
 import { useTraderReadiness } from '../lib/useTraderReadiness'
-import { evaluateThesis } from '../lib/calculations/thesisScoring'
-import { useSignals } from '../lib/research/useSignals'
-import { ACTION_LABELS, EXIT_ALERT_ACTIONS, buyDistanceOf } from '../lib/research/signals'
 import { StatCard } from './StatCard'
 import { RiskViolationList } from './RiskViolationList'
 import { formatCurrency } from '../lib/format'
 
 const MAX_ALERTS = 5
-// Research cards should be refreshed after every quarterly report.
-const THESIS_STALE_MONTHS = 4
 
 export function StrategyOverview() {
   const profile = useAppStore((s) => s.profile)
   const { assumptions, fromPortfolio } = usePlanningAssumptions()
-  const { policy, journey } = useJourney()
+  const { policy } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
-  const macroCheckIns = useAppStore((s) => s.macroCheckIns)
   const holdings = useAppStore((s) => s.holdings)
   const theses = useAppStore((s) => s.stockTheses)
   const meta = useAppStore((s) => s.portfolioMeta)
@@ -31,9 +25,9 @@ export function StrategyOverview() {
 
   const today = todayIsoDate()
   const required = computeRequiredReturn(profile, assumptions, policy.targetYears)
-  const latestMacro = [...macroCheckIns].sort((a, b) => b.date.localeCompare(a.date))[0]
   const risk = analyzePortfolio(holdings, theses, policy, guardrails, meta)
-  const discipline = computeDiscipline(trades, holdings, theses, policy, today)
+  const plans = useAppStore((s) => s.tradePlans)
+  const discipline = computeDiscipline(trades, holdings, theses, policy, today, plans)
   const readiness = useTraderReadiness()
   const foundation = useAppStore((s) => s.foundation)
   // Months of living costs held outside the portfolio, and what share of
@@ -43,58 +37,6 @@ export function StrategyOverview() {
     readiness.target.annualExpenses > 0 && assumptions.currentNetWorth > 0
       ? (readiness.target.annualExpenses / assumptions.currentNetWorth) * 100
       : null
-  const signalsFor = useSignals()
-  const advised = theses
-    .filter((t) => t.auto && t.status !== 'exited')
-    .map((t) => ({ thesis: t, report: signalsFor(t, evaluateThesis(t, policy)) }))
-  const exitAlerts = advised.filter(({ report }) => report.held && EXIT_ALERT_ACTIONS.includes(report.action))
-  // Price reminders: cards whose advice is to buy or add now. Shown when the
-  // site is opened; there is no push.
-  const buyAlerts = advised.filter(({ thesis, report }) => buyDistanceOf(report, thesis.kind === 'etf').inZone)
-
-  const todos: { text: string; to: string }[] = []
-  // Macro reviews belong to stage three; only nag once the core is in place
-  // or the habit has started.
-  const macroStageReached = journey.stages[1].done || latestMacro !== undefined
-  if (macroStageReached && (!latestMacro || addMonths(latestMacro.date, 1) <= today)) {
-    todos.push({ text: '本月的總經三支柱檢視尚未完成', to: '/research/market' })
-  }
-  const stale = theses.filter(
-    (t) => t.status !== 'exited' && addMonths(t.updatedAt.slice(0, 10), THESIS_STALE_MONTHS) <= today,
-  )
-  if (stale.length > 0) {
-    todos.push({
-      text: `${stale.length} 張研究卡超過 ${THESIS_STALE_MONTHS} 個月未更新（${stale
-        .slice(0, 3)
-        .map((t) => t.ticker)
-        .join('、')}${stale.length > 3 ? '…' : ''}）`,
-      to: '/research/stocks',
-    })
-  }
-  if (buyAlerts.length > 0) {
-    todos.push({
-      text: `${buyAlerts.length} 檔進入買進區或可加碼（${buyAlerts
-        .slice(0, 3)
-        .map(({ thesis, report }) => `${thesis.ticker} ${ACTION_LABELS[report.action]}`)
-        .join('、')}${buyAlerts.length > 3 ? '…' : ''}），下單前先過交易前檢核`,
-      // One card opens directly; several open the list, nearest buy point first.
-      to: buyAlerts.length === 1 ? `/research/stocks?new=${encodeURIComponent(buyAlerts[0].thesis.ticker)}` : '/research/stocks',
-    })
-  }
-  if (exitAlerts.length > 0) {
-    todos.push({
-      text: `${exitAlerts.length} 檔持股有出場提醒（${exitAlerts
-        .slice(0, 3)
-        .map(({ thesis, report }) => `${thesis.ticker} ${ACTION_LABELS[report.action]}`)
-        .join('、')}${exitAlerts.length > 3 ? '…' : ''}）`,
-      // One alert opens that card directly.
-      to: exitAlerts.length === 1 ? `/research/stocks?new=${encodeURIComponent(exitAlerts[0].thesis.ticker)}` : '/research/stocks',
-    })
-  }
-  if (discipline.pendingReviews.length > 0) {
-    todos.push({ text: `${discipline.pendingReviews.length} 筆交易待完成事後檢討`, to: '/portfolio/trades' })
-  }
-
   const alerts = risk.violations.filter((v) => v.severity !== 'info')
 
   return (
@@ -162,7 +104,7 @@ export function StrategyOverview() {
         </Link>
       </div>
 
-      {(alerts.length > 0 || todos.length > 0) && (
+      {alerts.length > 0 && (
         <div className="mt-5 space-y-3">
           {alerts.length > 0 && (
             <RiskViolationList violations={alerts.slice(0, MAX_ALERTS)} emptyMessage="" />
@@ -171,17 +113,6 @@ export function StrategyOverview() {
             <Link to="/portfolio" className="text-xs text-indigo-700 hover:underline dark:text-indigo-400">
               還有 {alerts.length - MAX_ALERTS} 項警示，前往投資組合查看
             </Link>
-          )}
-          {todos.length > 0 && (
-            <ul className="space-y-1 text-sm">
-              {todos.map((t) => (
-                <li key={t.text}>
-                  <Link to={t.to} className="text-gray-700 hover:underline dark:text-gray-300">
-                    ☐ {t.text}
-                  </Link>
-                </li>
-              ))}
-            </ul>
           )}
         </div>
       )}

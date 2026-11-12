@@ -20,8 +20,9 @@ describe('trade links', () => {
   it('turns research-card advice into the matching trade', () => {
     const report = (o: Partial<SignalReport>) => ({ action: 'buy', suggestedShares: 300, stopLoss: 210, heldShares: null, ...o }) as SignalReport
     const thesis = { id: 't1', ticker: '2317', verdict: 'invest' as const, currentPrice: 230 }
-    expect(signalTradeLink(report({}), thesis)!.label).toBe('記錄買進（第 1 批）')
-    expect(signalTradeLink(report({ action: 'add' }), thesis)!.to).toContain('reason=tranche_2')
+    // Buys start from a trade plan.
+    expect(signalTradeLink(report({}), thesis)!.label).toBe('建立計畫單（第 1 批）')
+    expect(signalTradeLink(report({ action: 'add' }), thesis)!.to).toBe(`/portfolio/plans?thesis=${thesis.id}`)
     const trim = signalTradeLink(report({ action: 'trim', heldShares: 900 }), thesis)!
     expect(trim.to).toContain('side=sell')
     expect(trim.to).toContain('shares=300')

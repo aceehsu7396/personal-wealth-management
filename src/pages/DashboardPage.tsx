@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { computeFireProjection } from '../lib/calculations/fireProjection'
 import { StrategyOverview } from '../components/StrategyOverview'
+import { DailyScan } from '../components/trades/DailyScan'
 import { useJourney } from '../lib/useJourney'
 import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { usePlanningAssumptions } from '../lib/usePlanningAssumptions'
@@ -26,6 +27,10 @@ export function DashboardPage() {
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
         財富自由計畫的整體現況：下一步、進度與策略紀律。
       </p>
+
+      <div className="mt-6">
+        <DailyScan />
+      </div>
 
       {nextStep && (
         <div className="mt-6 rounded-lg border border-indigo-300 bg-indigo-50 p-5 dark:border-indigo-700 dark:bg-indigo-900/30">

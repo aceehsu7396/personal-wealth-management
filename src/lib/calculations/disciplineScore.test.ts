@@ -69,6 +69,16 @@ describe('computeDiscipline', () => {
     expect(result.exceptionTrades).toHaveLength(1)
     expect(result.pendingReviews).toHaveLength(1)
   })
+
+  it('takes 5 points per late stop-loss exit on a plan, at most 20', () => {
+    const plan = { id: 'p', stopLoss: 900, currentStop: 950 }
+    const onTime = trade({ side: 'sell', reason: 'stop_loss', planId: 'p', price: 945 })
+    const late = trade({ side: 'sell', reason: 'stop_loss', planId: 'p', price: 920 })
+    const base = computeDiscipline([onTime], [], [], policy, '', [plan]).score!
+    expect(computeDiscipline([onTime, late], [], [], policy, '', [plan])).toMatchObject({ lateStops: 1, score: base - 5 })
+    const many = Array.from({ length: 6 }, () => late)
+    expect(computeDiscipline(many, [], [], policy, '', [plan]).score).toBe(base - 20)
+  })
 })
 
 describe('tierOf', () => {

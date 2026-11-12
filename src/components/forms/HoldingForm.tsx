@@ -298,7 +298,7 @@ export function HoldingForm({ theses, initialValues, onSubmit, onCancel }: Props
       <div className="flex items-end gap-2 sm:col-span-3">
         <button
           type="submit"
-          className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+          className="rounded-md border border-indigo-600 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
         >
           {initialValues ? '儲存修改' : isFundForm ? '新增基金' : '新增持股'}
         </button>

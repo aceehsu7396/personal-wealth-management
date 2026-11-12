@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { tradeLink } from '../lib/trades/tradeLink'
 import { STARTER_STRATEGIES, type StarterStrategy } from '../lib/backtest/starterStrategies'
 import { SimGuide } from '../components/SimGuide'
 import { StrategyResearchLinks } from '../components/research/StrategyResearchLinks'
 import { useAppStore } from '../lib/storage/appStore'
-import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, parseSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
+import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
 import { liveGate, PAPER_RULES } from '../lib/calculations/strategyProgress'
 import { todayIsoDate } from '../lib/market/twse'
 import { StrategyForm, type StrategyFormValues } from '../components/forms/StrategyForm'
@@ -119,7 +118,7 @@ export function StrategiesPage() {
                       <button
                         type="button"
                         onClick={() => applyStarter(st, true)}
-                        className="rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                        className="rounded-md border border-indigo-600 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-300 dark:hover:bg-indigo-900/30"
                       >
                         套用並回測
                       </button>
@@ -207,16 +206,14 @@ export function StrategiesPage() {
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 {(() => {
                   // The one step this card needs next.
-                  const btn = 'rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700'
+                  // Outlined: the page's one solid button is 「新增策略卡」 (docs/ui-guidelines.md §2).
+                  const btn = 'rounded-md border border-indigo-600 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-300 dark:hover:bg-indigo-900/30'
                   if (s.status === 'retired') return null
                   if (s.status === 'live') {
-                    const first = s.symbols[0]
+                    // Real-money entries start from a trade plan.
                     return (
-                      <Link
-                        to={tradeLink({ ticker: first ? parseSymbol(first).code : '', side: 'buy', reason: 'strategy_entry', strategyId: s.id })}
-                        className={btn}
-                      >
-                        下一步：記錄實單 →
+                      <Link to={`/portfolio/plans?strategy=${encodeURIComponent(s.id)}`} className={btn}>
+                        下一步：建立計畫單 →
                       </Link>
                     )
                   }

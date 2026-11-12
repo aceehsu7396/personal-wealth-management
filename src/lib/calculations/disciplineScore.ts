@@ -1,4 +1,4 @@
-import type { Holding, InvestmentPolicy, StockThesis, Trade } from '../storage/schema'
+import type { Holding, InvestmentPolicy, StockThesis, Trade, TradePlan } from '../storage/schema'
 import { isSatellite } from './portfolioRisk'
 import { evaluateThesis } from './thesisScoring'
 
@@ -18,6 +18,8 @@ export interface DisciplineReport {
   reviewCompletionRate: number | null
   exceptionTrades: Trade[]
   pendingReviews: PendingReview[]
+  // Stop-loss exits filled well below the plan's stop.
+  lateStops: number
 }
 
 const WEIGHTS = { compliance: 0.4, thesis: 0.3, review: 0.3 }
@@ -66,12 +68,32 @@ export function tierOf(score: number | null): string {
   return '警示：暫停新增衛星部位，直到分數回升'
 }
 
+// A stop-loss exit more than 2% below the stop in force: the stop was not
+// acted on when it was hit.
+export const LATE_STOP = 0.02
+export function lateStopExits(plans: Pick<TradePlan, 'id' | 'currentStop' | 'stopLoss'>[], trades: Trade[]): number {
+  const byId = new Map(plans.map((p) => [p.id, p]))
+  return trades.filter((t) => {
+    if (t.side !== 'sell' || t.reason !== 'stop_loss' || !t.planId) return false
+    const plan = byId.get(t.planId)
+    const stop = plan?.currentStop ?? plan?.stopLoss
+    return stop !== undefined && t.price < stop * (1 - LATE_STOP)
+  }).length
+}
+
+// Each late stop costs 5 points, at most 20 (blueprint 02 §3.8). Coverage
+// and slippage are shown on the trade log but not scored, so trades made
+// before trade plans existed are not penalised.
+const LATE_STOP_PENALTY = 5
+const LATE_STOP_MAX_PENALTY = 20
+
 export function computeDiscipline(
   trades: Trade[],
   holdings: Holding[],
   theses: StockThesis[],
   policy: InvestmentPolicy,
   today: string,
+  plans: Pick<TradePlan, 'id' | 'currentStop' | 'stopLoss'>[] = [],
 ): DisciplineReport {
   const exceptionTrades = trades.filter(isException)
   const complianceRate =
@@ -100,9 +122,11 @@ export function computeDiscipline(
   ]
   const available = parts.filter((p): p is [number, number] => p[0] !== null)
   const weightSum = available.reduce((acc, [, w]) => acc + w, 0)
+  const lateStops = lateStopExits(plans, trades)
+  const penalty = Math.min(lateStops * LATE_STOP_PENALTY, LATE_STOP_MAX_PENALTY)
   const score =
     weightSum > 0
-      ? Math.round(available.reduce((acc, [v, w]) => acc + v * w, 0) / weightSum)
+      ? Math.max(0, Math.round(available.reduce((acc, [v, w]) => acc + v * w, 0) / weightSum) - penalty)
       : null
 
   return {
@@ -113,5 +137,6 @@ export function computeDiscipline(
     reviewCompletionRate,
     exceptionTrades,
     pendingReviews: due,
+    lateStops,
   }
 }

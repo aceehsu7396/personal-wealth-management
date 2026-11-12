@@ -11,6 +11,7 @@ import { tradeLink } from '../lib/trades/tradeLink'
 import { RiskViolationList } from '../components/RiskViolationList'
 import { PriceZoneBadge } from '../components/ThesisEvaluationView'
 import { StatCard } from '../components/StatCard'
+import { ExitManager } from '../components/trades/ExitManager'
 import { inputClass, labelClass } from '../components/forms/FormField'
 import { formatCurrency, formatPercent } from '../lib/format'
 
@@ -146,6 +147,10 @@ export function PortfolioPage() {
         </p>
       </div>
 
+      <div className="mt-8">
+        <ExitManager />
+      </div>
+
       <div className={cardClass}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">持股</h2>
@@ -252,7 +257,7 @@ export function PortfolioPage() {
                       <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
                         {formatPercent(v.weightPercent)}
                         {v.positionCapPercent !== null && (
-                          <span className="text-xs text-gray-400"> / {v.positionCapPercent}%</span>
+                          <span className="text-xs text-gray-500 dark:text-gray-400"> / {v.positionCapPercent}%</span>
                         )}
                       </td>
                       <td
@@ -358,7 +363,7 @@ export function PortfolioPage() {
             <span className={labelClass}>組合市值高點（用於回撤熔斷）</span>
             <p className="mt-2 text-sm text-gray-700 dark:text-gray-300">
               {formatCurrency(meta.peakValueTwd, 'TWD')}
-              {meta.peakDate && <span className="text-xs text-gray-500"> （{meta.peakDate}）</span>}
+              {meta.peakDate && <span className="text-xs text-gray-500 dark:text-gray-400"> （{meta.peakDate}）</span>}
             </p>
             <button
               type="button"

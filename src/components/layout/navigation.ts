@@ -49,6 +49,7 @@ export const NAV_GROUPS: NavGroup[] = [
     tabs: [
       { label: '今日', to: '/today' },
       { label: '目標與政策', to: '/goals' },
+      { label: '交易計畫', to: '/portfolio/plans' },
       { label: '持股與風控', to: '/portfolio', exact: true },
       { label: '交易日誌', to: '/portfolio/trades' },
       { label: '績效歸因', to: '/portfolio/review' },

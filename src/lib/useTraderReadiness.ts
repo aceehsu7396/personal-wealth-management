@@ -14,7 +14,8 @@ export function useTraderReadiness() {
   const performanceReviews = useAppStore((s) => s.performanceReviews)
   const policy = useAppStore((s) => s.investmentPolicy)
   const today = todayIsoDate()
-  const discipline = computeDiscipline(trades, holdings, theses, policy, today)
+  const plans = useAppStore((s) => s.tradePlans)
+  const discipline = computeDiscipline(trades, holdings, theses, policy, today, plans)
   return computeTraderReadiness({
     assumptions,
     foundation,

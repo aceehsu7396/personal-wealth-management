@@ -229,7 +229,7 @@ export function StocksPage() {
                 onClick={() => setFilter(f)}
                 className={`rounded-md px-2 py-1 text-xs font-medium ${
                   filter === f
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900'
                     : 'text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-gray-700'
                 }`}
               >
@@ -270,7 +270,7 @@ export function StocksPage() {
                         {t.kind === 'etf' ? 'ETF' : `${t.sector}・${LYNCH_LABELS[e.lynchCategory]}`}・{STATUS_LABELS[t.status]}
                       </div>
                       {t.market === 'TW' ? (
-                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           {t.auto ? `體檢 ${t.auto.fetchedAt.slice(0, 10)}` : '尚未體檢'}
                           {' · '}
                           <button
@@ -287,7 +287,7 @@ export function StocksPage() {
                       )}
                     </td>
                     <td className="py-2 pr-4">
-                      {e.rating ? <AutoRatingBar rating={e.rating} compact /> : <span className="text-xs text-gray-400">—</span>}
+                      {e.rating ? <AutoRatingBar rating={e.rating} compact /> : <span className="text-xs text-gray-500 dark:text-gray-400">—</span>}
                     </td>
                     <td className="py-2 pr-4">
                       {t.verdict ? (
@@ -316,7 +316,7 @@ export function StocksPage() {
                       {t.auto?.stock?.valuation.pe?.percentile != null ? `第 ${t.auto.stock.valuation.pe.percentile} 百分位` : '—'}
                     </td>
                     <td className="py-2 pr-4">
-                      {t.kind === 'etf' || !t.auto ? <span className="text-xs text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
+                      {t.kind === 'etf' || !t.auto ? <span className="text-xs text-gray-500 dark:text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
                     </td>
                     <td
                       className={`py-2 pr-4 text-xs whitespace-nowrap ${
@@ -340,7 +340,7 @@ export function StocksPage() {
                           })()}
                         </>
                       ) : (
-                        <span className="text-xs text-gray-400">—</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">—</span>
                       )}
                     </td>
                     <td className="py-2 pr-4">

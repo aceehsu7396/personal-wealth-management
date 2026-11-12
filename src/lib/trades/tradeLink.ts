@@ -12,6 +12,7 @@ export interface TradeLinkInput {
   reason: TradeReason
   thesisId?: string
   strategyId?: string
+  planId?: string
   shares?: number
   price?: number
   stopLoss?: number
@@ -21,6 +22,7 @@ export function tradeLink(input: TradeLinkInput): string {
   const params = new URLSearchParams({ ticker: input.ticker, side: input.side, reason: input.reason })
   if (input.thesisId) params.set('thesis', input.thesisId)
   if (input.strategyId) params.set('strategy', input.strategyId)
+  if (input.planId) params.set('plan', input.planId)
   if (input.shares) params.set('shares', String(input.shares))
   if (input.price) params.set('price', String(input.price))
   if (input.stopLoss) params.set('stop', String(input.stopLoss))
@@ -37,6 +39,7 @@ export interface TradePrefill {
   currency: Holding['currency']
   thesisId: string
   strategyId: string
+  planId: string
   stopLoss: string
   shares: string
   price: string
@@ -69,23 +72,23 @@ export function prefillFromSearch(
     currency: holding?.currency ?? 'TWD',
     thesisId: thesis?.id ?? holding?.thesisId ?? '',
     strategyId: strategy?.id ?? holding?.strategyId ?? '',
+    planId: search.get('plan') ?? '',
     stopLoss: search.get('stop') ?? '',
     shares: search.get('shares') ?? '',
     price: search.get('price') ?? '',
   }
 }
 
-// The trade a research card's advice points to, if any: buy or add a
-// batch, trim a third, or exit in full.
+// The next step a research card's advice points to, if any: a trade plan for
+// buying or adding a batch, or recording a trim of a third or a full exit.
 export function signalTradeLink(report: SignalReport, thesis: Pick<StockThesis, 'id' | 'ticker' | 'verdict' | 'currentPrice'>): { label: string; to: string } | null {
   const price = thesis.currentPrice || undefined
   const base = { ticker: thesis.ticker, thesisId: thesis.id, price }
+  // A buy starts from a trade plan (blueprint 02 §3.3); the plan then links
+  // to the trade log with everything filled in.
   if (report.action === 'buy' || report.action === 'add') {
     const batch = report.action === 'buy' ? 1 : 2
-    return {
-      label: `記錄買進（第 ${batch} 批）`,
-      to: tradeLink({ ...base, side: 'buy', reason: batch === 1 ? 'tranche_1' : 'tranche_2', shares: report.suggestedShares ?? undefined, stopLoss: report.stopLoss ?? undefined }),
-    }
+    return { label: `建立計畫單（第 ${batch} 批）`, to: `/portfolio/plans?thesis=${encodeURIComponent(thesis.id)}` }
   }
   if ((report.action === 'trim' || report.action === 'exit') && report.heldShares) {
     const shares = report.action === 'trim' ? Math.floor(report.heldShares / 3) : report.heldShares

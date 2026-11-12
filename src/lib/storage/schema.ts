@@ -820,6 +820,8 @@ export const TradePlanSchema = z.object({
   stopMethod: StopMethodSchema.default('manual'),
   // 5 size.
   entryPrice: z.number().optional(),
+  // The actual average fill, set when the plan opens; R is measured from it.
+  fillPrice: z.number().optional(),
   shares: z.number().optional(),
   // 6 order.
   orderType: z.enum(['limit', 'market', 'stop']).default('limit'),

@@ -33,6 +33,7 @@ const schema = z.object({
   currency: CurrencySchema,
   thesisId: z.string(),
   strategyId: z.string(),
+  planId: z.string(),
   stopLoss: z.string(),
   shares: z.coerce.number().positive('須大於 0'),
   price: z.coerce.number().positive('須大於 0'),
@@ -72,6 +73,7 @@ function blankDefaults(): FormInput {
     currency: 'TWD',
     thesisId: '',
     strategyId: '',
+    planId: '',
     stopLoss: '',
     shares: '',
     price: '',
@@ -96,7 +98,8 @@ function toPending(v: FormOutput, ctx: ChecklistContext): PendingTrade {
     holdingId: holding?.id,
     thesisId: holding?.thesisId ?? (v.thesisId || undefined),
     strategyId: STRATEGY_REASONS.includes(v.reason) ? v.strategyId || undefined : undefined,
-    stopLoss: v.reason === 'strategy_entry' && Number(v.stopLoss) > 0 ? Number(v.stopLoss) : undefined,
+    // Strategy entries and plan-based buys carry the plan's stop.
+    stopLoss: (v.reason === 'strategy_entry' || (v.planId && v.side === 'buy')) && Number(v.stopLoss) > 0 ? Number(v.stopLoss) : undefined,
     biasNotes: v.biasNotes,
   }
 }
@@ -160,6 +163,7 @@ export function TradeForm({ ctx, onSubmit, prefill }: Props) {
         holdingId: pending.holdingId,
         thesisId: pending.thesisId,
         strategyId: pending.strategyId,
+        planId: values.planId || undefined,
         stopLoss: pending.stopLoss,
         side: values.side,
         reason: values.reason,
