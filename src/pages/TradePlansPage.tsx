@@ -64,7 +64,7 @@ function PlanTable({ plans }: { plans: TradePlan[] }) {
   )
 }
 
-// Trade plans (blueprint 02 §3.3): every trading-sleeve trade starts here.
+// Trade plans (handbook 04 §0): every trading-sleeve trade starts here.
 // ?thesis=<id> or ?strategy=<id> drafts one (or reopens the existing draft);
 // ?id=<plan> opens one.
 export function TradePlansPage() {

@@ -84,7 +84,7 @@ export function prefillFromSearch(
 export function signalTradeLink(report: SignalReport, thesis: Pick<StockThesis, 'id' | 'ticker' | 'verdict' | 'currentPrice'>): { label: string; to: string } | null {
   const price = thesis.currentPrice || undefined
   const base = { ticker: thesis.ticker, thesisId: thesis.id, price }
-  // A buy starts from a trade plan (blueprint 02 §3.3); the plan then links
+  // A buy starts from a trade plan (handbook 04 §0); the plan then links
   // to the trade log with everything filled in.
   if (report.action === 'buy' || report.action === 'add') {
     const batch = report.action === 'buy' ? 1 : 2

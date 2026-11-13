@@ -1,6 +1,6 @@
 import type { ScenarioSet } from '../storage/schema'
 
-// Probability calibration (blueprint 02 §2.2): Brier score per resolved
+// Probability calibration (handbook 05 §8.2): Brier score per resolved
 // scenario set, and how often each probability band came true.
 
 export const probabilityTotal = (set: Pick<ScenarioSet, 'scenarios'>) => set.scenarios.reduce((a, s) => a + s.probability, 0)

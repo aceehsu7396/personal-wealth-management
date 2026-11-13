@@ -387,7 +387,7 @@ export const TradeSchema = z.object({
   holdingId: z.string().optional(),
   thesisId: z.string().optional(),
   strategyId: z.string().optional(),
-  // The trade plan this trade carried out (blueprint 02 §3.3).
+  // The trade plan this trade carried out (handbook 04 §0).
   planId: z.string().optional(),
   stopLoss: z.number().optional(),
   side: TradeSideSchema,
@@ -796,7 +796,7 @@ export type IdeaNote = z.infer<typeof IdeaNoteSchema>
 
 // A trade plan: written before a trade, it records why to enter, where the
 // idea is wrong, how to exit, how much and how to place the order, plus the
-// rules it rests on and the advice given (blueprint 02 §3.3, 01 §C1).
+// rules it rests on and the advice given (handbook 04 §0).
 export const TradePlanStatusSchema = z.enum(['draft', 'open', 'closed', 'cancelled'])
 export type TradePlanStatus = z.infer<typeof TradePlanStatusSchema>
 export const TradePlanSourceSchema = z.enum(['thesis', 'strategy', 'core', 'manual'])
@@ -827,7 +827,7 @@ export const TradePlanSchema = z.object({
   name: z.string().default(''),
   market: z.enum(['TW', 'US']).default('TW'),
   entryMethod: EntryMethodSchema.default('other'),
-  // 1 setup, 2 trigger, 3 confirmation (01 §C1).
+  // 1 setup, 2 trigger, 3 confirmation (handbook 04 §0).
   setup: z.string().default(''),
   trigger: z.string().default(''),
   confirmation: z.string().default(''),
@@ -854,7 +854,7 @@ export const TradePlanSchema = z.object({
   regimeSnapshot: z.string().optional(),
   // The regime's size multiplier when the plan was drafted (stage 2).
   regimeMultiplier: z.number().optional(),
-  // Planned batches and add-ons, each filled in turn (blueprint 02 §3.5).
+  // Planned batches and add-ons, each filled in turn (handbook 08 §2.3).
   batches: z
     .array(
       z.object({
@@ -887,8 +887,8 @@ export const RuleVersionSchema = z.object({
 })
 export type RuleVersion = z.infer<typeof RuleVersionSchema>
 
-// Market regimes (01 §C6) and the signed table of what each one allows
-// (blueprint 02 §3.9). Parameters can only make trading more conservative.
+// Market regimes (handbook 05 §7, 04 §0.1) and the signed table of what each one allows
+// (handbook 04 §0.1). Parameters can only make trading more conservative.
 export const RegimeKeySchema = z.enum(['bull', 'overheated', 'correction', 'bear', 'crash', 'rebound', 'range'])
 export type RegimeKey = z.infer<typeof RegimeKeySchema>
 export const AddOnRuleSchema = z.enum(['allowed', 'scheduled', 'none'])
@@ -940,8 +940,8 @@ export function createDefaultRegimeParams(): RegimeParams {
   }
 }
 
-// Reserve cash to put in when the TAIEX falls from its high (blueprint
-// 02 §4.2). A step counts as done only after the last new high.
+// Reserve cash to put in when the TAIEX falls from its high (handbook
+// 08 §2.4). A step counts as done only after the last new high.
 export const DipLadderSchema = z.object({
   steps: z.array(
     z.object({
@@ -956,7 +956,7 @@ export const DipLadderSchema = z.object({
 export type DipLadder = z.infer<typeof DipLadderSchema>
 
 // A review written after a losing streak paused new trading positions; the
-// streak counts again from its date (blueprint 02 §5.5).
+// streak counts again from its date (handbook 04 §8).
 export const PauseReviewSchema = z.object({
   id: z.string(),
   date: z.string(),
@@ -971,7 +971,7 @@ export const PauseReviewSchema = z.object({
 })
 export type PauseReview = z.infer<typeof PauseReviewSchema>
 
-// A non-trade decision written before it plays out (blueprint 02 §6.2):
+// A non-trade decision written before it plays out (handbook 04 §5):
 // the call, why, how sure, and a pre-mortem; filled in after the review date.
 export const DecisionKindSchema = z.enum(['tilt', 'regime_params', 'policy', 'other'])
 export type DecisionKind = z.infer<typeof DecisionKindSchema>
@@ -993,7 +993,7 @@ export const DecisionSchema = z.object({
 export type Decision = z.infer<typeof DecisionSchema>
 
 // Two to four scenarios with probabilities that sum to 100, scored once
-// the horizon passes (blueprint 02 §2.1–2.2). Shocks are % moves.
+// the horizon passes (handbook 05 §8.1–8.2). Shocks are % moves.
 export const ScenarioSchema = z.object({
   name: z.string(),
   probability: z.number().min(0).max(100),

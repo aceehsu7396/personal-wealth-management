@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-// Event calendar (blueprint 02 §1.2): ex-dividend dates and investor
+// Event calendar (handbook 05 §9.1): ex-dividend dates and investor
 // conferences from TWSE and TPEx open data (built daily into
 // public/data/events.json), statutory report deadlines by rule, and central
 // bank meetings from the banks' published schedules.

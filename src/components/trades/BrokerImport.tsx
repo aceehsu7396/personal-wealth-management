@@ -33,7 +33,7 @@ interface Choice {
 }
 
 // Import Fubon's statement (saved web page, pasted tables or CSV) into the
-// trade log (blueprint 02 §3.11).
+// trade log (handbook 04 §6).
 // Each row becomes a trade marked as imported, through the same path as a
 // trade typed in, so holdings and trade plans update the same way.
 export function BrokerImport({ onImport }: { onImport: (s: TradeSubmission) => void }) {

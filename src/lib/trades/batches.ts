@@ -1,6 +1,6 @@
 import type { AddOnRule, PlanAdvice, TradePlan } from '../storage/schema'
 
-// Batches and add-ons (blueprint 02 §3.5, 01 §C3): each planned buy with its
+// Batches and add-ons (handbook 08 §2.3): each planned buy with its
 // price and shares, filled in turn. Before the next one, the whole trade's
 // stop risk must stay within the per-trade limit, the regime must allow it,
 // and the position must stay under the single-position cap.

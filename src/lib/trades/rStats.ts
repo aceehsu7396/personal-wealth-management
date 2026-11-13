@@ -1,7 +1,7 @@
 import type { PlanAdvice, Trade, TradePlan } from '../storage/schema'
 
 // What closed trade plans earned in R, grouped by entry method and by the
-// regime they were drafted in (blueprint 02 §6.3), and whether following
+// regime they were drafted in (handbook 08 §6.3), and whether following
 // the assistant's advice paid (§3.8).
 
 export const MIN_GROUP = 5

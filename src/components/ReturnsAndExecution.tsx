@@ -33,7 +33,7 @@ function RTable({ rows, title }: { rows: RGroup[]; title: string }) {
 }
 
 // Time- and money-weighted returns, R by entry method and regime, and
-// whether following the assistant paid (blueprint 02 §6.3, §3.8).
+// whether following the assistant paid (handbook 08 §6.3, 04 §4).
 export function ReturnsAndExecution() {
   const reviews = useAppStore((s) => s.performanceReviews)
   const pauseReviews = useAppStore((s) => s.pauseReviews)

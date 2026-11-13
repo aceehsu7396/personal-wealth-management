@@ -7,7 +7,7 @@ import { secondaryButton } from '../ui'
 
 type Checks = Record<(typeof REVIEW_QUESTIONS)[number]['key'], boolean>
 
-// The review that lifts a losing-streak pause (blueprint 02 §5.5).
+// The review that lifts a losing-streak pause (handbook 04 §8).
 export function PauseReviewForm({ pause }: { pause: PauseStatus }) {
   const add = useAppStore((s) => s.addPauseReview)
   const [checks, setChecks] = useState<Checks>({ followedStops: false, regimeChanged: false, strategyStillValid: false, sizeTooLarge: false })

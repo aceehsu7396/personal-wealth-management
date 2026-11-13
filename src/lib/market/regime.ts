@@ -6,7 +6,7 @@ import { flowSums, marginChange, vixBand, type IndexTrend, type Tone } from './t
 import type { MacroData, Point } from '../macro/macroData'
 import type { ValuationPoint } from './valuation'
 
-// Market regime (blueprint 02 §1.1, 01 §C6): one of seven states, read from
+// Market regime (handbook 05 §7, 04 §0.1): one of seven states, read from
 // the TAIEX by fixed price rules and confirmed over a few sessions. The
 // regime picks a row of the signed parameter table, which sets the size
 // multiplier, allowed entries, stop width and add-on rule for new plans.
@@ -33,7 +33,7 @@ export const REGIME_TONE: Record<RegimeKey, Tone> = {
   range: 'info',
 }
 
-// Table order of 01 §C6.
+// Table order of handbook 05 §7.
 export const REGIME_ORDER: RegimeKey[] = ['bull', 'overheated', 'correction', 'bear', 'crash', 'rebound', 'range']
 
 export const REGIME_RULES = {
@@ -366,7 +366,7 @@ export interface RegimeContext {
   multiplier: number
   macroHalved: boolean
   macroHeadwind: boolean
-  // Signed within the cooling-off days (01 §C10).
+  // Signed within the cooling-off days (handbook 02 §9.1).
   coolingOff: boolean
   basis: string
 }

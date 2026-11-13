@@ -26,7 +26,7 @@ const SHOCK_FIELDS = [
 ] as const
 
 // Two to four scenarios with probabilities, signals and prepared actions;
-// scored with the Brier rule once the horizon passes (blueprint 02 §2).
+// scored with the Brier rule once the horizon passes (handbook 05 §8).
 export function ScenarioWorkbench() {
   const sets = useAppStore((s) => s.scenarioSets)
   const add = useAppStore((s) => s.addScenarioSet)

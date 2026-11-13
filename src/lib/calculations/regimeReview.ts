@@ -1,7 +1,7 @@
 import type { RegimeKey } from '../storage/schema'
 import type { RegimeSegment } from '../market/regime'
 
-// Hindsight check of the regime rules (blueprint 02 §6.1): was each regime
+// Hindsight check of the regime rules (handbook 05 §8.3): was each regime
 // followed by the move it braced for? Used only as evidence for the yearly
 // review; thresholds are never tuned automatically.
 

@@ -56,7 +56,7 @@ function RowEditor({ row, onChange }: { row: RegimeParamRow; onChange: (row: Reg
   )
 }
 
-// The signed regime parameter table (blueprint 02 §3.9, 01 §C6): one row per
+// The signed regime parameter table (handbook 04 §0.1, 05 §7): one row per
 // regime; editing needs a reason and a signature, then a cooling-off week.
 export function RegimeParamsCard() {
   const params = useAppStore((s) => s.regimeParams)

@@ -1,7 +1,7 @@
 import type { Holding } from '../storage/schema'
 import { holdingValueTwd } from './portfolioRisk'
 
-// Stress tests (blueprint 02 §5.2): historical and hypothetical shocks
+// Stress tests (handbook 08 §5.2): historical and hypothetical shocks
 // applied to today's holdings, and the reverse question of how far the
 // market can fall before the circuit breaker or the drawdown limit.
 

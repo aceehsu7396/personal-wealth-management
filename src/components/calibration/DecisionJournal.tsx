@@ -66,7 +66,7 @@ function ReviewForm({ decision, onDone }: { decision: Decision; onDone: () => vo
 }
 
 // Non-trade decisions with a pre-mortem, filled in after the review date
-// (blueprint 02 §6.2). Trades are recorded on trade plans instead.
+// (handbook 04 §5). Trades are recorded on trade plans instead.
 export function DecisionJournal() {
   const decisions = useAppStore((s) => s.decisions)
   const add = useAppStore((s) => s.addDecision)

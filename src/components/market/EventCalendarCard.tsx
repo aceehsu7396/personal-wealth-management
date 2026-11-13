@@ -4,7 +4,7 @@ import { todayIsoDate } from '../../lib/market/twse'
 import { Badge, Card, DataTable } from '../ui'
 
 // The next two weeks: company events for holdings and open plans first,
-// then market-wide dates (blueprint 02 §1.2).
+// then market-wide dates (handbook 05 §9.1).
 export function EventCalendarCard() {
   const today = todayIsoDate()
   const events = useEvents(today)

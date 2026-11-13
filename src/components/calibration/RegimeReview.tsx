@@ -7,7 +7,7 @@ import { Badge, Card, DataTable, type Tone } from '../ui'
 const signed = (v: number | null) => (v === null ? '—' : `${v > 0 ? '+' : ''}${v.toFixed(1)}%`)
 const VERDICT_TONE: Record<Verdict, Tone> = { right: 'good', wrong: 'bad', unclear: 'warn', unscored: 'info', pending: 'info' }
 
-// The regime rules in hindsight (blueprint 02 §6.1), with the scenario sets
+// The regime rules in hindsight (handbook 05 §8.3), with the scenario sets
 // written during each regime beside them.
 export function RegimeReview() {
   const review = useRegimeReview()

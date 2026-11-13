@@ -1,6 +1,6 @@
 import type { InvestmentPolicy, PauseReview, Trade } from '../storage/schema'
 
-// Pause rules for the trading sleeve (blueprint 02 §5.5, 01 §E3): stop new
+// Pause rules for the trading sleeve (handbook 04 §8): stop new
 // positions after a run of losing trades until a review is written, and
 // for the rest of the month once realised losses reach the monthly limit.
 

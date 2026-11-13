@@ -3,7 +3,7 @@ import type { CalibrationSummary } from './calibration'
 import type { ExecutionStats } from '../trades/tradePlan'
 import type { AdviceUptake, RGroup } from '../trades/rStats'
 
-// The yearly review (blueprint 02 §6.4): one report of goal progress,
+// The yearly review (handbook 11 §5.1): one report of goal progress,
 // returns, plan execution, rule breaks, and judgement quality, ending with
 // revision suggestions from fixed rules. Suggestions never change a setting.
 

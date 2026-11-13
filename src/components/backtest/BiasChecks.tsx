@@ -12,7 +12,7 @@ type Checks = {
   cost: ReturnType<typeof costSensitivity>
 }
 
-// Three guards against a backtest that only looks good (blueprint 02 §7.1):
+// Three guards against a backtest that only looks good (handbook 10 §6.3):
 // walk-forward, a Sharpe ratio deflated for the number of tries, and costs.
 export function BiasChecks({ input, result, trials, sweepKey }: { input: BacktestInput; result: BacktestResult; trials: number; sweepKey?: string }) {
   const [checks, setChecks] = useState<Checks | null>(null)

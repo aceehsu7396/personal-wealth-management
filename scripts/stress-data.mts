@@ -1,5 +1,5 @@
 // Builds src/lib/calculations/stressScenarios.json: the historical stress scenarios of the
-// risk page (blueprint 02 §5.2). For each crisis it finds the TAIEX peak
+// risk page (handbook 08 §5.2). For each crisis it finds the TAIEX peak
 // and trough inside a search window, then measures the other markets over
 // the same dates:
 //   - TAIEX: TWSE monthly history (MI_5MINS_HIST)

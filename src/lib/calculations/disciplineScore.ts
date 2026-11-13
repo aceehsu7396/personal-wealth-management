@@ -21,7 +21,7 @@ export interface DisciplineReport {
   // Stop-loss exits filled well below the plan's stop.
   lateStops: number
   // Mean buy slippage against the plan, and required advice declined on
-  // executed plans (blueprint 02 §3.8).
+  // executed plans (handbook 04 §4).
   avgSlippage: number | null
   declinedRequired: number
   penalties: { lateStops: number; slippage: number; declined: number }
@@ -86,12 +86,12 @@ export function lateStopExits(plans: Pick<TradePlan, 'id' | 'currentStop' | 'sto
   }).length
 }
 
-// Each late stop costs 5 points, at most 20 (blueprint 02 §3.8). Coverage
+// Each late stop costs 5 points, at most 20 (handbook 04 §4). Coverage
 // and slippage are shown on the trade log but not scored, so trades made
 // before trade plans existed are not penalised.
 const LATE_STOP_PENALTY = 5
 const LATE_STOP_MAX_PENALTY = 20
-// Execution penalties (blueprint 02 §3.8), revised at the yearly review.
+// Execution penalties (handbook 04 §4), revised at the yearly review.
 export const EXECUTION_RULES = { slippageWarn: 0.005, slippageBad: 0.01, slippageWarnPenalty: 5, slippageBadPenalty: 10, declinedPenalty: 3, declinedMaxPenalty: 15 } as const
 
 type PlanLike = Pick<TradePlan, 'id' | 'currentStop' | 'stopLoss'> & Partial<Pick<TradePlan, 'status' | 'advice' | 'entryPrice' | 'batches'>>

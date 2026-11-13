@@ -41,7 +41,7 @@ function DrawdownChart() {
   )
 }
 
-// Risk (blueprint 02 §5): how much the portfolio could lose, where the risk
+// Risk (handbook 08 §5): how much the portfolio could lose, where the risk
 // sits, how long the buffer lasts, and the trading sleeve's pause rules.
 export function RiskPage() {
   const [custom, setCustom] = useState<StressScenario | null>(null)

@@ -578,7 +578,7 @@ export const useAppStore = create<AppStore>()(
           tradePlans: state.tradePlans.map((p) => {
             if (p.id !== id) return p
             const next = { ...p, ...entry, updatedAt: new Date().toISOString() }
-            // The stop in force only moves up (01 §C4).
+            // The stop in force only moves up (handbook 05 §7).
             if (entry.currentStop !== undefined && p.currentStop !== undefined && entry.currentStop < p.currentStop) {
               next.currentStop = p.currentStop
             }

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import type { DecisionKind } from '../../lib/storage/schema'
 
 // After a rule set is signed: offer to record it as a decision with a
-// pre-mortem (blueprint 02 §6.2).
+// pre-mortem (handbook 04 §5).
 export function DecisionPrompt({ kind, title, reasons }: { kind: DecisionKind; title: string; reasons: string }) {
   const q = new URLSearchParams({ decision: 'new', kind, title, reasons })
   return (

@@ -1,6 +1,6 @@
 import type { InvestmentPolicy, PortfolioSnapshot, TradePlan } from '../storage/schema'
 
-// Risk numbers for the risk page (blueprint 02 §5.1): volatility, beta,
+// Risk numbers for the risk page (handbook 08 §5.1): volatility, beta,
 // historical VaR and CVaR, concentration, correlations, risk contribution
 // and the trading sleeve's risk budget. Returns are daily simple returns on
 // a shared calendar; weights are current portfolio weights.

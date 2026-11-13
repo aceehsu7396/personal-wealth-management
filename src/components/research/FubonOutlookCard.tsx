@@ -130,7 +130,7 @@ export function FubonOutlookCard({ data }: { data: MacroData | null }) {
 
   return (
     // An outside view, kept for reference and collapsed by default: the
-    // site's own regime reading comes first (blueprint 04, stage 0).
+    // site's own regime reading comes first (handbook 05 §7).
     <details className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
       <summary className="flex cursor-pointer flex-wrap items-baseline justify-between gap-2">
         <h2 className="inline text-lg font-semibold text-gray-900 dark:text-gray-100">外部觀點：富邦總經觀點（選用參考）</h2>

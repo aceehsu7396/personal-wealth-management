@@ -220,7 +220,7 @@ export function netFlowsBySleeve(
   return flows
 }
 
-// --- Time- and money-weighted returns (blueprint 02 §6.3) --------------------
+// --- Time- and money-weighted returns (handbook 08 §6.3) --------------------
 
 // Annual rate r with Σ cf × (1 + r)^(−years from the first flow) = 0.
 // Contributions are negative, the ending value positive. Newton's method,

@@ -1,6 +1,6 @@
 import { buildPrompt, type PromptSection } from './common'
 
-// The six agents of blueprint 03, in its order. Each takes the rule layer's
+// The six AI agents (handbook 00 §3). Each takes the rule layer's
 // results as plain lines (already formatted by the page) and returns the
 // prompt to paste into Claude.
 

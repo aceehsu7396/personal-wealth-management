@@ -72,7 +72,7 @@ function Decision({ item, saved, onSave }: { item: PlanAdvice; saved?: PlanAdvic
   )
 }
 
-// A trade plan (blueprint 02 §3.3): conclusion and action on the left, the
+// A trade plan (handbook 04 §0): conclusion and action on the left, the
 // seven parts on the right. Advice is recomputed from the rules on every
 // change; the trader's follow/decline choices are kept on the plan.
 export function PlanEditor({ plan }: { plan: TradePlan }) {

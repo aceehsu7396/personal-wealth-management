@@ -5,7 +5,7 @@ import { dailyMetrics } from './market/regime'
 import { reviewHistory } from './calculations/regimeReview'
 
 // Every regime segment of the past four years judged in hindsight
-// (blueprint 02 §6.1), shared by the review card and the annual report.
+// (handbook 05 §8.3), shared by the review card and the annual report.
 export function useRegimeReview() {
   const { history } = useRegime()
   const { data } = useDailyMarket()

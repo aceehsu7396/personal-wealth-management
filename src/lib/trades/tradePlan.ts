@@ -12,7 +12,7 @@ import { EVENT_LABELS, EVENT_RULES, GAP_RISK, upcoming, type MarketEvent } from 
 import { batchChecks, draftBatches } from './batches'
 import { analyzePortfolio } from '../calculations/portfolioRisk'
 
-// The entry-exit assistant's rule layer (blueprint 02 §3): drafts a trade
+// The entry-exit assistant's rule layer (handbook 04 §0): drafts a trade
 // plan from a research card or a strategy card, checks it against the
 // discipline rules in three levels, manages the stop while the position is
 // open, and orders the day's work. Every number is computed here; nothing is
@@ -176,7 +176,7 @@ export function sharesByRisk(price: number, stop: number, totalValueTwd: number,
   return Math.floor(budget / (price - stop))
 }
 
-// --- Position size (blueprint 02 §5.3) ---------------------------------------
+// --- Position size (handbook 08 §5.3) ---------------------------------------
 
 export interface SizeOption {
   key: 'risk' | 'volatility' | 'kelly'
@@ -488,7 +488,7 @@ export interface ScanItem {
   to: string
 }
 
-// Discipline order (blueprint 02 §3.1 ①): stops and broken theses come
+// Discipline order (handbook 04 §0): stops and broken theses come
 // before anything that adds risk.
 export const SCAN_PRIORITY = {
   stop_hit: 1,

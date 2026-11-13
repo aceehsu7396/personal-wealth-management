@@ -29,7 +29,7 @@ function FacetRow({ facet }: { facet: Facet }) {
   )
 }
 
-// The regime and the parameter row it applies (blueprint 02 §1.1, §3.9):
+// The regime and the parameter row it applies (handbook 05 §7, 04 §0.1):
 // conclusion on the left, the basis on the right.
 export function RegimeCard() {
   const { ctx, history, facets, loading } = useRegime()

@@ -1,4 +1,4 @@
-// Prompt templates for the six AI agents of blueprint 03 (stage 6), used
+// Prompt templates for the six AI agents (handbook 00 §3), used
 // without an API key: the site builds the prompt from what the rules
 // already computed, and the trader pastes it into their own Claude chat.
 // The model may only explain those results; it never adds trades or

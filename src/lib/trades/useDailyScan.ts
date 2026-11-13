@@ -20,7 +20,7 @@ import { ENTRY_SIGNAL_LABELS, ENTRY_SIGNAL_METHOD } from './entrySignals'
 // Research cards should be refreshed after every quarterly report.
 const THESIS_STALE_MONTHS = 4
 
-// The day's work in discipline order (blueprint 02 §3.1 ①): open positions
+// The day's work in discipline order (handbook 04 §0): open positions
 // first (stops, broken theses, targets, time stops, stops to raise), then
 // buy points, then reviews and housekeeping.
 export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
@@ -58,7 +58,7 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
     items.push(scanItem('buy_zone', `${plan.ticker} ${plan.name}：第 ${i + 1} 批到價（${b.price}，收盤 ${status.close}），${b.shares} 股`, `計畫單：分批與加碼${note}`, `/portfolio/plans?id=${plan.id}`))
   }
 
-  // Pause rules come before any new risk (blueprint 02 §5.5).
+  // Pause rules come before any new risk (handbook 04 §8).
   if (pause.streakPaused) {
     items.push(scanItem('pause', `連續虧損 ${pause.streak} 筆：交易部位暫停新建倉，先完成暫停檢討`, `投資政策：連續虧損 ${pause.streakLimit} 筆就暫停`, '/portfolio/risk'))
   }

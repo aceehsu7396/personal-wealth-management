@@ -33,7 +33,7 @@ function exitLink({ plan, status }: OpenPlanStatus): { label: string; to: string
   }
 }
 
-// Open trade plans while the position is held (blueprint 02 §3.6): the stop
+// Open trade plans while the position is held (handbook 04 §0): the stop
 // in force, R, the next target, the time stop, and what to do about them.
 export function ExitManager() {
   const { items, loading } = useOpenPlanStatus()

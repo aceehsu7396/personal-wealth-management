@@ -12,7 +12,7 @@ const thClass = 'py-2 pr-4 text-left text-xs font-medium text-gray-600 dark:text
 const tdClass = 'py-2 pr-4 text-sm text-gray-800 dark:text-gray-200'
 const twd = (v: number) => `NT$${v.toLocaleString('zh-TW')}`
 
-// The dip ladder (blueprint 02 §4.2): reserve cash for each TAIEX drawdown
+// The dip ladder (handbook 08 §2.4): reserve cash for each TAIEX drawdown
 // step, written down and signed before the fall.
 export function DipLadderCard() {
   const ladder = useAppStore((s) => s.dipLadder)

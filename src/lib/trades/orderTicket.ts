@@ -1,6 +1,6 @@
 import type { TradePlan } from '../storage/schema'
 
-// Order drafts (blueprint 02 §3.7, 01 §C7): the orders to place at the
+// Order drafts (handbook 04 §0.2): the orders to place at the
 // broker for a trade plan, on valid price ticks, split into board lots and
 // intraday odd lots, with the stop (or a one-cancels-other order with the
 // first target) to set once filled. The site never connects to a broker.

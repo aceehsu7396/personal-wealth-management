@@ -2,7 +2,7 @@ import { rsi, sma } from '../backtest/indicators'
 import type { EntryMethod } from '../storage/schema'
 import type { Bar } from '../market/priceHistory'
 
-// Entry-condition monitoring (blueprint 02 §3.4): three rules checked on
+// Entry-condition monitoring (handbook 10 §6.4): three rules checked on
 // the latest daily bar of each watched symbol. A signal only suggests
 // drafting a trade plan; the plan and the pre-trade checklist still decide.
 

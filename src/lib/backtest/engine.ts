@@ -689,7 +689,7 @@ export function latestSignals(
 }
 
 // ---------------------------------------------------------------------------
-// Bias checks (blueprint 02 §7.1)
+// Bias checks (handbook 10 §6.3)
 // ---------------------------------------------------------------------------
 
 export interface WalkSegment {

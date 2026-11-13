@@ -16,7 +16,7 @@ import { Card, secondaryButton } from '../ui'
 import { reviewerPrompt } from '../../lib/ai/prompts/agents'
 import { PromptPanel } from '../ai/PromptPanel'
 
-// The yearly review (blueprint 02 §6.4), copyable as Markdown.
+// The yearly review (handbook 11 §5.1), copyable as Markdown.
 export function AnnualReport() {
   const s = useAppStore()
   const { policy } = useJourney()

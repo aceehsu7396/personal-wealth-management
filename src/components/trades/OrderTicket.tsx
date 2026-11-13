@@ -6,7 +6,7 @@ import { secondaryButton, textLink } from '../ui'
 
 const fmt = (v: number) => v.toLocaleString('zh-TW', { maximumFractionDigits: 0 })
 
-// The orders to place at the broker for this plan (blueprint 02 §3.7);
+// The orders to place at the broker for this plan (handbook 04 §0.2);
 // updates as the plan changes. Nothing is sent anywhere.
 export function OrderTicket({ plan, discount }: { plan: TradePlan; discount: number }) {
   const [copied, setCopied] = useState<number | 'all' | null>(null)

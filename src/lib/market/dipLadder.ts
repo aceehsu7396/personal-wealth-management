@@ -1,6 +1,6 @@
 import type { DipLadder } from '../storage/schema'
 
-// The dip ladder (blueprint 02 §4.2): reserve cash written down in advance
+// The dip ladder (handbook 08 §2.4): reserve cash written down in advance
 // for each TAIEX drawdown step. A step is due when the drawdown reaches it,
 // it has an amount, and it has not been done since the last 52-week high.
 

@@ -37,7 +37,6 @@ const ALL_PAGES = [
   '/handbook/00',
   '/journey',
   '/settings',
-  '/blueprint/00',
 ]
 
 // Laptop sizes are the main review; the phone only checks overflow and errors.

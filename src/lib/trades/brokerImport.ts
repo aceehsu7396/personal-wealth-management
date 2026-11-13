@@ -1,6 +1,6 @@
 import type { Trade } from '../storage/schema'
 
-// Broker statement import (blueprint 02 §3.11). Fubon's statements are web
+// Broker statement import (handbook 04 §6). Fubon's statements are web
 // pages with several tables (TW cash trades, US regular savings, …): they
 // can be saved as HTML, copied and pasted (tab-separated) or exported as
 // CSV. Columns are found by name, with aliases for other brokers' wording;

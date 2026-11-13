@@ -14,7 +14,7 @@ const TABS = [
 
 type Tab = (typeof TABS)[number]['key']
 
-// Review and calibration (blueprint 02 §2, §6): decisions, scenarios and
+// Review and calibration (handbook 05 §8): decisions, scenarios and
 // regime calls checked against what happened, and the yearly report. One
 // section at a time keeps the page short.
 export function CalibrationPage() {

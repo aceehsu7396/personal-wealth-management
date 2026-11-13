@@ -9,7 +9,7 @@ import { Badge, secondaryButton, textLink } from '../ui'
 const fmt = (v: number | undefined) => (v === undefined ? '—' : v.toLocaleString('zh-TW', { maximumFractionDigits: 2 }))
 const num = (s: string) => (s.trim() === '' ? undefined : Number(s))
 
-// Batches and add-ons of a plan (blueprint 02 §3.5). The first batch is the
+// Batches and add-ons of a plan (handbook 08 §2.3). The first batch is the
 // plan's own entry; later ones are recorded one at a time from here.
 export function BatchPlan({ plan }: { plan: TradePlan }) {
   const update = useAppStore((s) => s.updateTradePlan)
