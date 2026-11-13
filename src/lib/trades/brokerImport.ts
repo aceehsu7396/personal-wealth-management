@@ -1,11 +1,14 @@
 import type { Trade } from '../storage/schema'
 
-// Broker statement import (blueprint 02 §3.11): Fubon's trade-detail CSV
-// read by column names, with aliases for the other wordings brokers use.
-// When the columns cannot be recognised the caller asks the trader to map
-// them. Imported trades are marked as such and never pass as checked.
+// Broker statement import (blueprint 02 §3.11). Fubon's statements are web
+// pages with several tables (TW cash trades, US regular savings, …): they
+// can be saved as HTML, copied and pasted (tab-separated) or exported as
+// CSV. Columns are found by name, with aliases for other brokers' wording;
+// the TW table has no ticker, so names are looked up. When nothing can be
+// recognised the caller asks the trader to map the columns. Imported trades
+// are marked as such and never pass as checked.
 
-export type ImportField = 'date' | 'ticker' | 'name' | 'side' | 'shares' | 'lots' | 'price' | 'fee' | 'tax'
+export type ImportField = 'date' | 'ticker' | 'name' | 'side' | 'shares' | 'lots' | 'price' | 'fee' | 'tax' | 'market'
 
 export const FIELD_LABELS: Record<ImportField, string> = {
   date: '成交日期',
@@ -17,6 +20,7 @@ export const FIELD_LABELS: Record<ImportField, string> = {
   price: '成交價',
   fee: '手續費',
   tax: '交易稅',
+  market: '市場',
 }
 
 const ALIASES: Record<ImportField, string[]> = {
@@ -24,11 +28,12 @@ const ALIASES: Record<ImportField, string[]> = {
   ticker: ['股票代號', '證券代號', '股票代碼', '商品代號', '代號'],
   name: ['股票名稱', '證券名稱', '商品名稱', '名稱'],
   side: ['買賣別', '交易類別', '交易別', '買/賣', '買賣'],
-  shares: ['成交股數', '股數', '成交數量', '數量'],
+  shares: ['成交股數', '成交股數/台股', '股數', '成交數量', '數量'],
   lots: ['成交張數', '張數'],
   price: ['成交價', '成交單價', '成交價格', '單價', '價格'],
   fee: ['手續費'],
   tax: ['交易稅', '證交稅'],
+  market: ['市場', '交易市場'],
 }
 
 export const REQUIRED: ImportField[] = ['date', 'ticker', 'side', 'price']
@@ -77,24 +82,56 @@ export function parseCsv(text: string): string[][] {
 
 const norm = (s: string) => s.replace(/[\s（）()]/g, '')
 
-// The header row (the first that names a date and a ticker) and the column
-// of each field it names.
-export function detectColumns(rows: string[][]): { headerRow: number; mapping: Mapping } | null {
-  for (let r = 0; r < Math.min(rows.length, 15); r++) {
-    const cells = rows[r].map(norm)
-    const mapping: Mapping = {}
-    for (const field of Object.keys(ALIASES) as ImportField[]) {
-      for (const alias of ALIASES[field]) {
-        const i = cells.findIndex((c, k) => c === alias && !Object.values(mapping).includes(k))
-        if (i >= 0) {
-          mapping[field] = i
-          break
-        }
+// The columns a row names, if it is a trade table's header: a date, a
+// ticker or name, and a price.
+export function headerMapping(row: string[]): Mapping | null {
+  const cells = row.map(norm)
+  const mapping: Mapping = {}
+  for (const field of Object.keys(ALIASES) as ImportField[]) {
+    for (const alias of ALIASES[field]) {
+      const i = cells.findIndex((c, k) => c === alias && !Object.values(mapping).includes(k))
+      if (i >= 0) {
+        mapping[field] = i
+        break
       }
     }
-    if (mapping.date !== undefined && mapping.ticker !== undefined) return { headerRow: r, mapping }
+  }
+  const named = mapping.ticker !== undefined || mapping.name !== undefined
+  return mapping.date !== undefined && named && mapping.price !== undefined ? mapping : null
+}
+
+// The first header row and its columns, for the manual mapping screen.
+export function detectColumns(rows: string[][]): { headerRow: number; mapping: Mapping } | null {
+  for (let r = 0; r < Math.min(rows.length, 60); r++) {
+    const mapping = headerMapping(rows[r])
+    if (mapping) return { headerRow: r, mapping }
   }
   return null
+}
+
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', nbsp: ' ', '#39': "'" }
+const text = (h: string) => h.replace(/<br\s*\/?>/gi, ' ').replace(/<[^>]+>/g, '').replace(/&(\w+|#\d+);/g, (m, e: string) => ENTITIES[e] ?? (e.startsWith('#') ? String.fromCharCode(Number(e.slice(1))) : m)).replace(/\s+/g, ' ').trim()
+
+// Every table row of an HTML statement, tables one after another; a
+// table's caption-like first cell stays as a one-cell row.
+export function htmlRows(html: string): string[][] {
+  const rows: string[][] = []
+  for (const tr of html.match(/<tr[\s\S]*?<\/tr>/gi) ?? []) {
+    const cells = (tr.match(/<t[hd][\s\S]*?<\/t[hd]>/gi) ?? []).flatMap((c) => {
+      const span = Number(c.match(/colspan\s*=\s*"?(\d+)/i)?.[1] ?? 1)
+      return [text(c), ...Array<string>(Math.max(0, span - 1)).fill('')]
+    })
+    if (cells.some((c) => c !== '')) rows.push(cells)
+  }
+  return rows
+}
+
+// A statement as rows of cells: HTML, tab-separated (copied from a web
+// page) or CSV.
+export function statementRows(content: string): string[][] {
+  if (/<table/i.test(content)) return htmlRows(content)
+  if (content.includes('\t')) return content.split(/\r?\n/).map((l) => l.split('\t').map((c) => c.trim())).filter((r) => r.some((c) => c !== ''))
+  return parseCsv(content)
 }
 
 export const missingFields = (m: Mapping): ImportField[] => {
@@ -132,6 +169,7 @@ const num = (s: string | undefined) => {
 export interface ImportRow {
   line: number
   date: string
+  // Empty when a name-only row could not be matched to a ticker.
   ticker: string
   name: string
   side: Trade['side']
@@ -140,6 +178,9 @@ export interface ImportRow {
   fee?: number
   tax?: number
   margin: boolean
+  currency: Trade['currency']
+  // A regular savings plan buy (定期定額).
+  dca: boolean
 }
 
 export interface ParseResult {
@@ -148,27 +189,80 @@ export interface ParseResult {
   skipped: { line: number; reason: string }[]
 }
 
-export function readRows(rows: string[][], headerRow: number, m: Mapping): ParseResult {
+const US_MARKETS = /^(ARCA|NYSE|NASDAQ|AMEX|BATS|NYSEARCA|美國)/i
+const nameKey = (s: string) => s.replace(/[\s　]/g, '').replace(/臺/g, '台').toUpperCase()
+
+// Look up a ticker by security name (the TW table has names only).
+export function nameResolver(entries: { code: string; name: string }[]): (name: string) => string {
+  const byName = new Map(entries.map((e) => [nameKey(e.name), e.code]))
+  return (name) => byName.get(nameKey(name)) ?? ''
+}
+
+// One data row under a header; null when the row is not a trade (totals,
+// a second header in English, notes).
+function readRow(cells: string[], m: Mapping, line: number, resolve: (name: string) => string, context: { dca: boolean }): ImportRow | { line: number; reason: string } | null {
+  const cell = (f: ImportField) => (m[f] === undefined ? undefined : cells[m[f]!])
+  const rawDate = cell('date') ?? ''
+  if (!/\d/.test(rawDate)) return null
+  const date = parseDate(rawDate)
+  const sideText = cell('side') ?? ''
+  const side = parseSide(sideText)
+  const name = cell('name') ?? ''
+  // Codes such as 00679B keep their letter; quotes and '=' from Excel go.
+  const ticker = (cell('ticker') ?? '').replace(/[="'\s]/g, '').toUpperCase() || resolve(name)
+  const lots = num(cell('lots'))
+  const shares = num(cell('shares')) ?? (lots !== null ? lots * 1000 : null)
+  const price = num(cell('price'))
+  if (!date) return { line, reason: '日期看不懂' }
+  if (!side) return { line, reason: '買賣別看不懂' }
+  if (!shares || shares <= 0 || !price || price <= 0) return { line, reason: '股數或價格不正確' }
+  if (!ticker && !name) return { line, reason: '缺代號與名稱' }
+  const us = US_MARKETS.test(cell('market') ?? '')
+  return { line, date, ticker, name, side: side.side, shares, price, fee: num(cell('fee')) ?? undefined, tax: num(cell('tax')) ?? undefined, margin: side.margin, currency: us ? 'USD' : 'TWD', dca: context.dca || sideText.includes('定期定額') }
+}
+
+// Rows under one known header (manual mapping).
+export function readRows(rows: string[][], headerRow: number, m: Mapping, resolve: (name: string) => string = () => ''): ParseResult {
   const out: ImportRow[] = []
   const skipped: ParseResult['skipped'] = []
   for (let r = headerRow + 1; r < rows.length; r++) {
-    const cell = (f: ImportField) => (m[f] === undefined ? undefined : rows[r][m[f]!])
-    const date = parseDate(cell('date') ?? '')
-    const side = parseSide(cell('side') ?? '')
-    // Codes such as 00679B keep their letter; quotes and '=' from Excel go.
-    const ticker = (cell('ticker') ?? '').replace(/[="'\s]/g, '').toUpperCase()
-    const lots = num(cell('lots'))
-    const shares = num(cell('shares')) ?? (lots !== null ? lots * 1000 : null)
-    const price = num(cell('price'))
-    // Totals and notes at the end of a statement are not trades.
-    if (!date && !ticker) continue
-    if (!date || !side || !ticker || !shares || shares <= 0 || !price || price <= 0) {
-      skipped.push({ line: r + 1, reason: !date ? '日期看不懂' : !side ? '買賣別看不懂' : !ticker ? '缺代號' : '股數或價格不正確' })
-      continue
-    }
-    out.push({ line: r + 1, date, ticker, name: cell('name') ?? '', side: side.side, shares, price, fee: num(cell('fee')) ?? undefined, tax: num(cell('tax')) ?? undefined, margin: side.margin })
+    const row = readRow(rows[r], m, r + 1, resolve, { dca: false })
+    if (!row) continue
+    if ('date' in row) out.push(row)
+    else skipped.push(row)
   }
   return { rows: out, skipped }
+}
+
+// A whole statement: every trade table, each under its own header. A
+// one-cell title row containing 定期定額 marks the next table as savings
+// plan buys.
+export function readStatement(rows: string[][], resolve: (name: string) => string = () => ''): ParseResult & { tables: number } {
+  const out: ImportRow[] = []
+  const skipped: ParseResult['skipped'] = []
+  let mapping: Mapping | null = null
+  let tables = 0
+  const context = { dca: false }
+  rows.forEach((cells, r) => {
+    const filled = cells.filter((c) => c !== '')
+    const header = headerMapping(cells)
+    if (header) {
+      mapping = header
+      tables++
+      return
+    }
+    if (filled.length <= 2 && filled.join('').length > 3 && !/\d{3}\/\d/.test(filled.join(''))) {
+      // A title between tables: a new table starts after it.
+      context.dca = filled.join('').includes('定期定額')
+      return
+    }
+    if (!mapping) return
+    const row = readRow(cells, mapping, r + 1, resolve, context)
+    if (!row) return
+    if ('date' in row) out.push(row)
+    else skipped.push(row)
+  })
+  return { rows: out, skipped, tables }
 }
 
 // Same date, ticker, side, shares and price: already in the trade log.
