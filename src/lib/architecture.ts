@@ -49,9 +49,9 @@ export const ARCH_NODES: Record<string, ArchNode> = {
   },
   macro: {
     id: 'macro',
-    title: '總經與大盤',
-    what: '每月依成長、通膨、流動性、情緒判斷景氣體制與順逆風；每天依均線與回檔判讀台股、美股大盤的趨勢狀態。',
-    why: '總經與大盤只調「多少」（股債比例、交易部位能否新建倉），不決定「買什麼」；核心部位不因每日走勢調整。',
+    title: '局勢與總經',
+    what: '每天依加權指數的規則判斷七種局勢之一（連續 3 個交易日才確認），局勢參數表決定交易部位的倍數、允許的進場方法與停損寬度；每月依成長、通膨、流動性、情緒判斷景氣體制；事件日曆列出重要日期。',
+    why: '局勢與總經只調「多少」（股債比例、交易部位能否新建倉、部位多大），不決定「買什麼」；核心部位不因每日走勢調整。',
     page: { to: '/research/market', label: '研究分析・市場' },
     handbook: { slug: '05', label: '05 總體經濟與政策' },
     steps: ['3.1', '3.2'],
@@ -121,9 +121,9 @@ export const ARCH_NODES: Record<string, ArchNode> = {
   },
   checklist: {
     id: 'checklist',
-    title: '交易前檢核與交易日誌',
-    what: '每筆下單前逐項檢核（政策上限、總經、策略卡或研究卡、停損與風險），成交後記錄並事後檢討。',
-    why: '檢核表擋下已知錯誤；日誌把決策品質和結果分開，才能檢討。',
+    title: '交易計畫、檢核與日誌',
+    what: '下單前先寫交易計畫單（進場、停損、停利、分批與加碼），系統給三級建議並產生委託單草稿；下單前逐項檢核（政策上限、局勢參數、暫停規則、策略卡或研究卡、停損與風險），成交後記錄滑價並事後檢討。',
+    why: '計畫寫在進場前，才不會被盤中情緒改寫；檢核表擋下已知錯誤；日誌把決策品質和結果分開，才能檢討。',
     page: { to: '/portfolio/trades', label: '投資持有與檢討回顧・交易日誌' },
     handbook: { slug: '04', label: '04 紀律與檢核流程' },
     steps: ['5.1', '5.3'],
@@ -131,7 +131,7 @@ export const ARCH_NODES: Record<string, ArchNode> = {
   risk: {
     id: 'risk',
     title: '持股與組合風控',
-    what: '檢查配置偏離、部位與產業集中度、美元曝險、回撤熔斷。',
+    what: '檢查配置偏離、部位與產業集中度、美元曝險、回撤熔斷；出場管理追蹤每個持倉的停損與停利；風險頁估算最壞會虧多少（風險值、壓力測試）；連續虧損觸發暫停規則。',
     why: '個別看法再強，部位大小也由規則決定；先求不大輸。',
     page: { to: '/portfolio', label: '投資持有與檢討回顧・持股與風控' },
     handbook: { slug: '08', label: '08 投資組合策略與風險' },
@@ -140,7 +140,7 @@ export const ARCH_NODES: Record<string, ArchNode> = {
   review: {
     id: 'review',
     title: '績效歸因',
-    what: '每季拆解報酬：配置效果、選股或策略效果，與基準比較。',
+    what: '每季拆解報酬：配置效果、選股或策略效果，與基準比較；檢討與校準頁回顧決策日誌、情境機率（布瑞爾分數）與局勢判斷的命中率；每年產生年度檢討報告。',
     why: '區分能力與運氣；連續落後基準就依規則縮小交易部位，並回頭修訂投資政策。',
     page: { to: '/portfolio/review', label: '投資持有與檢討回顧・績效歸因' },
     handbook: { slug: '08', label: '08 §6 績效歸因' },
@@ -176,7 +176,7 @@ export const ARCH_EDGES: ArchEdge[] = [
   { from: 'ips', to: 'risk', label: '部位／產業／美元上限、回撤熔斷', kind: 'flow' },
   { from: 'macro', to: 'core', label: '股債比例傾斜（有上限）', kind: 'flow' },
   { from: 'macro', to: 'research', label: '本月順逆風訊號', kind: 'flow' },
-  { from: 'macro', to: 'checklist', label: '經局勢參數決定部位倍數；強烈逆風減半', kind: 'gate' },
+  { from: 'macro', to: 'checklist', label: '局勢參數：部位倍數、允許的進場方法；不允許時不新建倉', kind: 'gate' },
   { from: 'strategy', to: 'backtest', label: '範本、參數、標的', kind: 'flow' },
   { from: 'backtest', to: 'paper', label: '樣本外勝過買進持有（報酬或風險調整後）才進虛擬交易', kind: 'gate' },
   { from: 'paper', to: 'checklist', label: '虛擬交易 3 個月、10 筆才解鎖實單', kind: 'gate' },
@@ -189,7 +189,8 @@ export const ARCH_EDGES: ArchEdge[] = [
   { from: 'checklist', to: 'risk', label: '成交後成為持股', kind: 'flow' },
   { from: 'risk', to: 'research', label: '持股對照：減碼、出清、複查提醒', kind: 'feedback' },
   { from: 'risk', to: 'review', label: '持股、交易與權益紀錄', kind: 'flow' },
-  { from: 'review', to: 'ips', label: '每年依歸因修訂政策與交易部位上限', kind: 'feedback' },
+  { from: 'review', to: 'ips', label: '年度檢討報告：依歸因修訂政策與交易部位上限', kind: 'feedback' },
+  { from: 'review', to: 'macro', label: '局勢判斷回顧：年度修訂局勢參數表', kind: 'feedback' },
   { from: 'review', to: 'fulltime', label: '實單績效與紀律分數', kind: 'flow' },
 ]
 

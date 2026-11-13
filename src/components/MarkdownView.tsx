@@ -43,7 +43,7 @@ function makeComponents(resolveLink?: (href: string) => string | null): Componen
   ),
   blockquote: ({ node, children }) =>
     textOf(node).trim().startsWith('本章行動') ? (
-      <blockquote className="mt-4 rounded-md border border-indigo-300 bg-indigo-50 px-5 py-2 text-gray-800 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-gray-200 [&>p]:my-2 [&_ul]:mt-1">
+      <blockquote className="mt-4 rounded-md border border-indigo-300 bg-indigo-50 px-5 py-2 text-gray-800 dark:border-indigo-700 dark:bg-indigo-900/30 dark:text-gray-200 dark:[&_a]:text-indigo-300 [&>p]:my-2 [&_ul]:mt-1">
         {children}
       </blockquote>
     ) : (
