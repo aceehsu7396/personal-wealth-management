@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { costSensitivity, dailyReturnsOf, deflatedSharpe, walkForward, type BacktestInput, type BacktestResult } from '../../lib/backtest/engine'
 import { STRATEGY_TEMPLATES } from '../../lib/backtest/templates'
 import { Badge, secondaryButton } from '../ui'
+import { Term } from '../Term'
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined ? '—' : `${(v * 100).toFixed(1)}%`)
 
@@ -39,7 +40,7 @@ export function BiasChecks({ input, result, trials, sweepKey }: { input: Backtes
       {checks && (
         <div className="mt-3 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <section className="text-sm">
-            <p className="font-medium text-gray-900 dark:text-gray-100">walk-forward（{checks.wf?.label ?? '—'}）</p>
+            <p className="font-medium text-gray-900 dark:text-gray-100"><Term name="前進分析" />（{checks.wf?.label ?? '—'}）</p>
             {checks.wf ? (
               <>
                 <p className="mt-1 text-gray-700 dark:text-gray-300">
@@ -53,7 +54,7 @@ export function BiasChecks({ input, result, trials, sweepKey }: { input: Backtes
             )}
           </section>
           <section className="text-sm">
-            <p className="font-medium text-gray-900 dark:text-gray-100">試過 {trials} 次的夏普比率</p>
+            <p className="font-medium text-gray-900 dark:text-gray-100"><Term name="折減夏普比率" />（試過 {trials} 次）</p>
             {checks.dsr ? (
               <>
                 <p className="mt-1 text-gray-700 dark:text-gray-300">

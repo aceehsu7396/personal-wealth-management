@@ -16,6 +16,8 @@ import { EntryMethodSchema, type TradePlan } from '../lib/storage/schema'
 import { PlanEditor } from '../components/trades/PlanEditor'
 import { ENTRY_METHOD_LABELS, PLAN_STATUS } from '../components/trades/planLabels'
 import { Badge, Card, DataTable, PageHeader, primaryButton, textLink } from '../components/ui'
+import { JourneyNotice } from '../components/JourneyNotice'
+import { useJourney } from '../lib/useJourney'
 
 const fmt = (v: number | undefined) => (v === undefined ? '—' : v.toLocaleString('zh-TW', { maximumFractionDigits: 2 }))
 const SOURCE_LABELS: Record<TradePlan['source'], string> = { thesis: '研究卡', strategy: '策略卡', core: '核心', manual: '手動' }
@@ -73,6 +75,7 @@ export function TradePlansPage() {
   const strategies = useAppStore((s) => s.tradingStrategies)
   const holdings = useAppStore((s) => s.holdings)
   const policy = useAppStore((s) => s.investmentPolicy)
+  const { journey } = useJourney()
   const guardrails = useAppStore((s) => s.guardrails)
   const meta = useAppStore((s) => s.portfolioMeta)
   const addTradePlan = useAppStore((s) => s.addTradePlan)
@@ -165,6 +168,10 @@ export function TradePlansPage() {
             手動新增計畫單
           </button>
         }
+      />
+      <JourneyNotice
+        missing={journey.missingForSatellite}
+        intro="計畫單可以先寫；交易部位的實單要先完成這些步驟，否則交易前檢核會標示未通過："
       />
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card title={`進行中（${open.length}）`} description="已成交、正在持有。停損與停利在「持股與風控」的出場管理追蹤。" action={<Link to="/portfolio" className={textLink}>出場管理</Link>}>

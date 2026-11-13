@@ -1,12 +1,14 @@
 // Builds src/lib/demo/demo-data.json: a complete worked example (handbook
 // chapter 12) from real FinMind prices and the app's own functions — from
 // a research card and a strategy card through backtest, ten months of paper
-// trading and a year of real trades, to quarterly attribution.
+// trading and a year of real trades, to quarterly attribution. The written
+// records (the October trade plan, the pause review, decisions, scenarios,
+// and the signed regime table and dip ladder) come from demo-curated.json.
 //
 //   npx tsx scripts/demo-data.mts
 //
 // Run once by hand; the JSON is committed so the site never fetches it.
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { createDefaultAppData, type AppData, type Holding, type MacroCheckIn, type PaperAccount, type PerformanceReview, type Sleeve, type Trade } from '../src/lib/storage/schema.ts'
 import { requestDataset } from '../src/lib/research/finmind.ts'
 import { buildAutoResearch, derivedFields } from '../src/lib/research/autoResearch.ts'
@@ -443,6 +445,12 @@ data.portfolioSnapshots = monthEnds.filter((d) => d >= '2025-01-01').map((d) => 
 const peak = data.portfolioSnapshots.reduce((p, s) => (s.valueTwd > p.valueTwd ? s : p))
 data.portfolioMeta = { fxUsdTwd: 32.5, peakValueTwd: peak.valueTwd, peakDate: peak.date }
 data.assumptions.currentNetWorth = data.portfolioSnapshots.at(-1)!.valueTwd
+
+// Hand-written records for chapter 12 steps 7, 7.5 and 9.
+const curated = JSON.parse(readFileSync(new URL('./demo-curated.json', import.meta.url), 'utf8')) as Pick<AppData, 'tradePlans' | 'pauseReviews' | 'decisions' | 'scenarioSets' | 'ruleVersions' | 'regimeParams' | 'dipLadder'> & { tradePlanLinks: Record<string, string> }
+const { tradePlanLinks, ...records } = curated
+Object.assign(data, records)
+data.trades = data.trades.map((t) => (tradePlanLinks[t.id] ? { ...t, planId: tradePlanLinks[t.id] } : t))
 
 writeFileSync(OUT, JSON.stringify(data))
 const fills = paper.orders.filter((o) => o.status === 'filled')

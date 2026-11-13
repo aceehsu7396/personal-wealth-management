@@ -78,7 +78,7 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   if (ctx && (ctx.regime === 'bear' || ctx.regime === 'crash')) {
     for (const { plan } of open) {
       if (allows(ctx, plan.entryMethod)) continue
-      items.push(scanItem('regime_exit', `${plan.ticker} ${plan.name}：局勢為「${ctx.label}」，建議依部位倍數 ${ctx.multiplier} 縮小部位`, '出場規則：局勢出場（01 §C4）', `/portfolio/plans?id=${plan.id}`))
+      items.push(scanItem('regime_exit', `${plan.ticker} ${plan.name}：局勢為「${ctx.label}」，建議依部位倍數 ${ctx.multiplier} 縮小部位`, '出場規則：局勢出場（05 §7）', `/portfolio/plans?id=${plan.id}`))
     }
   }
   const target = fullTimeTarget(assumptions, foundation)

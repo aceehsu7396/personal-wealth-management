@@ -1,0 +1,490 @@
+{
+ "tradePlans": [
+  {
+   "id": "demo-plan-2330-oct",
+   "status": "closed",
+   "source": "strategy",
+   "strategyId": "demo-strategy-chip",
+   "ticker": "2330",
+   "name": "台積電",
+   "market": "TW",
+   "entryMethod": "breakout",
+   "setup": "策略卡「台積電外資籌碼濾網」：外資籌碼濾網",
+   "trigger": "外資近 20 日累計淨買超轉正，隔日開盤買進",
+   "confirmation": "策略卡狀態為實單；交易部位可以新建倉",
+   "stopLoss": 2474.2,
+   "stopMethod": "atr",
+   "entryPrice": 2570,
+   "fillPrice": 2575,
+   "shares": 81,
+   "orderType": "limit",
+   "orderNote": "隔日開盤限價 2,570；成交後設觸價停損 2,474.2",
+   "trailing": "none",
+   "targets": [],
+   "thesisExit": "外資近 20 日累計轉為淨賣超，隔日開盤賣出",
+   "currentStop": 2474.2,
+   "rules": [
+    "策略卡：每筆停損風險 1%",
+    "策略卡出場規則：外資近 20 日累計轉為淨賣超"
+   ],
+   "advice": [
+    {
+     "level": "required",
+     "text": "停損 2474.2 低於進場價 2570",
+     "basis": "進出場規則：停損是失效點",
+     "decision": "accepted"
+    },
+    {
+     "level": "suggest",
+     "text": "風報比只有 1.6，低於 2",
+     "basis": "第一個停利點、停損",
+     "decision": "declined",
+     "reason": "策略卡以訊號出場，不設固定停利"
+    },
+    {
+     "level": "notice",
+     "text": "跌停或隔夜跳空時，停損可能無法依價成交；部位要留空間",
+     "basis": "台灣市場實務：漲跌幅 10%",
+     "decision": "accepted"
+    },
+    {
+     "level": "required",
+     "text": "股數 81 超過局勢上限 40 股（建議股數 × 0.5）",
+     "basis": "局勢參數：反彈初期（2026-08-10 起），部位倍數 0.5",
+     "decision": "declined",
+     "reason": "示範：策略卡以固定風險算股數，選擇不減半"
+    }
+   ],
+   "createdAt": "2026-10-05T12:00:00.000Z",
+   "updatedAt": "2026-10-07T06:00:00.000Z",
+   "openedAt": "2026-10-06",
+   "closedAt": "2026-10-07",
+   "regimeSnapshot": "反彈初期（2026-08-10 起）・部位倍數 0.5",
+   "batches": [
+    {
+     "kind": "batch",
+     "price": 2570,
+     "shares": 81,
+     "addedAt": "2026-10-05T12:00:00.000Z",
+     "filledAt": "2026-10-06",
+     "fillPrice": 2575,
+     "fillShares": 81
+    },
+    {
+     "kind": "batch",
+     "price": 2440,
+     "shares": 81,
+     "addedAt": "2026-10-05T12:00:00.000Z"
+    },
+    {
+     "kind": "batch",
+     "price": 2310,
+     "shares": 81,
+     "addedAt": "2026-10-05T12:00:00.000Z"
+    }
+   ]
+  }
+ ],
+ "pauseReviews": [
+  {
+   "id": "demo-pause-review-1",
+   "date": "2026-10-08",
+   "streak": 3,
+   "checks": {
+    "followedStops": true,
+    "regimeChanged": true,
+    "strategyStillValid": true,
+    "sizeTooLarge": false
+   },
+   "notes": "三筆都照策略卡出場，虧損都在 1R 以內；共同原因是 7 月後局勢轉為反彈與過熱來回，外資籌碼訊號反覆。策略回測的樣本外仍有優勢，續用，但下一筆部位照局勢倍數減半。"
+  }
+ ],
+ "decisions": [
+  {
+   "id": "demo-decision-1",
+   "date": "2026-04-10",
+   "kind": "tilt",
+   "title": "股票比例下調 5 個百分點",
+   "judgment": "關稅與景氣放緩，未來半年台股波動加大；先降低股票部位，等總經轉順風再加回。",
+   "reasons": "總經三支柱轉為逆風；加權指數跌破 200 日線。",
+   "confidence": 60,
+   "premortem": "如果結果很差，最可能是低估了 AI 需求，市場很快創新高，減碼的部位錯過反彈。",
+   "reviewDate": "2026-10-10",
+   "outcome": "6 月後台股快速反彈並創新高，減碼的 5% 少賺約 1.2%。",
+   "quality": 3,
+   "lesson": "減碼本身符合規則，但沒有寫『何時加回』的條件；下次同時寫好加回的觸發。",
+   "reviewedAt": "2026-10-12"
+  },
+  {
+   "id": "demo-decision-2",
+   "date": "2026-11-10",
+   "kind": "regime_params",
+   "title": "局勢轉為修正：維持參數表，不另外調整",
+   "judgment": "修正期照參數表執行即可：部位減半、只做價值分批與均值回歸。",
+   "reasons": "局勢 11/10 確立為修正；參數表 2024 年簽署後沒有需要修改的證據。",
+   "confidence": 70,
+   "premortem": "如果結果很差，最可能是修正轉為空頭，價值分批買得太早。",
+   "reviewDate": "2027-02-10"
+  }
+ ],
+ "scenarioSets": [
+  {
+   "id": "demo-scenario-1",
+   "date": "2026-04-15",
+   "question": "未來 6 個月台股會怎麼走",
+   "horizon": "2026-10-15",
+   "premortem": "三個情境都假設景氣是主因；如果是地緣政治事件主導，可能都不準。",
+   "scenarios": [
+    {
+     "name": "反彈創高",
+     "probability": 30,
+     "trigger": "AI 資本支出上修",
+     "signals": "外資連續買超、台積電營收年增 >30%",
+     "shock": {
+      "tw": 15,
+      "us": 10,
+      "bond": 0,
+      "fx": -3
+     },
+     "actions": "照定期定額，不追高"
+    },
+    {
+     "name": "區間震盪",
+     "probability": 50,
+     "trigger": "關稅談判拖延",
+     "signals": "加權指數在 200 日線上下來回",
+     "shock": {
+      "tw": 0,
+      "us": 0,
+      "bond": 0,
+      "fx": 0
+     },
+     "actions": "交易部位只做均值回歸"
+    },
+    {
+     "name": "跌入空頭",
+     "probability": 20,
+     "trigger": "美國景氣衰退",
+     "signals": "信用條件（HYG÷IEF）轉緊、外資持續賣超",
+     "shock": {
+      "tw": -25,
+      "us": -20,
+      "bond": 8,
+      "fx": 3
+     },
+     "actions": "依逢低階梯投入預留資金"
+    }
+   ],
+   "outcome": 0,
+   "resolvedAt": "2026-10-16"
+  },
+  {
+   "id": "demo-scenario-2",
+   "date": "2026-11-11",
+   "question": "這次修正會不會變成空頭（到 2027 年 2 月）",
+   "horizon": "2027-02-28",
+   "premortem": "如果都錯，最可能是低估了政策救市的速度。",
+   "scenarios": [
+    {
+     "name": "修正結束、回到多頭",
+     "probability": 45,
+     "trigger": "外資回補、半導體庫存去化結束",
+     "signals": "加權指數站回 60 日線",
+     "shock": {
+      "tw": 10,
+      "us": 5,
+      "bond": 0,
+      "fx": 0
+     },
+     "actions": "照局勢參數恢復正常部位"
+    },
+    {
+     "name": "轉為空頭",
+     "probability": 25,
+     "trigger": "獲利下修擴大",
+     "signals": "回撤超過 20%、融資大減",
+     "shock": {
+      "tw": -20,
+      "us": -15,
+      "bond": 5,
+      "fx": 2
+     },
+     "actions": "依逢低階梯第 2 階投入；交易部位只做價值分批"
+    },
+    {
+     "name": "區間整理",
+     "probability": 30,
+     "trigger": "消息面拉鋸",
+     "signals": "成交量萎縮",
+     "shock": {
+      "tw": -3,
+      "us": 0,
+      "bond": 0,
+      "fx": 0
+     },
+     "actions": "等計畫單觸發，不追價"
+    }
+   ]
+  }
+ ],
+ "ruleVersions": [
+  {
+   "id": "demo-rule-regime",
+   "kind": "regime_params",
+   "at": "2024-12-20T06:00:00.000Z",
+   "reason": "簽署投資政策時一併採用手冊 05 §7、04 §0.1 的示例值",
+   "snapshot": {
+    "rows": [
+     {
+      "regime": "bull",
+      "allowedEntries": [
+       "value_batches",
+       "breakout",
+       "pullback",
+       "mean_reversion",
+       "momentum",
+       "event",
+       "dca",
+       "other"
+      ],
+      "sizeMultiplier": 1,
+      "stopAtr": 2.5,
+      "addOn": "allowed",
+      "takeProfit": "移動停損為主，讓獲利奔跑",
+      "core": "照定期定額"
+     },
+     {
+      "regime": "overheated",
+      "allowedEntries": [
+       "breakout",
+       "pullback",
+       "dca"
+      ],
+      "sizeMultiplier": 0.75,
+      "stopAtr": 2,
+      "addOn": "none",
+      "takeProfit": "到 2R 先出一半",
+      "core": "觸及再平衡區間就賣出超標部分"
+     },
+     {
+      "regime": "correction",
+      "allowedEntries": [
+       "value_batches",
+       "mean_reversion",
+       "dca"
+      ],
+      "sizeMultiplier": 0.5,
+      "stopAtr": 2.5,
+      "addOn": "scheduled",
+      "takeProfit": "估值出場",
+      "core": "照常；可依逢低階梯投入"
+     },
+     {
+      "regime": "bear",
+      "allowedEntries": [
+       "value_batches",
+       "dca"
+      ],
+      "sizeMultiplier": 0.25,
+      "stopAtr": 2.5,
+      "addOn": "none",
+      "takeProfit": "估值出場",
+      "core": "依再平衡規則買進股票"
+     },
+     {
+      "regime": "crash",
+      "allowedEntries": [],
+      "sizeMultiplier": 0,
+      "stopAtr": 2.5,
+      "addOn": "none",
+      "takeProfit": "優先確認保證金與生活費緩衝",
+      "core": "不動"
+     },
+     {
+      "regime": "rebound",
+      "allowedEntries": [
+       "breakout",
+       "value_batches",
+       "dca"
+      ],
+      "sizeMultiplier": 0.5,
+      "stopAtr": 2.5,
+      "addOn": "allowed",
+      "takeProfit": "移動停損",
+      "core": "照常"
+     },
+     {
+      "regime": "range",
+      "allowedEntries": [
+       "pullback",
+       "mean_reversion",
+       "dca"
+      ],
+      "sizeMultiplier": 0.75,
+      "stopAtr": 2.5,
+      "addOn": "none",
+      "takeProfit": "區間上緣先出",
+      "core": "照常"
+     }
+    ]
+   }
+  },
+  {
+   "id": "demo-rule-dip",
+   "kind": "dip_ladder",
+   "at": "2024-12-20T06:00:00.000Z",
+   "reason": "預留 150 萬，回檔越深投入越多",
+   "snapshot": {
+    "steps": [
+     {
+      "drawdownPercent": -10,
+      "amountTwd": 150000,
+      "executedAt": null
+     },
+     {
+      "drawdownPercent": -20,
+      "amountTwd": 300000,
+      "executedAt": null
+     },
+     {
+      "drawdownPercent": -30,
+      "amountTwd": 450000,
+      "executedAt": null
+     },
+     {
+      "drawdownPercent": -40,
+      "amountTwd": 600000,
+      "executedAt": null
+     }
+    ]
+   }
+  }
+ ],
+ "regimeParams": {
+  "rows": [
+   {
+    "regime": "bull",
+    "allowedEntries": [
+     "value_batches",
+     "breakout",
+     "pullback",
+     "mean_reversion",
+     "momentum",
+     "event",
+     "dca",
+     "other"
+    ],
+    "sizeMultiplier": 1,
+    "stopAtr": 2.5,
+    "addOn": "allowed",
+    "takeProfit": "移動停損為主，讓獲利奔跑",
+    "core": "照定期定額"
+   },
+   {
+    "regime": "overheated",
+    "allowedEntries": [
+     "breakout",
+     "pullback",
+     "dca"
+    ],
+    "sizeMultiplier": 0.75,
+    "stopAtr": 2,
+    "addOn": "none",
+    "takeProfit": "到 2R 先出一半",
+    "core": "觸及再平衡區間就賣出超標部分"
+   },
+   {
+    "regime": "correction",
+    "allowedEntries": [
+     "value_batches",
+     "mean_reversion",
+     "dca"
+    ],
+    "sizeMultiplier": 0.5,
+    "stopAtr": 2.5,
+    "addOn": "scheduled",
+    "takeProfit": "估值出場",
+    "core": "照常；可依逢低階梯投入"
+   },
+   {
+    "regime": "bear",
+    "allowedEntries": [
+     "value_batches",
+     "dca"
+    ],
+    "sizeMultiplier": 0.25,
+    "stopAtr": 2.5,
+    "addOn": "none",
+    "takeProfit": "估值出場",
+    "core": "依再平衡規則買進股票"
+   },
+   {
+    "regime": "crash",
+    "allowedEntries": [],
+    "sizeMultiplier": 0,
+    "stopAtr": 2.5,
+    "addOn": "none",
+    "takeProfit": "優先確認保證金與生活費緩衝",
+    "core": "不動"
+   },
+   {
+    "regime": "rebound",
+    "allowedEntries": [
+     "breakout",
+     "value_batches",
+     "dca"
+    ],
+    "sizeMultiplier": 0.5,
+    "stopAtr": 2.5,
+    "addOn": "allowed",
+    "takeProfit": "移動停損",
+    "core": "照常"
+   },
+   {
+    "regime": "range",
+    "allowedEntries": [
+     "pullback",
+     "mean_reversion",
+     "dca"
+    ],
+    "sizeMultiplier": 0.75,
+    "stopAtr": 2.5,
+    "addOn": "none",
+    "takeProfit": "區間上緣先出",
+    "core": "照常"
+   }
+  ],
+  "signedAt": "2024-12-20T06:00:00.000Z",
+  "updatedAt": "2024-12-20T06:00:00.000Z"
+ },
+ "dipLadder": {
+  "steps": [
+   {
+    "drawdownPercent": -10,
+    "amountTwd": 150000,
+    "executedAt": null
+   },
+   {
+    "drawdownPercent": -20,
+    "amountTwd": 300000,
+    "executedAt": null
+   },
+   {
+    "drawdownPercent": -30,
+    "amountTwd": 450000,
+    "executedAt": null
+   },
+   {
+    "drawdownPercent": -40,
+    "amountTwd": 600000,
+    "executedAt": null
+   }
+  ],
+  "signedAt": "2024-12-20T06:00:00.000Z",
+  "updatedAt": "2024-12-20T06:00:00.000Z"
+ },
+ "tradePlanLinks": {
+  "demo-trade-96": "demo-plan-2330-oct",
+  "demo-trade-97": "demo-plan-2330-oct"
+ }
+}

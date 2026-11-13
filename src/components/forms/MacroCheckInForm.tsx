@@ -70,7 +70,7 @@ const INFLATION_FIELDS = [
 const LIQUIDITY_FIELDS = [
   { name: 'liquidity.policyRate', label: '政策利率方向（降息＝寬鬆）' },
   { name: 'liquidity.yieldCurve', label: '殖利率曲線 10Y−2Y' },
-  { name: 'liquidity.creditSpread', label: '高收益債信用利差（收斂＝寬鬆）' },
+  { name: 'liquidity.creditSpread', label: '信用條件：高收益債 ÷ 公債 ETF（上漲＝寬鬆）' },
   { name: 'liquidity.centralBankBalanceSheet', label: '央行資產負債表（擴表＝寬鬆）' },
   { name: 'liquidity.usDollar', label: '美元指數（走弱＝寬鬆）' },
 ] as const

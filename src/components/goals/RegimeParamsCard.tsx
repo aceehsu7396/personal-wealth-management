@@ -101,7 +101,7 @@ export function RegimeParamsCard() {
         }
       >
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          {params.signedAt ? `✓ 已於 ${params.signedAt.slice(0, 10)} 簽署` : '尚未簽署：目前使用手冊 01 §C6 的示例值，請依自己的投資政策檢查後簽署。'}
+          {params.signedAt ? `✓ 已於 ${params.signedAt.slice(0, 10)} 簽署` : '尚未簽署：目前使用手冊 05 §7、04 §0.1 的示例值，請依自己的投資政策檢查後簽署。'}
           {ctx && `　目前局勢：${ctx.label}`}
         </p>
 

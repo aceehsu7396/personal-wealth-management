@@ -82,6 +82,6 @@ describe('summary', () => {
     expect(lines[0]).toMatch(/^加權指數 150.5（−0.33%），空頭/)
     expect(lines).toContain('上市股票上漲 438 家、下跌 544 家（2026-11-04）。')
     expect(lines).toContain('外資近 5 日賣超 500 億、近 20 日賣超 2,000 億；投信近 5 日買超 100 億。')
-    expect(lines.at(-1)).toContain('暫停新建倉')
+    expect(lines.at(-1)).toContain('依局勢參數表')
   })
 })

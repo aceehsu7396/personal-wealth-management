@@ -39,7 +39,7 @@ export function SettingsPage() {
           AI 網路研究設定
         </h2>
         <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
-          用於市場分析（預填總經三支柱）、產業分析、個股分析（預填研究卡事實數據）與大盤摘要。AI 會上網搜尋並附上資料來源；費用直接計入你的 Anthropic 帳戶，每次分析約 US$0.1–0.5，按下按鈕才會執行。
+          用於市場分析（預填總經三支柱）、產業分析、個股分析（預填研究卡事實數據）。AI 會上網搜尋並附上資料來源；費用直接計入你的 Anthropic 帳戶，每次分析約 US$0.1–0.5，按下按鈕才會執行。各頁的「AI 說明」只產生提示詞讓你貼到自己的 Claude 對話，不需要金鑰。
         </p>
         <div className="mt-4">
           <AiKeySettings />

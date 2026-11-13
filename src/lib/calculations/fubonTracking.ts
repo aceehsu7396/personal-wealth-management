@@ -15,7 +15,7 @@ export const MACRO_SIGNAL_LABELS: Record<MacroSignalKey, string> = {
   'inflation.twCpi': '台灣 CPI',
   'liquidity.policyRate': '政策利率方向（Fed、台灣央行）',
   'liquidity.yieldCurve': '殖利率曲線 10Y−2Y',
-  'liquidity.creditSpread': '高收益債信用利差',
+  'liquidity.creditSpread': '信用條件（高收益債 ÷ 公債 ETF）',
   'liquidity.centralBankBalanceSheet': '央行資產負債表',
   'liquidity.usDollar': '美元指數',
   'sentiment.valuation': '大盤本益比歷史位置',

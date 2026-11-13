@@ -25,7 +25,7 @@ export function DashboardPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">今日</h1>
       <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        財富自由計畫的整體現況：下一步、進度與策略紀律。
+        今天要處理的事、行動路線的下一步與淨值進度。
       </p>
 
       <div className="mt-6">

@@ -49,7 +49,7 @@ export function groupR(results: ClosedPlanResult[], keyOf: (p: TradePlan) => str
 }
 
 // The regime name a plan was drafted in, from its snapshot.
-export const regimeOfPlan = (p: TradePlan) => p.regimeSnapshot?.split('（')[0] ?? '（階段 2 之前）'
+export const regimeOfPlan = (p: TradePlan) => p.regimeSnapshot?.split('（')[0] ?? '（未記錄局勢）'
 
 export interface AdviceUptake {
   byLevel: Record<PlanAdvice['level'], { decided: number; accepted: number }>

@@ -124,7 +124,7 @@ export const ARCH_NODES: Record<string, ArchNode> = {
     title: '交易計畫、檢核與日誌',
     what: '下單前先寫交易計畫單（進場、停損、停利、分批與加碼），系統給三級建議並產生委託單草稿；下單前逐項檢核（政策上限、局勢參數、暫停規則、策略卡或研究卡、停損與風險），成交後記錄滑價並事後檢討。',
     why: '計畫寫在進場前，才不會被盤中情緒改寫；檢核表擋下已知錯誤；日誌把決策品質和結果分開，才能檢討。',
-    page: { to: '/portfolio/trades', label: '投資持有與檢討回顧・交易日誌' },
+    page: { to: '/portfolio/plans', label: '投資持有與檢討回顧・交易計畫' },
     handbook: { slug: '04', label: '04 紀律與檢核流程' },
     steps: ['5.1', '5.3'],
   },

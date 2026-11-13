@@ -129,7 +129,7 @@ export function TradesPage() {
     <div className="mx-auto max-w-4xl px-4 py-10">
       <PageHeader
         title="交易日誌"
-        summary="每筆交易先過檢核表，事後在 6 與 12 個月時檢討。評估的是流程，不是結果。"
+        summary="交易部位從計畫單記錄成交；每筆交易先過檢核表，事後在 6 與 12 個月時檢討。評估的是流程，不是結果。"
         action={
           !formOpen && (
             <button type="button" className={primaryButton} onClick={() => openForm()}>
@@ -221,7 +221,7 @@ export function TradesPage() {
             </button>
           </div>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            檢核依目前的投資政策、總經判斷、研究卡與持股即時計算。交易會同步更新持股的股數與平均成本。
+            檢核依目前的投資政策、局勢參數、暫停規則、計畫單、研究卡與持股即時計算。交易會同步更新持股的股數與平均成本。
           </p>
           <div className="mt-4">
             {prefill && (
@@ -243,7 +243,7 @@ export function TradesPage() {
       )}
 
       <div className={cardClass}>
-        <Disclosure summary="匯入券商對帳單（富邦證券成交明細 CSV）">
+        <Disclosure summary="匯入券商對帳單（富邦證券：貼上、HTML 或 CSV）">
           <div className="mt-3">
             <BrokerImport onImport={handleSubmit} />
           </div>
@@ -353,7 +353,7 @@ export function TradesPage() {
           </div>
         )}
         <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-          刪除交易紀錄不會回復持股；若是輸入錯誤，請到投資組合頁手動修正持股。
+          刪除交易紀錄不會回復持股；若是輸入錯誤，請到持股與風控頁手動修正持股。
         </p>
       </div>
     </div>

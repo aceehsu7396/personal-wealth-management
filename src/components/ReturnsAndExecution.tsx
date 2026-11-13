@@ -2,6 +2,7 @@ import { useAppStore } from '../lib/storage/appStore'
 import { weightedReturns } from '../lib/calculations/attribution'
 import { adviceUptake, closedResults, groupR, MIN_GROUP, regimeOfPlan, type RGroup } from '../lib/trades/rStats'
 import { ENTRY_METHOD_LABELS, executionStats } from '../lib/trades/tradePlan'
+import { Term } from './Term'
 import { ADVICE_LABELS, Card, DataTable, StatTile } from './ui'
 import { coachPrompt } from '../lib/ai/prompts/agents'
 import { PromptPanel } from './ai/PromptPanel'
@@ -49,8 +50,8 @@ export function ReturnsAndExecution() {
       <Card title="報酬：時間加權與金額加權" description="時間加權看投資方法本身；金額加權（XIRR）看你實際投入的錢賺多少。金額加權明顯較低，代表加碼的時機不好。">
         {w ? (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <StatTile label="時間加權（年化）" value={pct(w.twrAnnual)} hint={`${w.from} 至 ${w.to}，累計 ${pct(w.twr)}`} />
-            <StatTile label="金額加權（年化）" value={pct(w.mwrAnnual)} hint="依季度淨投入計算" />
+            <StatTile label={<><Term name="時間加權報酬">時間加權</Term>（年化）</>} value={pct(w.twrAnnual)} hint={`${w.from} 至 ${w.to}，累計 ${pct(w.twr)}`} />
+            <StatTile label={<><Term name="金額加權報酬">金額加權</Term>（年化）</>} value={pct(w.mwrAnnual)} hint="依季度淨投入計算" />
             <StatTile label="兩者差距" value={gap === null ? '—' : Math.abs(gap) < 0.0005 ? '0.0 個百分點' : `${gap > 0 ? '+' : ''}${(gap * 100).toFixed(1)} 個百分點`} hint={gap === null ? '期間不足半年' : gap < -0.02 ? '加碼時機不好' : '投入時機沒有明顯拖累'} />
           </div>
         ) : (
@@ -74,11 +75,11 @@ export function ReturnsAndExecution() {
             </dd>
           </div>
           <div>
-            <dt className="text-xs text-gray-600 dark:text-gray-400">平均滑價</dt>
+            <dt className="text-xs text-gray-600 dark:text-gray-400">平均<Term name="滑價" /></dt>
             <dd className="font-medium text-gray-900 dark:text-gray-100">{pct(exec.avgSlippage, 2)}</dd>
           </div>
           <div>
-            <dt className="text-xs text-gray-600 dark:text-gray-400">停損延遲</dt>
+            <dt className="text-xs text-gray-600 dark:text-gray-400"><Term name="停損延遲" /></dt>
             <dd className="font-medium text-gray-900 dark:text-gray-100">{exec.lateStops} 次</dd>
           </div>
           {(['required', 'suggest', 'notice'] as const).map((l) => (

@@ -75,6 +75,7 @@ const PAGES = {
   goals: { to: '/goals', label: '目標與政策' },
   portfolio: { to: '/portfolio', label: '持股與風控' },
   trades: { to: '/portfolio/trades', label: '交易日誌' },
+  plans: { to: '/portfolio/plans', label: '交易計畫' },
   review: { to: '/portfolio/review', label: '績效歸因' },
   market: { to: '/research/market', label: '研究分析・市場' },
   stocks: { to: '/research/stocks', label: '研究分析・研究卡' },
@@ -201,7 +202,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
     {
       number: 3,
       title: '看懂市場：總經只調比例',
-      summary: '每月檢視景氣、流動性與情緒，只用來微調股債比例。',
+      summary: '每月檢視景氣、流動性與情緒，只用來微調股債比例；每天的局勢狀態經局勢參數決定交易部位能否新建倉、部位多大。',
       steps: [
         {
           id: '3.1',
@@ -213,7 +214,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
         },
         {
           id: '3.2',
-          title: '連續 3 個月總經檢視',
+          title: '完成 3 個月份的總經檢視',
           done: macroMonths >= 3,
           detail: `已檢視 ${Math.min(macroMonths, 3)}/3 個月`,
           page: PAGES.market,
@@ -266,8 +267,8 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
           id: '5.1',
           title: '第一筆實單交易（附策略卡與停損）',
           done: satelliteBuys.some((t) => t.strategyId !== undefined && t.stopLoss !== undefined),
-          detail: '在交易日誌以「策略進場」記錄，連結策略卡並填停損價',
-          page: PAGES.trades,
+          detail: '在交易計畫建立計畫單，成交後按「記錄成交」（自動帶入策略卡與停損）',
+          page: PAGES.plans,
           handbookSlug: '04',
         },
         {

@@ -1,5 +1,5 @@
 // One number with its label and a short hint; four to a row at most.
-export function StatTile({ label, value, hint }: { label: string; value: React.ReactNode; hint?: React.ReactNode }) {
+export function StatTile({ label, value, hint }: { label: React.ReactNode; value: React.ReactNode; hint?: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-800">
       <p className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</p>

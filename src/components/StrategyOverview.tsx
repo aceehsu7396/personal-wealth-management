@@ -111,7 +111,7 @@ export function StrategyOverview() {
           )}
           {alerts.length > MAX_ALERTS && (
             <Link to="/portfolio" className="text-xs text-indigo-700 hover:underline dark:text-indigo-400">
-              還有 {alerts.length - MAX_ALERTS} 項警示，前往投資組合查看
+              還有 {alerts.length - MAX_ALERTS} 項警示，前往持股與風控查看
             </Link>
           )}
         </div>

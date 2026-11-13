@@ -6,6 +6,7 @@ import { usePauseStatus } from '../lib/trades/usePauseStatus'
 import type { StressScenario } from '../lib/calculations/stressTest'
 import { StressCard } from '../components/risk/StressCard'
 import { PauseReviewForm } from '../components/risk/PauseReviewForm'
+import { Term } from '../components/Term'
 import { AdviceList, Badge, Card, DataTable, Disclosure, PageHeader, StatTile, primaryButton, type Advice } from '../components/ui'
 
 const twd = (v: number) => `${v < 0 ? '−' : ''}NT$${Math.round(Math.abs(v)).toLocaleString('zh-TW')}`
@@ -76,7 +77,7 @@ export function RiskPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
-          label="1 個月 CVaR（95%）"
+          label={<><Term name="CVaR">1 個月 CVaR</Term>（95%）</>}
           value={r.monthly ? `${twd(-r.monthly.cvar * r.total)}` : r.loading ? '計算中…' : '—'}
           hint={r.monthly ? `最差 5% 的月份平均虧 ${pct(r.monthly.cvar)}；VaR ${pct(r.monthly.var)}` : '需要一年的日線'}
         />
@@ -117,11 +118,11 @@ export function RiskPage() {
               <dd className="font-medium text-gray-900 dark:text-gray-100">{pct(r.vol)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-gray-600 dark:text-gray-400">貝他（對加權指數）</dt>
+              <dt className="text-xs text-gray-600 dark:text-gray-400"><Term name="β值">貝他</Term>（對加權指數）</dt>
               <dd className="font-medium text-gray-900 dark:text-gray-100">{r.beta === null ? '—' : r.beta.toFixed(2)}</dd>
             </div>
             <div>
-              <dt className="text-xs text-gray-600 dark:text-gray-400">有效持股數</dt>
+              <dt className="text-xs text-gray-600 dark:text-gray-400"><Term name="有效持股數" /></dt>
               <dd className="font-medium text-gray-900 dark:text-gray-100">{r.concentration.effective.toFixed(1)} 檔</dd>
             </div>
             <div>

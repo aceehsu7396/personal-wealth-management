@@ -43,7 +43,7 @@ export const STANCE_LABELS: Record<MacroStance, string> = {
 }
 
 const STANCE_ACTIONS: Record<MacroStance, string> = {
-  strong_tailwind: '新資金優先投入股票，衛星可正常建倉。',
+  strong_tailwind: '新資金優先投入股票；交易部位依局勢參數。',
   tailwind: '照常執行定期定額與建倉計畫。',
   neutral: '維持策略配置，不做方向性調整。',
   headwind: '新資金優先補債券/現金；交易部位依局勢參數，建議縮小部位。',

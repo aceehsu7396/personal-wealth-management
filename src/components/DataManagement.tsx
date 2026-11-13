@@ -90,7 +90,7 @@ export function DataManagement() {
       <div>
         <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100">清除資料</h3>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          會清除所有試算假設、進度紀錄與市場評估，且無法復原，建議先匯出備份。
+          會清除所有資料（持股、交易、計畫單、決策與設定），且無法復原，建議先匯出備份。
         </p>
         <div className="mt-3">
           {pendingReset ? (

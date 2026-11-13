@@ -35,4 +35,3 @@ Every new or changed page must pass this review before it is merged. The rules a
 - The browser comes from `CHROME_PATH` or the local Playwright cache (`~/Library/Caches/ms-playwright`).
 - `--base` checks another address, e.g. the live site after deploy: `--base https://aceehsu7396.github.io/personal-wealth-management/#`.
 - `--no-demo` checks the empty state a new user sees.
-- The baseline of existing pages is in `docs/ui-baseline.md`; when you change one of those pages, fix its listed items too.
