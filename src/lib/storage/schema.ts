@@ -794,9 +794,46 @@ export const PaperAccountSchema = z.object({
   positions: z.array(PaperPositionSchema),
   orders: z.array(PaperOrderSchema),
   equityHistory: z.array(z.object({ date: z.string(), equity: z.number() })),
+  // The entry-exit assistant's latest suggestions, and what became of the
+  // earlier ones (handbook 10 §7).
+  assistant: z.lazy(() => AssistantSnapshotSchema).optional(),
+  signalLog: z.array(z.lazy(() => AssistantItemSchema)).default([]),
   createdAt: z.string(),
 })
 export type PaperAccount = z.infer<typeof PaperAccountSchema>
+
+export const AssistantKindSchema = z.enum(['enter', 'exit', 'stop_hit', 'raise_stop', 'near_stop', 'hold', 'wait', 'no_data'])
+export type AssistantKind = z.infer<typeof AssistantKindSchema>
+
+// followed: ordered as suggested; modified: ordered with other shares or
+// stop; skipped: passed over with a reason; missed: never acted on.
+export const SignalOutcomeSchema = z.enum(['pending', 'followed', 'modified', 'skipped', 'missed'])
+export type SignalOutcome = z.infer<typeof SignalOutcomeSchema>
+
+export const AssistantItemSchema = z.object({
+  symbol: z.string(),
+  kind: AssistantKindSchema,
+  // The latest close's date.
+  date: z.string(),
+  close: z.number(),
+  side: TradeSideSchema.optional(),
+  shares: z.number().optional(),
+  stopLoss: z.number().optional(),
+  // A raised stop to apply.
+  raiseTo: z.number().optional(),
+  reading: z.string(),
+  basis: z.array(z.string()).default([]),
+  outcome: SignalOutcomeSchema.default('pending'),
+  note: z.string().optional(),
+})
+export type AssistantItem = z.infer<typeof AssistantItemSchema>
+
+export const AssistantSnapshotSchema = z.object({
+  date: z.string(),
+  generatedAt: z.string(),
+  items: z.array(AssistantItemSchema),
+})
+export type AssistantSnapshot = z.infer<typeof AssistantSnapshotSchema>
 
 // A stock or ETF the user is watching, usually added from the screener.
 export const WatchItemSchema = z.object({

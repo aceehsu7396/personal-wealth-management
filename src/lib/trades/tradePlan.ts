@@ -159,7 +159,7 @@ function thesisDraft(thesis: StockThesis, report: SignalReport, policy: Investme
   })
 }
 
-const METHOD_OF: Partial<Record<TradingStrategy['template'], TradePlan['entryMethod']>> = {
+export const METHOD_OF: Partial<Record<TradingStrategy['template'], TradePlan['entryMethod']>> = {
   ma_cross: 'breakout',
   donchian: 'breakout',
   rsi_reversion: 'mean_reversion',

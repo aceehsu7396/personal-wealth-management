@@ -228,6 +228,7 @@ let paper: PaperAccount = {
   positions: [],
   orders: [],
   equityHistory: [],
+  signalLog: [],
   createdAt: iso('2025-01-02'),
 }
 for (const d of days.filter((x) => x >= '2025-01-02' && x <= '2025-10-31')) {
@@ -245,6 +246,13 @@ for (const d of days.filter((x) => x >= '2025-01-02' && x <= '2025-10-31')) {
       iso(d),
     )
   }
+}
+// Every signal was ordered as suggested: the assistant's log shows it.
+paper = {
+  ...paper,
+  signalLog: paper.orders
+    .filter((o) => o.status === 'filled')
+    .map((o) => ({ symbol: o.symbol, kind: o.side === 'buy' ? 'enter' : 'exit', date: o.filledAt!, close: o.fillPrice!, side: o.side, shares: o.shares, reading: o.reason.replace('策略訊號：', ''), basis: [], outcome: 'followed' })),
 }
 data.paperAccounts = [paper]
 

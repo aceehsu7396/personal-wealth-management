@@ -16,6 +16,7 @@ import { usePauseStatus } from './usePauseStatus'
 import { useEntrySignals } from './useEntrySignals'
 import { nextBatch } from './batches'
 import { ENTRY_SIGNAL_LABELS, ENTRY_SIGNAL_METHOD } from './entrySignals'
+import { paperScanItems } from '../paper/assistant'
 
 // Research cards should be refreshed after every quarterly report.
 const THESIS_STALE_MONTHS = 4
@@ -34,6 +35,8 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   const scenarioSets = useAppStore((s) => s.scenarioSets)
   const assumptions = useAppStore((s) => s.assumptions)
   const foundation = useAppStore((s) => s.foundation)
+  const paperAccounts = useAppStore((s) => s.paperAccounts)
+  const strategies = useAppStore((s) => s.tradingStrategies)
   const regime = useRegime()
   const pause = usePauseStatus()
   const events = useEvents(todayIsoDate())
@@ -123,6 +126,8 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
       items.push(scanItem('entry_signal', `${w.ticker} ${w.name}：${ENTRY_SIGNAL_LABELS[sig.kind]}（${sig.detail}）：建立計畫單`, `進場條件監控（${sig.date}）${blocked}`, to))
     }
   }
+
+  items.push(...paperScanItems(paperAccounts, strategies, today))
 
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
   if (discipline.pendingReviews.length > 0) {

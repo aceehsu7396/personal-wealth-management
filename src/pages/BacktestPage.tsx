@@ -472,6 +472,14 @@ export function BacktestPage() {
             </span>
           </div>
           {verdict && output.stats.outOfSample !== null && <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">{verdict.reason}</p>}
+          {passed && card && (card.status === 'dev' || card.status === 'paper') && (
+            <p className="mt-2 text-sm">
+              <Link to={`/sim/paper?strategy=${encodeURIComponent(card.id)}`} className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+                下一步：開始虛擬交易（進出場助手）→
+              </Link>
+              {!savedId && <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">先按下方「儲存回測結果」，這次通過才會計入解鎖實單。</span>}
+            </p>
+          )}
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             {output.strategy.dates[0]}～{output.strategy.dates[output.strategy.dates.length - 1]}，{output.strategy.dates.length} 個交易日
             {output.oosStart && `；樣本外自 ${output.oosStart} 起`}。價格已還原除權息。

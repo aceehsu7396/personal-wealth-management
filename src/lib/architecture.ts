@@ -86,7 +86,7 @@ export const ARCH_NODES: Record<string, ArchNode> = {
   paper: {
     id: 'paper',
     title: '虛擬帳戶',
-    what: '用即時價格照策略卡下虛擬單，記錄成交、停損與情緒。',
+    what: '用最新收盤價照策略卡下虛擬單；進出場助手給每天的建議、股數與停損，並記錄照做或略過。',
     why: '回測證明策略有優勢，虛擬交易證明「你」能照規則執行；兩關都過才用真錢。',
     page: { to: '/sim/paper', label: '模擬交易・虛擬帳戶' },
     handbook: { slug: '10', label: '10 §7 虛擬交易' },

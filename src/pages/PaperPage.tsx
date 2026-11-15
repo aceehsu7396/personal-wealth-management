@@ -3,7 +3,6 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import {
   cancelOrder,
-  equityOf,
   paperStats,
   placeOrder,
   setStopLoss,
@@ -11,10 +10,14 @@ import {
   type NewOrder,
   type Quote,
 } from '../lib/paper/paperAccount'
-import { latestSignals, type SignalSuggestion } from '../lib/backtest/engine'
+import { symbolStatus } from '../lib/backtest/engine'
 import { loadChipData, loadPriceData } from '../lib/backtest/data'
 import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList } from '../lib/backtest/templates'
-import { PAPER_RULES } from '../lib/calculations/strategyProgress'
+import { PAPER_RULES, liveGate } from '../lib/calculations/strategyProgress'
+import { assistantItems, orderChecks, resolveItem, withSnapshot } from '../lib/paper/assistant'
+import { useJourney } from '../lib/useJourney'
+import { useRegime } from '../lib/market/useRegime'
+import { OrderCheckList, PaperAssistant } from '../components/paper/PaperAssistant'
 import { fetchLatestTwseBar, isoDaysAgo, loadSeries, seriesForBacktest, TWSE_REQUEST_GAP_MS } from '../lib/market/priceHistory'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
@@ -24,7 +27,7 @@ import { SimGuide } from '../components/SimGuide'
 import { PaperHowTo } from '../components/PaperHowTo'
 import { Field, inputClass } from '../components/forms/FormField'
 import { PageHeader, primaryButton, secondaryButton } from '../components/ui'
-import type { PaperAccount, PaperOrder } from '../lib/storage/schema'
+import type { AssistantItem, PaperAccount, PaperOrder } from '../lib/storage/schema'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -94,7 +97,7 @@ function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: str
           disabled={!(cash > 0)}
           onClick={() =>
             onCreate({
-              name: name.trim() || strategy?.name || '虛擬帳戶',
+              name: name.trim() || (strategy ? `${strategy.name}・虛擬` : '虛擬帳戶'),
               strategyId: strategyId || undefined,
               market,
               initialCash: cash,
@@ -102,6 +105,7 @@ function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: str
               positions: [],
               orders: [],
               equityHistory: [],
+              signalLog: [],
             })
           }
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
@@ -124,19 +128,21 @@ export function PaperPage() {
   const updateTradingStrategy = useAppStore((s) => s.updateTradingStrategy)
 
   const presetStrategy = search.get('strategy') ?? ''
-  const preset = accounts.find((a) => a.strategyId === presetStrategy)
+  const preset = accounts.find((a) => a.id === search.get('account')) ?? accounts.find((a) => a.strategyId === presetStrategy)
   const [selectedId, setSelectedId] = useState<string | null>(preset?.id ?? accounts[0]?.id ?? null)
   const [creating, setCreating] = useState(accounts.length === 0 || (presetStrategy !== '' && !preset))
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [signals, setSignals] = useState<SignalSuggestion[] | null>(null)
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({})
   const [order, setOrder] = useState({ symbol: '', side: 'buy' as 'buy' | 'sell', type: 'market' as PaperOrder['type'], shares: '', price: '', stopLoss: '', reason: '', emotion: 3 })
   const [pendingDelete, setPendingDelete] = useState(false)
 
+  const { policy } = useJourney()
+  const regime = useRegime().ctx
   const today = todayIsoDate()
   const account = accounts.find((a) => a.id === selectedId)
   const strategy = strategies.find((s) => s.id === account?.strategyId)
+  const current = () => useAppStore.getState().paperAccounts.find((a) => a.id === account?.id)!
 
   function save(next: PaperAccount) {
     replacePaperAccount(next)
@@ -173,9 +179,10 @@ export function PaperPage() {
     })
   }
 
-  async function submitOrder(input: NewOrder) {
-    if (!account) return
-    await guarded('下單中…', async () => {
+  // Places an order on the latest saved account; the caller saves it.
+  async function execOrder(input: NewOrder): Promise<PaperAccount> {
+    if (!account) throw new Error('沒有選取帳戶')
+    {
       let quote: Quote | undefined
       if (input.type === 'market') {
         if (account.market === 'TW') quote = (await fetchQuotes([input.symbol], today, setBusy))[input.symbol]
@@ -187,8 +194,28 @@ export function PaperPage() {
         }
         if (!quote) throw new Error(account.market === 'TW' ? '取不到最新收盤價（上櫃股票不支援）' : '請填寫成交價')
       }
-      const current = useAppStore.getState().paperAccounts.find((a) => a.id === account.id)!
-      save(placeOrder(current, input, quote))
+      return placeOrder(current(), input, quote)
+    }
+  }
+
+  async function submitOrder(input: NewOrder) {
+    await guarded('下單中…', async () => save(await execOrder(input)))
+  }
+
+  // An order as the assistant suggested, or with other shares or stop.
+  async function followItem(item: AssistantItem, shares: number, stopLoss: number | undefined) {
+    const modified = item.side === 'buy' && (shares !== item.shares || stopLoss !== item.stopLoss)
+    await guarded('下單中…', async () => {
+      const next = await execOrder({
+        symbol: item.symbol,
+        name: account?.positions.find((p) => p.symbol === item.symbol)?.name ?? '',
+        side: item.side ?? 'buy',
+        type: 'market',
+        shares,
+        stopLoss: item.side === 'buy' ? stopLoss : undefined,
+        reason: `策略訊號：${item.reading}${modified ? '（修改股數或停損）' : ''}`,
+      })
+      save(resolveItem(next, item.symbol, item.kind, modified ? 'modified' : 'followed'))
     })
   }
 
@@ -209,16 +236,18 @@ export function PaperPage() {
     })
   }
 
-  async function makeSignals() {
+  async function makeAdvice() {
     if (!account || !strategy) return
-    await guarded('計算今日訊號…', async () => {
-      const symbols = strategy.symbols
+    await guarded('計算今日建議…', async () => {
+      const symbols = [...new Set([...strategy.symbols, ...account.positions.map((p) => p.symbol)])]
       const data = await loadPriceData(symbols, isoDaysAgo(today, 1), today, (p) => setBusy(`下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}`))
       const held = Object.fromEntries(account.positions.map((p) => [p.symbol, { shares: p.shares, openedAt: p.openedAt }]))
       const chips = STRATEGY_TEMPLATES[strategy.template].chipData
         ? await loadChipData(symbols, isoDaysAgo(today, 1), (p) => setBusy(`下載 ${formatSymbol(p.symbol)} 法人買賣超 ${p.done + 1}/${p.total}`))
         : undefined
-      setSignals(latestSignals(strategy.template, strategy.params, data, held, equityOf(account), chips))
+      const statuses = symbolStatus(strategy.template, strategy.params, data, held, chips)
+      const latest = current()
+      save(withSnapshot(latest, assistantItems({ strategy, account: latest, statuses, data, policy, regime }), new Date().toISOString()))
     })
   }
 
@@ -243,6 +272,27 @@ export function PaperPage() {
   // The day's one main action: strategy signals when the linked card can
   // produce them, otherwise a price update.
   const canSignal = !!strategy && STRATEGY_TEMPLATES[strategy.template].backtestable
+  const backtestPassed = !!strategy && liveGate(strategy, runs, accounts, today).backtestPassed
+  // The manual order's checks, on the latest known price of that symbol.
+  const formSymbol = account ? parseSymbolList(account.market === 'US' ? `US:${order.symbol.replace(/^US:/i, '')}` : order.symbol)[0] : undefined
+  const known = formSymbol ? (account?.assistant?.items.find((i) => i.symbol === formSymbol) ?? account?.positions.find((p) => p.symbol === formSymbol)) : undefined
+  const knownPrice = known ? ('close' in known ? { price: known.close, date: known.date } : { price: known.lastPrice, date: known.lastPriceDate }) : null
+  const formChecks =
+    account && knownPrice && Number(order.shares) > 0
+      ? orderChecks({
+          side: order.side,
+          price: order.type === 'market' ? knownPrice.price : Number(order.price) || knownPrice.price,
+          shares: Number(order.shares),
+          stopLoss: Number(order.stopLoss) > 0 ? Number(order.stopLoss) : undefined,
+          date: knownPrice.date,
+          today,
+          account,
+          policy,
+          strategy,
+          backtestPassed,
+          regime,
+        })
+      : null
   const showAccount = !!account && !!stats && !creating
 
   return (
@@ -260,8 +310,8 @@ export function PaperPage() {
         }
         action={
           showAccount ? (
-            <button type="button" disabled={busy !== null} onClick={() => void (canSignal ? makeSignals() : refreshPrices())} className={primaryButton}>
-              {canSignal ? '產生今日策略訊號' : '更新價格'}
+            <button type="button" disabled={busy !== null} onClick={() => void (canSignal ? makeAdvice() : refreshPrices())} className={primaryButton}>
+              {canSignal ? '產生今日建議' : '更新價格'}
             </button>
           ) : undefined
         }
@@ -275,7 +325,6 @@ export function PaperPage() {
             onClick={() => {
               setSelectedId(a.id)
               setCreating(false)
-              setSignals(null)
             }}
             aria-pressed={a.id === selectedId && !creating}
             className={`rounded-md px-3 py-1.5 text-sm ${a.id === selectedId && !creating ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700'}`}
@@ -343,7 +392,7 @@ export function PaperPage() {
                 </button>
               )}
               <span className="text-xs text-gray-600 dark:text-gray-400">
-                {canSignal ? '每天收盤後：先更新價格（觸發停損與限價單），再按頁首「產生今日策略訊號」。' : '每天收盤後按頁首「更新價格」，觸發停損與限價單。'}
+                {canSignal ? '每天收盤後：先更新價格（觸發停損與限價單），再按頁首「產生今日建議」。' : '每天收盤後按頁首「更新價格」，觸發停損與限價單。'}
               </span>
             </div>
 
@@ -364,45 +413,19 @@ export function PaperPage() {
               </div>
             )}
 
-            {signals && (
-              <div className="mt-4 rounded-md bg-gray-50 p-3 text-sm dark:bg-gray-900/40">
-                <p className="font-medium text-gray-800 dark:text-gray-200">今日策略訊號</p>
-                {signals.length === 0 ? (
-                  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">沒有新訊號：照規則什麼都不做也是一種紀律。</p>
-                ) : (
-                  <ul className="mt-2 space-y-1">
-                    {signals.map((sg) => (
-                      <li key={`${sg.side}${sg.symbol}`} className="flex flex-wrap items-center gap-3">
-                        <span className={sg.side === 'buy' ? 'text-indigo-700 dark:text-indigo-400' : 'text-orange-700 dark:text-orange-400'}>
-                          {sg.side === 'buy' ? '買進' : '賣出'} {formatSymbol(sg.symbol)} {sg.shares} 股
-                        </span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {sg.reason}・{sg.date} 收盤 {sg.close}
-                          {sg.stopLoss !== undefined && `・停損 ${sg.stopLoss}`}
-                        </span>
-                        <button
-                          type="button"
-                          className={linkClass}
-                          disabled={busy !== null || sg.shares <= 0}
-                          onClick={() =>
-                            void submitOrder({
-                              symbol: sg.symbol,
-                              name: '',
-                              side: sg.side,
-                              type: 'market',
-                              shares: sg.shares,
-                              stopLoss: sg.stopLoss,
-                              reason: `策略訊號：${sg.reason}`,
-                            }).then(() => setSignals((list) => list?.filter((x) => x !== sg) ?? null))
-                          }
-                        >
-                          依訊號下單
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+            {canSignal && strategy && (
+              <PaperAssistant
+                account={account}
+                strategy={strategy}
+                backtestPassed={backtestPassed}
+                regime={regime}
+                policy={policy}
+                today={today}
+                busy={busy !== null}
+                onOrder={(item, shares, stop) => void followItem(item, shares, stop)}
+                onRaise={(item) => item.raiseTo !== undefined && save(resolveItem(setStopLoss(current(), item.symbol, item.raiseTo), item.symbol, item.kind, 'followed'))}
+                onSkip={(item, note) => save(resolveItem(current(), item.symbol, item.kind, 'skipped', note))}
+              />
             )}
 
             <h3 className="mt-6 text-sm font-semibold text-gray-900 dark:text-gray-100">持倉</h3>
@@ -437,6 +460,7 @@ export function PaperPage() {
                           <td className={`${tdClass} ${gain >= 0 ? 'text-indigo-700 dark:text-indigo-400' : 'text-orange-700 dark:text-orange-400'}`}>{pct(gain)}</td>
                           <td className={tdClass}>
                             <input
+                              key={p.stopLoss ?? 'none'}
                               type="number"
                               step="any"
                               className="w-20 rounded border border-gray-300 px-1 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800"
@@ -505,6 +529,7 @@ export function PaperPage() {
                 </select>
               </Field>
             </div>
+            {formChecks && <OrderCheckList checks={formChecks} />}
             <button
               type="button"
               disabled={busy !== null}

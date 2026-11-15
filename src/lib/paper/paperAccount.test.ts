@@ -4,7 +4,7 @@ import { cancelOrder, equityOf, paperStats, placeOrder, updatePrices } from './p
 import { latestSignals } from '../backtest/engine'
 
 function account(cash = 100_000): PaperAccount {
-  return { id: 'a', name: 'x', market: 'TW', initialCash: cash, cash, positions: [], orders: [], equityHistory: [], createdAt: '' }
+  return { id: 'a', name: 'x', market: 'TW', initialCash: cash, cash, positions: [], orders: [], equityHistory: [], signalLog: [], createdAt: '' }
 }
 
 const fee = (v: number) => Math.max(20, v * 0.001425)

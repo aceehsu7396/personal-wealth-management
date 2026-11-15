@@ -1,0 +1,302 @@
+import type { Bar } from '../market/priceHistory'
+import type { AssistantItem, AssistantKind, InvestmentPolicy, PaperAccount, PlanAdvice, SignalOutcome, TradingStrategy } from '../storage/schema'
+import type { SymbolStatus } from '../backtest/engine'
+import { resolveParams } from '../backtest/templates'
+import { riskLimitOf } from '../calculations/preTradeChecklist'
+import { STOP_ATR_MULTIPLE } from '../research/signals'
+import { allows, type RegimeContext } from '../market/regime'
+import { ENTRY_METHOD_LABELS, METHOD_OF, scanItem, trailingStop, type ScanItem } from '../trades/tradePlan'
+import { formatSymbol } from '../backtest/templates'
+import { equityOf } from './paperAccount'
+
+// The paper-trading entry-exit assistant (handbook 10 §7): the linked
+// strategy card's signals turned into orders sized by risk, with a stop on
+// every buy, a chandelier stop that only moves up, and a record of what
+// was done with each suggestion.
+
+const round2 = (v: number) => Math.round(v * 100) / 100
+const pct = (v: number) => `${(v * 100).toFixed(1)}%`
+const money = (v: number) => Math.round(v).toLocaleString()
+
+// Within this distance of the stop, a position is flagged (as for plans).
+export const NEAR_STOP = 0.03
+// Prices older than this many calendar days are not good enough to order on.
+export const STALE_DAYS = 5
+// Suggestions that ask for an order or a stop change.
+export const ACTIONABLE: AssistantKind[] = ['enter', 'exit', 'raise_stop']
+const MAX_LOG = 300
+
+export const ASSISTANT_KIND_LABELS: Record<AssistantKind, string> = {
+  enter: '進場',
+  exit: '出場',
+  stop_hit: '停損觸發',
+  raise_stop: '上調停損',
+  near_stop: '接近停損',
+  hold: '續抱',
+  wait: '觀望',
+  no_data: '無法判斷',
+}
+
+export const OUTCOME_LABELS: Record<SignalOutcome, string> = {
+  pending: '待處理',
+  followed: '照做',
+  modified: '修改後下單',
+  skipped: '略過',
+  missed: '未處理',
+}
+
+// The stop width: the regime row's multiple replaces the card's (as in
+// planFromStrategy). A card without an ATR stop still gets a protective
+// one, since every paper buy needs a stop, but it does not trail.
+export function stopWidth(strategy: Pick<TradingStrategy, 'template' | 'params'>, regime?: RegimeContext | null): { k: number; protective: boolean } {
+  const atrStop = resolveParams(strategy.template, strategy.params).atrStop
+  if (atrStop > 0) return { k: regime?.row.stopAtr ?? atrStop, protective: false }
+  return { k: STOP_ATR_MULTIPLE, protective: true }
+}
+
+export interface PaperSizeInput {
+  price: number
+  stop: number
+  equity: number
+  cash: number
+  policy: InvestmentPolicy
+  strategy?: Pick<TradingStrategy, 'riskPerTradePercent'>
+  multiplier?: number
+}
+
+// The paper account is the trading sleeve, so the per-trade risk is a
+// share of its equity; then the regime multiplier, then the caps: cash,
+// the single-position limit (rescaled from the whole portfolio to the
+// sleeve) and an equal slot for each allowed open position.
+export function paperShares(input: PaperSizeInput): { shares: number; basis: string[] } {
+  const { price, stop, equity, cash, policy } = input
+  if (!(price > stop) || equity <= 0) return { shares: 0, basis: ['停損須低於價格，無法計算股數'] }
+  const limit = riskLimitOf(input.strategy, policy)
+  const budget = (equity * limit.percent) / 100
+  const byRisk = Math.floor(budget / (price - stop))
+  const multiplier = input.multiplier ?? 1
+  const sized = Math.floor(byRisk * multiplier)
+  const singleShare = Math.min(1, policy.maxSinglePositionPercent / Math.max(policy.satellitePercent, 1))
+  const caps = [
+    { label: '可用現金', shares: Math.floor(cash / (price * 1.002)) },
+    { label: `單一部位上限（權益 × ${pct(singleShare)}）`, shares: Math.floor((equity * singleShare) / price) },
+    { label: `同時持有 ${policy.maxOpenPositions} 檔的平均額度`, shares: Math.floor(equity / policy.maxOpenPositions / price) },
+  ]
+  const tightest = caps.reduce((a, b) => (b.shares < a.shares ? b : a))
+  const shares = Math.max(0, Math.min(sized, tightest.shares))
+  const basis = [
+    `風險預算 = 權益 ${money(equity)} × ${limit.percent}%（${limit.source}）= ${money(budget)}`,
+    `每股風險 = ${price} − 停損 ${stop} = ${round2(price - stop)}，可買 ${byRisk.toLocaleString()} 股`,
+  ]
+  if (multiplier !== 1) basis.push(`局勢部位倍數 × ${multiplier} = ${sized.toLocaleString()} 股`)
+  if (tightest.shares < sized) basis.push(`受「${tightest.label}」限制，取 ${tightest.shares.toLocaleString()} 股`)
+  return { shares, basis }
+}
+
+export interface AssistantInput {
+  strategy: TradingStrategy
+  account: PaperAccount
+  statuses: SymbolStatus[]
+  data: Record<string, Bar[]>
+  policy: InvestmentPolicy
+  regime?: RegimeContext | null
+}
+
+// One suggestion per symbol, the most urgent kind first: an exit signal,
+// a broken stop, a stop to raise (or set), a stop close by, then hold.
+export function assistantItems({ strategy, account, statuses, data, policy, regime }: AssistantInput): AssistantItem[] {
+  const { k, protective } = stopWidth(strategy, regime)
+  const equity = equityOf(account)
+  let cash = account.cash
+  const out: AssistantItem[] = []
+  for (const st of statuses) {
+    const base = { symbol: st.symbol, date: st.date, close: st.close, reading: st.reading, basis: [] as string[], outcome: 'pending' as const }
+    const p = account.positions.find((x) => x.symbol === st.symbol)
+    if (p) {
+      const stop = p.stopLoss
+      if (st.state === 'exit') {
+        out.push({ ...base, kind: 'exit', side: 'sell', shares: p.shares, basis: ['策略出場訊號：全部賣出'] })
+        continue
+      }
+      if (stop !== undefined && st.close <= stop) {
+        out.push({ ...base, kind: 'stop_hit', basis: [`收盤 ${st.close} 已跌破停損 ${stop}；更新價格時若盤中觸及會自動賣出`] })
+        continue
+      }
+      if (stop === undefined && st.atr) {
+        const set = round2(st.close - k * st.atr)
+        out.push({ ...base, kind: 'raise_stop', raiseTo: set, basis: [`這筆部位沒有停損：設 收盤 − ${k} × ATR = ${set}`] })
+        continue
+      }
+      const raise = protective ? null : trailingStop({ trailing: 'chandelier', trailingParam: k, openedAt: p.openedAt, currentStop: stop, stopLoss: stop }, data[st.symbol] ?? [])
+      if (raise !== null) {
+        out.push({ ...base, kind: 'raise_stop', raiseTo: raise, basis: [`吊燈停損 = 進場後最高價 − ${k} × ATR = ${raise}，高於目前停損 ${stop}；停損只往上調`] })
+        continue
+      }
+      if (stop !== undefined && (st.close - stop) / st.close < NEAR_STOP) {
+        out.push({ ...base, kind: 'near_stop', basis: [`收盤 ${st.close} 離停損 ${stop} 不到 ${pct(NEAR_STOP)}；不要下移停損`] })
+        continue
+      }
+      const r = stop !== undefined && p.avgCost > stop ? (st.close - p.avgCost) / (p.avgCost - stop) : null
+      out.push({ ...base, kind: st.state === 'no_data' ? 'no_data' : 'hold', basis: [stop !== undefined ? `停損 ${stop}${r !== null ? `，目前 ${r.toFixed(1)}R` : ''}` : '沒有停損'] })
+      continue
+    }
+    if (st.state !== 'enter') {
+      out.push({ ...base, kind: st.state === 'exit' || st.state === 'hold' ? 'wait' : st.state })
+      continue
+    }
+    if (!st.atr) {
+      out.push({ ...base, kind: 'enter', side: 'buy', basis: ['ATR 資料不足，無法設停損與計算股數'] })
+      continue
+    }
+    const stopLoss = round2(st.close - k * st.atr)
+    const size = paperShares({ price: st.close, stop: stopLoss, equity, cash, policy, strategy, multiplier: regime?.multiplier })
+    cash -= size.shares * st.close
+    const stopNote = protective
+      ? `保護停損 = 收盤 − ${k} × ATR = ${stopLoss}（策略卡沒有停損規則，這是每筆必設停損的要求，不會移動）`
+      : `停損 = 收盤 − ${k} × ATR = ${stopLoss}${regime && regime.row.stopAtr !== resolveParams(strategy.template, strategy.params).atrStop ? `（局勢「${regime.label}」的停損寬度）` : ''}`
+    out.push({ ...base, kind: 'enter', side: 'buy', shares: size.shares, stopLoss, basis: [stopNote, ...size.basis] })
+  }
+  return out
+}
+
+export interface OrderCheck {
+  level: PlanAdvice['level']
+  text: string
+  passed: boolean
+}
+
+export interface OrderCheckInput {
+  side: 'buy' | 'sell'
+  price: number
+  shares: number
+  stopLoss?: number
+  // The date of the price the order is based on.
+  date: string
+  today: string
+  account: PaperAccount
+  policy: InvestmentPolicy
+  strategy?: TradingStrategy
+  backtestPassed: boolean
+  regime?: RegimeContext | null
+}
+
+// Before a paper order: required checks block it, the rest only advise.
+export function orderChecks(input: OrderCheckInput): OrderCheck[] {
+  const { side, price, shares, stopLoss, date, today, account, policy, strategy, regime } = input
+  const out: OrderCheck[] = []
+  const age = date ? Math.floor((Date.parse(today) - Date.parse(date)) / 86400000) : Infinity
+  out.push({ level: 'required', text: age <= STALE_DAYS ? `價格是最近的收盤（${date}）` : `價格太舊（${date || '沒有日期'}），請先更新價格`, passed: age <= STALE_DAYS })
+  if (side === 'sell') return out
+  const hasStop = stopLoss !== undefined && stopLoss > 0 && stopLoss < price
+  out.push({ level: 'required', text: hasStop ? `已設停損 ${stopLoss}` : '買進必須設停損，且低於買進價', passed: hasStop })
+  if (hasStop) {
+    const limit = riskLimitOf(strategy, policy)
+    const risk = shares * (price - stopLoss!)
+    const share = equityOf(account) > 0 ? (risk / equityOf(account)) * 100 : Infinity
+    const ok = share <= limit.percent + 0.005
+    out.push({ level: 'required', text: `停損風險 ${money(risk)}，占權益 ${share.toFixed(2)}%（上限 ${limit.percent}%，${limit.source}）`, passed: ok })
+  }
+  const cost = shares * price * 1.002
+  out.push({ level: 'required', text: cost <= account.cash ? `現金足夠（需約 ${money(cost)}）` : `現金不足：需約 ${money(cost)}，可用 ${money(account.cash)}`, passed: cost <= account.cash && shares > 0 })
+  if (strategy) {
+    out.push({
+      level: 'suggest',
+      text: input.backtestPassed ? '策略卡已通過回測' : '這張卡還沒有通過回測：虛擬交易的結果不能用來解鎖實單',
+      passed: input.backtestPassed,
+    })
+    const method = METHOD_OF[strategy.template] ?? 'other'
+    if (regime && !allows(regime, method)) {
+      out.push({ level: 'notice', text: `目前局勢「${regime.label}」不允許${ENTRY_METHOD_LABELS[method]}新建倉；實單會被擋下，虛擬交易可照練但請記下`, passed: false })
+    }
+  }
+  return out
+}
+
+export const blocked = (checks: OrderCheck[]) => checks.some((c) => c.level === 'required' && !c.passed)
+
+const sameItem = (a: AssistantItem, b: AssistantItem) => a.symbol === b.symbol && a.kind === b.kind
+
+// Saves a new set of suggestions. On the same price date, outcomes already
+// recorded carry over; on a new date, the old actionable ones go to the
+// log, untouched ones as missed.
+export function withSnapshot(account: PaperAccount, items: AssistantItem[], generatedAt: string): PaperAccount {
+  const prev = account.assistant
+  const date = items.map((i) => i.date).filter(Boolean).sort().pop() ?? generatedAt.slice(0, 10)
+  if (prev && prev.date === date) {
+    const merged = items.map((i) => {
+      const old = prev.items.find((o) => sameItem(o, i))
+      return old && old.outcome !== 'pending' ? { ...i, outcome: old.outcome, note: old.note } : i
+    })
+    return { ...account, assistant: { date, generatedAt, items: merged } }
+  }
+  const retired = (prev?.items ?? []).filter((i) => ACTIONABLE.includes(i.kind)).map((i) => (i.outcome === 'pending' ? { ...i, outcome: 'missed' as const } : i))
+  return { ...account, assistant: { date, generatedAt, items }, signalLog: [...account.signalLog, ...retired].slice(-MAX_LOG) }
+}
+
+export function resolveItem(account: PaperAccount, symbol: string, kind: AssistantKind, outcome: SignalOutcome, note?: string): PaperAccount {
+  if (!account.assistant) return account
+  return {
+    ...account,
+    assistant: { ...account.assistant, items: account.assistant.items.map((i) => (i.symbol === symbol && i.kind === kind ? { ...i, outcome, note } : i)) },
+  }
+}
+
+export interface Execution {
+  counts: Record<SignalOutcome, number>
+  // Followed or modified, out of the suggestions already decided or missed.
+  rate: number | null
+  // Skipped and modified ones with their reasons, newest first, for the weekly review.
+  notes: AssistantItem[]
+}
+
+export function executionOf(account: PaperAccount): Execution {
+  const items = [...account.signalLog, ...(account.assistant?.items ?? []).filter((i) => ACTIONABLE.includes(i.kind))]
+  const counts: Record<SignalOutcome, number> = { pending: 0, followed: 0, modified: 0, skipped: 0, missed: 0 }
+  for (const i of items) counts[i.outcome] += 1
+  const decided = counts.followed + counts.modified + counts.skipped + counts.missed
+  return {
+    counts,
+    rate: decided > 0 ? (counts.followed + counts.modified) / decided : null,
+    notes: items.filter((i) => i.outcome === 'skipped' || i.outcome === 'modified').reverse(),
+  }
+}
+
+const daysBetween = (from: string, to: string) => Math.floor((Date.parse(to) - Date.parse(from)) / 86400000)
+
+// Paper accounts on the day's list (handbook 04 §0), from what is saved:
+// suggestions not yet acted on, stops to raise or watch, and prices or
+// suggestions that are out of date. Marked 虛擬 to keep them apart from
+// real money.
+export function paperScanItems(accounts: PaperAccount[], strategies: TradingStrategy[], today: string): ScanItem[] {
+  const out: ScanItem[] = []
+  const weekday = ![0, 6].includes(new Date(`${today}T00:00:00Z`).getUTCDay())
+  for (const a of accounts) {
+    const card = strategies.find((s) => s.id === a.strategyId)
+    if (!card || card.status !== 'paper') continue
+    const to = `/sim/paper?account=${encodeURIComponent(a.id)}`
+    const tag = a.name.includes('虛擬') ? a.name : `虛擬・${a.name}`
+    const basis = `策略卡「${card.name}」進出場助手`
+    const snap = a.assistant
+    const fresh = snap && daysBetween(snap.date, today) <= STALE_DAYS
+    const items = fresh ? snap.items : []
+    for (const i of items.filter((x) => x.outcome === 'pending')) {
+      const sym = formatSymbol(i.symbol)
+      if (i.kind === 'stop_hit') out.push(scanItem('stop_hit', `${tag}：${sym} 收盤跌破停損，更新價格以觸發賣出`, basis, to, 'suggest'))
+      else if (i.kind === 'raise_stop') out.push(scanItem('raise_stop', `${tag}：${sym} 停損上調到 ${i.raiseTo}`, basis, to))
+      else if (i.kind === 'near_stop') out.push(scanItem('raise_stop', `${tag}：${sym} 接近停損，不要下移停損`, basis, to, 'notice'))
+    }
+    const orders = items.filter((x) => x.outcome === 'pending' && (x.kind === 'enter' || x.kind === 'exit'))
+    if (orders.length > 0) {
+      const list = orders.map((x) => `${ASSISTANT_KIND_LABELS[x.kind]} ${formatSymbol(x.symbol)}`).join('、')
+      out.push(scanItem('entry_signal', `${tag}：${orders.length} 筆建議待處理（${list}）`, `${basis}（${snap!.date} 收盤）`, to))
+    }
+    const priced = a.positions.map((p) => p.lastPriceDate).sort()[0]
+    if (priced && daysBetween(priced, today) > 3) {
+      out.push(scanItem('housekeeping', `${tag}：持倉價格停在 ${priced}，收盤後更新價格`, '更新價格才會觸發停損與限價單', to))
+    }
+    if (weekday && (!snap || snap.generatedAt.slice(0, 10) < today)) {
+      out.push(scanItem('housekeeping', `${tag}：收盤後產生今日建議`, '手冊 10 §7：每個交易日照策略卡檢查一次', to))
+    }
+  }
+  return out
+}

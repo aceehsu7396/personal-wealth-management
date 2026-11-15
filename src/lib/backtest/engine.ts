@@ -688,6 +688,111 @@ export function latestSignals(
   return out
 }
 
+// Every symbol's standing under the rules at the latest close, held or
+// not, with the reading in words: what the indicators say and how far the
+// next trigger is (the paper-trading assistant, handbook 10 §7).
+export type SymbolState = 'enter' | 'exit' | 'hold' | 'wait' | 'no_data'
+
+export interface SymbolStatus {
+  symbol: string
+  state: SymbolState
+  date: string
+  close: number
+  // ATR(14) at the latest bar, or null before 14 bars.
+  atr: number | null
+  reading: string
+}
+
+const num = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2))
+const gap = (from: number, to: number) => `${Math.abs((to / from - 1) * 100).toFixed(1)}%`
+
+export function symbolStatus(
+  template: StrategyTemplate,
+  rawParams: Record<string, number>,
+  data: Record<string, Bar[]>,
+  held: Record<string, { shares: number; openedAt: string }>,
+  chips?: Record<string, ChipSeries>,
+): SymbolStatus[] {
+  const params = resolveParams(template, rawParams)
+  const symbols = Object.keys(data)
+  const prepared = Object.fromEntries(symbols.filter((s) => data[s].length > 0).map((s) => [s, prepare(template, params, data[s], chips?.[s])]))
+  const latest = Object.values(prepared).map((d) => d.bars[d.bars.length - 1].date).sort().pop()
+  // The full ranking (absolute filter kept), for rotation's places.
+  const ranking = template === 'momentum_rotation' && latest ? rankMomentum({ ...params, topK: symbols.length }, prepared, latest) : []
+
+  return symbols.map((s): SymbolStatus => {
+    const d = prepared[s]
+    if (!d) return { symbol: s, state: 'no_data', date: '', close: NaN, atr: null, reading: '沒有價格資料' }
+    const i = d.bars.length - 1
+    const bar = d.bars[i]
+    const a = d.atr[i]
+    const base = { symbol: s, date: bar.date, close: bar.close, atr: Number.isFinite(a) && a > 0 ? a : null }
+    const h = held[s]
+    const at = (state: SymbolState, reading: string): SymbolStatus => ({ ...base, state, reading })
+    const { ind, closes } = d
+    const c = closes[i]
+
+    if (template === 'buy_hold') return h ? at('hold', '買進持有：不賣') : at('enter', '買進持有：尚未持有，買進')
+    if (template === 'dca') return at('enter', `每月定期定額 ${params.monthlyAmount.toLocaleString()} 元（本月已買就略過）`)
+    if (template === 'discretionary') return at('no_data', '自訂文字規則：系統無法自動判斷，請依策略卡規則自行檢查')
+    if (template === 'momentum_rotation') {
+      const place = ranking.indexOf(s)
+      const inTop = place >= 0 && place < params.topK
+      const rank = place >= 0 ? `動能排名第 ${place + 1} 名（取前 ${params.topK} 名）` : params.absoluteFilter ? '動能為負或資料不足，不列入排名' : '資料不足，不列入排名'
+      if (h) return inTop ? at('hold', `${rank}，續抱`) : at('exit', `${rank}，跌出前段班，賣出`)
+      return inTop ? at('enter', `${rank}，買進`) : at('wait', rank)
+    }
+
+    const entryBar = h ? Math.max(d.bars.findIndex((b) => b.date >= h.openedAt), 0) : 0
+    const pos = h ? { shares: h.shares, entryPrice: 0, entryDate: h.openedAt, entryBar, stop: null, cost: 0 } : undefined
+    const order = signal(template, params, d, i, pos)
+    const enter = !h && order?.side === 'buy'
+    const exit = !!h && order?.side === 'sell'
+
+    if (template === 'ma_cross') {
+      const [f, sl] = [ind.fast[i], ind.slow[i]]
+      if (Number.isNaN(f) || Number.isNaN(sl)) return at('no_data', `資料不足 ${params.slow} 個交易日，均線還算不出來`)
+      const fast = params.fast <= 1 ? `收盤 ${num(f)}` : `${params.fast} 日線 ${num(f)}`
+      const slow = `${params.slow} 日線 ${num(sl)}`
+      if (enter) return at('enter', `${fast} 上穿 ${slow}，進場`)
+      if (exit) return at('exit', `${fast} 跌破 ${slow}，出場`)
+      if (h) return at('hold', `${fast} 在 ${slow} 之上（高 ${gap(sl, f)}），續抱`)
+      return f > sl
+        ? at('wait', `${fast} 已在 ${slow} 之上，但交叉發生在先前；等下一次由下往上穿越`)
+        : at('wait', `${fast} 低於 ${slow}，還差 ${gap(f, sl)} 才會上穿進場`)
+    }
+    if (template === 'donchian') {
+      const [hi, lo] = [ind.high[i], ind.low[i]]
+      if (Number.isNaN(hi) || Number.isNaN(lo)) return at('no_data', `資料不足 ${params.entryDays} 個交易日`)
+      if (enter) return at('enter', `收盤 ${num(c)} 突破前 ${params.entryDays} 日高點 ${num(hi)}，進場`)
+      if (exit) return at('exit', `收盤 ${num(c)} 跌破前 ${params.exitDays} 日低點 ${num(lo)}，出場`)
+      if (h) return at('hold', `出場線（前 ${params.exitDays} 日低點）${num(lo)}，離收盤 ${gap(c, lo)}，續抱`)
+      return at('wait', `前 ${params.entryDays} 日高點 ${num(hi)}，收盤 ${num(c)} 還差 ${gap(c, hi)} 才突破`)
+    }
+    if (template === 'rsi_reversion') {
+      const [r, t] = [ind.rsi[i], ind.trend[i]]
+      if (Number.isNaN(r) || Number.isNaN(t)) return at('no_data', `資料不足 ${params.trendDays} 個交易日`)
+      const rs = `RSI(${params.rsiDays}) ${r.toFixed(0)}`
+      if (enter) return at('enter', `收盤在 ${params.trendDays} 日線之上，${rs} 低於 ${params.entryBelow}，進場`)
+      if (exit) return at('exit', r > params.exitAbove ? `${rs} 高於 ${params.exitAbove}，出場` : `已持有滿 ${params.maxHoldDays} 個交易日，出場`)
+      if (h) return at('hold', `${rs}，高於 ${params.exitAbove} 或持有滿 ${params.maxHoldDays} 天出場（已 ${i - entryBar} 天），續抱`)
+      return c <= t
+        ? at('wait', `收盤 ${num(c)} 在 ${params.trendDays} 日線 ${num(t)} 之下，不做多`)
+        : at('wait', `${rs}，要低於 ${params.entryBelow} 才進場`)
+    }
+    if (template === 'chip_flow') {
+      const flow = ind.flow[i]
+      if (Number.isNaN(flow)) return at('no_data', '缺少外資買賣超資料（FinMind）')
+      const lots = `外資 ${params.flowDays} 日累計${flow >= 0 ? '買超' : '賣超'} ${Math.round(Math.abs(flow) / 1000).toLocaleString()} 張`
+      const trend = ind.trend ? (Number.isNaN(ind.trend[i]) ? '' : `；收盤${c > ind.trend[i] ? '在' : '低於'} ${params.trendDays} 日線`) : ''
+      if (enter) return at('enter', `${lots}${trend}，進場`)
+      if (exit) return at('exit', `${lots}${trend}，出場`)
+      return at(h ? 'hold' : 'wait', `${lots}${trend}${h ? '，續抱' : '，等轉為買超'}`)
+    }
+    return at('no_data', '這個範本沒有每日訊號')
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Bias checks (handbook 10 §6.3)
 // ---------------------------------------------------------------------------

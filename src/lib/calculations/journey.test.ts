@@ -142,6 +142,7 @@ function paper(fills: number, firstFill: string): PaperAccount {
       reason: '',
     })),
     equityHistory: [],
+    signalLog: [],
     createdAt: '',
   }
 }
