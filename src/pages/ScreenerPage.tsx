@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import { fetchStockData, type StockData, type StockRow } from '../lib/screener/stockData'
 import {
@@ -23,6 +23,9 @@ import { buyDistanceOf } from '../lib/research/signals'
 import { inputClass, labelClass } from '../components/forms/FormField'
 import { useEntrySignals } from '../lib/trades/useEntrySignals'
 import { ENTRY_SIGNAL_LABELS } from '../lib/trades/entrySignals'
+import { BATCH_SUGGESTED_MAX, draftThesis, researchBatch } from '../lib/research/batchResearch'
+import { todayIsoDate } from '../lib/market/twse'
+import { primaryButton, secondaryButton } from '../components/ui'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -70,6 +73,8 @@ export function ScreenerPage() {
   const removeWatchItem = useAppStore((s) => s.removeWatchItem)
   const theses = useAppStore((s) => s.stockTheses)
   const policy = useAppStore((s) => s.investmentPolicy)
+  const addStockThesis = useAppStore((s) => s.addStockThesis)
+  const navigate = useNavigate()
   const signalsFor = useSignals()
   // A watched symbol's research card, if one is written: its advice and how
   // far it is from the buy point.
@@ -144,6 +149,35 @@ export function ScreenerPage() {
       source: preset ? `篩選：${preset.name}` : '篩選：自訂',
       note: '',
     })
+  }
+
+  // Ticked stocks to research in one go (handbook 06 §1).
+  const [picked, setPicked] = useState<string[]>([])
+  const [confirming, setConfirming] = useState(false)
+  const [batch, setBatch] = useState<{ running: boolean; message: string } | null>(null)
+  const carded = new Set(theses.map((t) => t.ticker.trim().toUpperCase()))
+  const togglePick = (code: string) => setPicked((p) => (p.includes(code) ? p.filter((c) => c !== code) : [...p, code]))
+
+  async function runBatch() {
+    setConfirming(false)
+    setBatch({ running: true, message: '準備中…' })
+    const rowsByCode = new Map((data?.stocks ?? []).map((r) => [r.code, r]))
+    const out = await researchBatch(picked, todayIsoDate(), {
+      onProgress: (p) => setBatch({ running: true, message: `體檢 ${p.code}（${p.done + 1}/${p.total}，FinMind 免費資料）` }),
+    })
+    for (const { code, auto } of out.done) {
+      addStockThesis(draftThesis(code, auto))
+      const row = rowsByCode.get(code)
+      if (row) watch(row)
+    }
+    const notes = [
+      ...out.failed.map((f) => `${f.code}：${f.error}`),
+      ...(out.pending.length > 0 ? [`${out.pending.join('、')} 尚未體檢，額度恢復後再勾選一次`] : []),
+    ]
+    if (out.done.length === 0) return setBatch({ running: false, message: notes.join('；') || '沒有完成任何一檔' })
+    setPicked(out.pending)
+    setBatch(notes.length > 0 ? { running: false, message: notes.join('；') } : null)
+    navigate(`/research/stocks?batch=${out.done.map((d) => d.code).join(',')}`)
   }
 
   const watchedSymbols = new Set(watchlist.map((w) => w.symbol))
@@ -258,7 +292,7 @@ export function ScreenerPage() {
             <>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {data.date} 收盤資料，共 {data.stocks.length} 檔，符合 {rows.length} 檔
-                {rows.length > MAX_ROWS && `（顯示前 ${MAX_ROWS} 檔）`}。報酬未加回股利；上櫃股票不在範圍內。點欄位標題可以排序
+                {rows.length > MAX_ROWS && `（顯示前 ${MAX_ROWS} 檔）`}。報酬未加回股利；上櫃股票不在範圍內。勾選個股可以一次建立研究卡，點欄位標題可以排序
                 {resultSort ? (
                   <>
                     {'，'}
@@ -271,6 +305,43 @@ export function ScreenerPage() {
                 )}
                 。
               </p>
+              {(picked.length > 0 || batch) && (
+                <div className="mt-3 rounded-md border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-900 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-100">
+                  {batch ? (
+                    <p>{batch.message}</p>
+                  ) : confirming ? (
+                    <>
+                      <p>
+                        將替 {picked.join('、')} 各建一張研究卡並自動體檢（財報、估值、技術面），完成後到研究卡逐張判定結論。資料來自 FinMind 免費額度，每小時有上限
+                        {picked.length > BATCH_SUGGESTED_MAX ? `；一次超過 ${BATCH_SUGGESTED_MAX} 檔很可能用完，沒做完的會留著稍後再試` : ''}。
+                      </p>
+                      <div className="mt-2 flex gap-2">
+                        <button type="button" className={primaryButton} onClick={() => void runBatch()}>
+                          確認開始研究
+                        </button>
+                        <button type="button" className={secondaryButton} onClick={() => setConfirming(false)}>
+                          取消
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span>已勾選 {picked.length} 檔：{picked.join('、')}</span>
+                      <button type="button" className={primaryButton} onClick={() => setConfirming(true)}>
+                        研究這 {picked.length} 檔
+                      </button>
+                      <button type="button" className={linkClass} onClick={() => setPicked([])}>
+                        清除勾選
+                      </button>
+                    </div>
+                  )}
+                  {batch && !batch.running && (
+                    <button type="button" className={`${linkClass} mt-1`} onClick={() => setBatch(null)}>
+                      知道了
+                    </button>
+                  )}
+                </div>
+              )}
               <div className="mt-2 max-h-[32rem] overflow-auto">
                 <table className="w-full text-sm">
                   <thead className="sticky top-0 bg-white dark:bg-gray-800">
@@ -292,6 +363,20 @@ export function ScreenerPage() {
                     {rows.slice(0, MAX_ROWS).map((r) => (
                       <tr key={r.code} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
                         <td className={`${tdClass} sticky left-0 bg-white dark:bg-gray-800`}>
+                          {r.isEtf ? (
+                            <span className="mr-2 inline-block w-4" />
+                          ) : carded.has(r.code) ? (
+                            <span className="mr-2 inline-block w-4 text-xs text-gray-400" title="已有研究卡">✓</span>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              className="mr-2 align-middle"
+                              aria-label={`勾選 ${r.code} 研究`}
+                              checked={picked.includes(r.code)}
+                              disabled={batch?.running}
+                              onChange={() => togglePick(r.code)}
+                            />
+                          )}
                           <span className="font-medium text-gray-900 dark:text-gray-100">{r.code}</span> {r.name}
                         </td>
                         <td className={`${tdClass} text-xs`}>{r.industry}</td>

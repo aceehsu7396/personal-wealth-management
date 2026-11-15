@@ -3,7 +3,7 @@
 // a research card and a strategy card through backtest, ten months of paper
 // trading and a year of real trades, to quarterly attribution. The written
 // records (the October trade plan, the pause review, decisions, scenarios,
-// and the signed regime table and dip ladder) come from demo-curated.json.
+// the signed regime table and dip ladder, and a strategy comparison) come from demo-curated.json.
 //
 //   npx tsx scripts/demo-data.mts
 //
@@ -447,7 +447,7 @@ data.portfolioMeta = { fxUsdTwd: 32.5, peakValueTwd: peak.valueTwd, peakDate: pe
 data.assumptions.currentNetWorth = data.portfolioSnapshots.at(-1)!.valueTwd
 
 // Hand-written records for chapter 12 steps 7, 7.5 and 9.
-const curated = JSON.parse(readFileSync(new URL('./demo-curated.json', import.meta.url), 'utf8')) as Pick<AppData, 'tradePlans' | 'pauseReviews' | 'decisions' | 'scenarioSets' | 'ruleVersions' | 'regimeParams' | 'dipLadder'> & { tradePlanLinks: Record<string, string> }
+const curated = JSON.parse(readFileSync(new URL('./demo-curated.json', import.meta.url), 'utf8')) as Pick<AppData, 'tradePlans' | 'pauseReviews' | 'decisions' | 'scenarioSets' | 'ruleVersions' | 'regimeParams' | 'dipLadder' | 'strategyComparisons'> & { tradePlanLinks: Record<string, string> }
 const { tradePlanLinks, ...records } = curated
 Object.assign(data, records)
 data.trades = data.trades.map((t) => (tradePlanLinks[t.id] ? { ...t, planId: tradePlanLinks[t.id] } : t))

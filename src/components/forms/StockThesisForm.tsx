@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { InvestmentPolicy, StockThesis } from '../../lib/storage/schema'
 import { evaluateThesis, VERDICT_LABELS } from '../../lib/calculations/thesisScoring'
-import { autoFairValues, buildAutoResearch, derivedFields, isStale, type AutoResearch } from '../../lib/research/autoResearch'
+import { autoFairValues, buildAutoResearch, isStale, type AutoResearch } from '../../lib/research/autoResearch'
+import { autoThesisFields, blankThesis, type ThesisValues } from '../../lib/research/batchResearch'
 import { todayIsoDate } from '../../lib/market/twse'
 import { describeAiError } from '../../lib/ai/client'
 import { ThesisEvaluationView } from '../ThesisEvaluationView'
@@ -10,7 +11,7 @@ import { SignalPanel } from '../research/SignalPanel'
 import { useSignals } from '../../lib/research/useSignals'
 import { errorClass, inputClass, labelClass } from './FormField'
 
-export type StockThesisFormValues = Omit<StockThesis, 'id' | 'createdAt' | 'updatedAt'>
+export type StockThesisFormValues = ThesisValues
 
 type Verdict = NonNullable<StockThesis['verdict']>
 
@@ -18,36 +19,6 @@ const VERDICT_STYLE: Record<Verdict, string> = {
   invest: 'bg-indigo-600 text-white',
   watch: 'bg-gray-600 text-white',
   pass: 'bg-orange-700 text-white',
-}
-
-// Fields the scoring no longer reads but the stored card still carries.
-function blank(): StockThesisFormValues {
-  return {
-    ticker: '',
-    name: '',
-    market: 'TW',
-    sector: '',
-    lynchCategory: 'stalwart',
-    inCircleOfCompetence: true,
-    status: 'watch',
-    thesis: '',
-    drivers: '',
-    killCriteria: '',
-    sources: '',
-    preMortem: '',
-    fiveForces: { rivalry: 3, newEntrants: 3, substitutes: 3, buyerPower: 3, supplierPower: 3 },
-    powers: { scaleEconomies: 0, networkEconomies: 0, counterPositioning: 0, switchingCosts: 0, branding: 0, corneredResource: 0, processPower: 0 },
-    fScore: 0,
-    hasUnexplainedRedFlags: false,
-    fairValueBear: 0,
-    fairValueBase: 0,
-    fairValueBull: 0,
-    currentPrice: 0,
-    kind: 'stock',
-    verdictNote: '',
-    explainedFlags: {},
-    fiveForcesRated: false,
-  }
 }
 
 interface Props {
@@ -89,20 +60,12 @@ export function StockThesisForm({ policy, initialValues, onSubmit, onCancel, pre
     if (!legacy && ticker && isStale(auto, todayIsoDate())) void runAuto(ticker)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps -- only when the card opens
 
-  const base = { ...blank(), ...(initialValues ?? {}) }
+  const base = { ...blankThesis(), ...(initialValues ?? {}) }
   const values: StockThesisFormValues = auto
     ? {
         ...base,
-        ticker: ticker.trim().toUpperCase(),
-        market: 'TW',
-        name: auto.name,
-        sector: auto.industry,
-        kind: auto.kind,
-        auto,
+        ...autoThesisFields(ticker, auto),
         lynchCategory: auto.stock?.lynch ?? base.lynchCategory,
-        assumptions: undefined,
-        explainedFlags: {},
-        ...derivedFields(auto, undefined, {}),
         verdict,
         verdictNote,
         verdictAt: verdict ? (verdict === initialValues?.verdict ? initialValues.verdictAt : todayIsoDate()) : undefined,

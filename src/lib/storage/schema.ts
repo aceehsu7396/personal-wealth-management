@@ -704,6 +704,50 @@ export const BacktestRunSchema = z.object({
 })
 export type BacktestRun = z.infer<typeof BacktestRunSchema>
 
+// One template in a strategy comparison (handbook 10 §6.5).
+export const CompareEntrySchema = z.object({
+  key: z.string(),
+  label: z.string(),
+  template: StrategyTemplateSchema,
+  params: z.record(z.string(), z.number()),
+  role: z.enum(['signal', 'benchmark']),
+})
+export type CompareEntry = z.infer<typeof CompareEntrySchema>
+
+// A saved strategy comparison: every template's summary statistics and a
+// weekly curve per template, in the order of `rows`.
+export const StrategyComparisonSchema = z.object({
+  id: z.string(),
+  thesisId: z.string().optional(),
+  symbol: z.string(),
+  name: z.string(),
+  start: z.string(),
+  end: z.string(),
+  initialCapital: z.number(),
+  outOfSampleStart: z.string().nullable(),
+  // 0 = the default set; 1, 2… = re-runs with adjusted conditions.
+  round: z.number(),
+  trials: z.number(),
+  rows: z.array(
+    z.object({
+      entry: CompareEntrySchema,
+      stats: BacktestSplitSchema.nullable(),
+      passed: z.boolean().nullable(),
+      verdictReason: z.string(),
+      warnings: z.array(z.string()),
+      costSensitive: z.boolean().nullable(),
+      deflatedProbability: z.number().nullable(),
+      avgR: z.number().nullable(),
+      error: z.string().optional(),
+    }),
+  ),
+  summary: z.object({ kind: z.enum(['edge', 'few_trades', 'none']), headline: z.string(), details: z.array(z.string()), ranking: z.array(z.string()) }),
+  // NaN does not survive JSON; a missing value is null.
+  equity: z.array(z.object({ date: z.string(), values: z.array(z.number().nullable()) })),
+  createdAt: z.string(),
+})
+export type StrategyComparison = z.infer<typeof StrategyComparisonSchema>
+
 export const PaperPositionSchema = z.object({
   symbol: z.string(),
   name: z.string(),
@@ -1047,6 +1091,9 @@ export const AppDataSchema = z.object({
   fubonOutlooks: z.array(FubonOutlookSchema).default([]),
   tradingStrategies: z.array(TradingStrategySchema).default([]),
   backtestRuns: z.array(BacktestRunSchema).default([]),
+  strategyComparisons: z.array(StrategyComparisonSchema).default([]),
+  // The user's own default comparison set; absent = the system default.
+  compareSet: z.array(CompareEntrySchema).optional(),
   paperAccounts: z.array(PaperAccountSchema).default([]),
   watchlist: z.array(WatchItemSchema).default([]),
   ideaNotes: z.array(IdeaNoteSchema).default([]),
@@ -1108,6 +1155,7 @@ export function createDefaultAppData(): AppData {
     fubonOutlooks: [],
     tradingStrategies: [],
     backtestRuns: [],
+    strategyComparisons: [],
     paperAccounts: [],
     watchlist: [],
     ideaNotes: [],

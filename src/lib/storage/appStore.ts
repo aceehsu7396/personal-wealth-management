@@ -27,6 +27,8 @@ import {
   type FubonOutlook,
   type TradingStrategy,
   type BacktestRun,
+  type CompareEntry,
+  type StrategyComparison,
   type PaperAccount,
   type WatchItem,
   type IdeaNote,
@@ -167,6 +169,9 @@ interface AppStore extends AppData {
   removeTradingStrategy: (id: string) => void
   addBacktestRun: (entry: Omit<BacktestRun, 'id' | 'createdAt'>) => string
   removeBacktestRun: (id: string) => void
+  addStrategyComparison: (entry: Omit<StrategyComparison, 'id' | 'createdAt'>) => string
+  removeStrategyComparison: (id: string) => void
+  setCompareSet: (entries: CompareEntry[] | undefined) => void
   addPaperAccount: (entry: Omit<PaperAccount, 'id' | 'createdAt'>) => string
   // Paper-account changes are computed by pure functions and saved whole.
   replacePaperAccount: (account: PaperAccount) => void
@@ -228,6 +233,8 @@ function toAppData(state: AppData): AppData {
     fubonOutlooks: state.fubonOutlooks,
     tradingStrategies: state.tradingStrategies,
     backtestRuns: state.backtestRuns,
+    strategyComparisons: state.strategyComparisons,
+    compareSet: state.compareSet,
     paperAccounts: state.paperAccounts,
     watchlist: state.watchlist,
     ideaNotes: state.ideaNotes,
@@ -243,6 +250,7 @@ function toAppData(state: AppData): AppData {
 
 // Keep localStorage bounded: only the most recent backtests are stored.
 export const MAX_BACKTEST_RUNS = 40
+export const MAX_STRATEGY_COMPARISONS = 20
 
 export function exportAppData(): AppData {
   return toAppData(useAppStore.getState())
@@ -517,6 +525,21 @@ export const useAppStore = create<AppStore>()(
 
       removeBacktestRun: (id) =>
         set((state) => ({ backtestRuns: state.backtestRuns.filter((r) => r.id !== id) })),
+
+      addStrategyComparison: (entry) => {
+        const id = crypto.randomUUID()
+        set((state) => ({
+          strategyComparisons: [...state.strategyComparisons, { ...entry, id, createdAt: new Date().toISOString() }].slice(
+            -MAX_STRATEGY_COMPARISONS,
+          ),
+        }))
+        return id
+      },
+
+      removeStrategyComparison: (id) =>
+        set((state) => ({ strategyComparisons: state.strategyComparisons.filter((c) => c.id !== id) })),
+
+      setCompareSet: (entries) => set({ compareSet: entries }),
 
       addPaperAccount: (entry) => {
         const id = crypto.randomUUID()

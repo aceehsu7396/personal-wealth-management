@@ -201,6 +201,7 @@ export const PAGE_NODES: Record<string, string> = {
   '/research/stocks': 'research',
   '/research/screener': 'screener',
   '/sim/strategies': 'strategy',
+  '/sim/compare': 'backtest',
   '/sim/backtest': 'backtest',
   '/sim/paper': 'paper',
   '/portfolio': 'risk',

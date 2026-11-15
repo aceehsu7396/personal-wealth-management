@@ -23,6 +23,7 @@ const ALL_PAGES = [
   '/research/screener',
   '/research/stocks',
   '/sim/strategies',
+  '/sim/compare',
   '/sim/backtest',
   '/sim/paper',
   '/today',

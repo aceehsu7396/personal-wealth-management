@@ -57,13 +57,33 @@ const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text
 // The strategy cards trading this ticker (linked by code), and two ways to
 // start one: fundamental batches at this card's prices, or a backtestable
 // trend template on the company the card picked.
-function StrategyLinks({ thesis }: { thesis: Pick<StockThesis, 'ticker' | 'name' | 'market'> }) {
+function StrategyLinks({ thesis }: { thesis: Pick<StockThesis, 'id' | 'ticker' | 'name' | 'market' | 'verdict'> }) {
   const strategies = useAppStore((s) => s.tradingStrategies)
+  const comparisons = useAppStore((s) => s.strategyComparisons)
   const using = strategiesForThesis(thesis, strategies)
   const symbol = encodeURIComponent(`${thesis.market}:${thesis.ticker}`)
   const name = (suffix: string) => encodeURIComponent(`${thesis.ticker} ${thesis.name}${suffix}`)
+  const last = comparisons.filter((c) => c.symbol === `${thesis.market}:${thesis.ticker}`).at(-1)
+  const compareTo = `/sim/compare?symbol=${symbol}${thesis.id ? `&thesis=${thesis.id}` : ''}`
   return (
     <div className="w-full text-xs text-gray-600 dark:text-gray-400">
+      {thesis.market === 'TW' && (
+        <p className="mb-1">
+          <span className="font-medium text-gray-800 dark:text-gray-200">策略比較：</span>
+          {thesis.verdict === 'pass' ? (
+            '結論為不投資，不做策略比較'
+          ) : !thesis.verdict ? (
+            '選了結論（值得投資或觀察）後，可以一鍵用全部預設範本回測'
+          ) : (
+            <>
+              {last && <>{last.end.slice(0, 10)}：{last.summary.headline} </>}
+              <Link to={compareTo} className={linkClass}>
+                {last ? '再比較一次' : '一鍵執行策略比較'} →
+              </Link>
+            </>
+          )}
+        </p>
+      )}
       <p>
         <span className="font-medium text-gray-800 dark:text-gray-200">使用這檔的策略卡：</span>
         {using.length === 0

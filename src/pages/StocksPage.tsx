@@ -43,6 +43,9 @@ export function StocksPage() {
   // null = form closed, 'new' = creating, otherwise the id being edited
   const [search, setSearch] = useSearchParams()
   const newCode = search.get('new')
+  // Researched in one go from the screener (?batch=2330,2317): the cards
+  // waiting for a verdict, opened one after another.
+  const [queue] = useState(() => (search.get('batch') ?? '').split(',').filter(Boolean))
   const [editing, setEditing] = useState<string | null>(newCode ? 'new' : null)
   // Started from the screener (?new=2330): prefill from the daily data.
   const [prefill, setPrefill] = useState<{ ticker: string; name: string; sector: string; currentPrice?: number }>()
@@ -150,10 +153,14 @@ export function StocksPage() {
     }
   }, [updateStockThesis])
 
+  const queued = queue.map((code) => theses.find((t) => t.ticker === code)).filter((t) => t !== undefined)
+  const undecided = queued.filter((t) => !t.verdict)
+
   function handleSubmit(values: StockThesisFormValues) {
     if (editingThesis) updateStockThesis(editingThesis.id, values)
     else addStockThesis(values)
-    setEditing(null)
+    const next = undecided.find((t) => t.id !== editingThesis?.id)
+    setEditing(editingThesis && queue.includes(editingThesis.ticker) && next ? next.id : null)
   }
 
   return (
@@ -175,6 +182,35 @@ export function StocksPage() {
         <StatCard label="待選結論" value={`${incomplete}`} hint="選了結論才能建倉" />
       </div>
 
+
+      {queued.length > 0 && (
+        <div className="mt-8 rounded-md border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-900 dark:border-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-100">
+          <p className="font-medium">
+            選股研究：完成 {queued.length} 張，{undecided.length > 0 ? `待判定 ${undecided.length} 張` : '都已判定'}
+          </p>
+          <p className="mt-1 flex flex-wrap gap-x-3 gap-y-1">
+            {queued.map((t) =>
+              t.verdict ? (
+                <span key={t.id}>
+                  {t.ticker} {t.name}：{VERDICT_LABELS[t.verdict]}
+                  {t.verdict !== 'pass' && (
+                    <>
+                      {' '}
+                      <Link to={`/sim/compare?symbol=TW:${t.ticker}&thesis=${t.id}`} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+                        一鍵策略比較 →
+                      </Link>
+                    </>
+                  )}
+                </span>
+              ) : (
+                <button key={t.id} type="button" onClick={() => setEditing(t.id)} className="font-medium text-indigo-700 hover:underline dark:text-indigo-300">
+                  判定 {t.ticker} {t.name}
+                </button>
+              ),
+            )}
+          </p>
+        </div>
+      )}
 
       {editing ? (
         <div className={cardClass}>
@@ -345,6 +381,11 @@ export function StocksPage() {
                     </td>
                     <td className="py-2 pr-4">
                       <div className="flex justify-end gap-2">
+                        {t.market === 'TW' && t.verdict && t.verdict !== 'pass' && (
+                          <Link to={`/sim/compare?symbol=TW:${t.ticker}&thesis=${t.id}`} className="text-xs font-medium whitespace-nowrap text-indigo-700 hover:underline dark:text-indigo-400">
+                            策略比較
+                          </Link>
+                        )}
                         <button
                           type="button"
                           onClick={() => {
