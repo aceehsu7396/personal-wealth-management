@@ -5,7 +5,6 @@ import type { BacktestStats, CompareEntry, StrategyComparison, StrategyTemplate 
 import { DeepDive, type RunDraft } from '../components/backtest/DeepDive'
 import { CsvImport } from '../components/backtest/CsvImport'
 import { ParamHelp } from '../components/ParamHelp'
-import { backtestPasses } from '../lib/calculations/strategyProgress'
 import {
   priorTrialsFor,
   runComparison,
@@ -17,6 +16,8 @@ import { loadChipData, loadPriceData } from '../lib/backtest/data'
 import { BACKTEST_SETTING_HELP, STRATEGY_TEMPLATES, defaultParams, formatSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
 import { calmarOf } from '../lib/backtest/passRule'
 import { compareEntriesOf, useLibrary, withCompareSet } from '../lib/backtest/library'
+import { findDuplicate } from '../lib/backtest/cardGroups'
+import { RunRecords } from '../components/backtest/RunRecords'
 import { thesisForCode } from '../lib/research/strategyLink'
 import { VERDICT_LABELS } from '../lib/calculations/thesisScoring'
 import { isoDaysAgo, type Bar } from '../lib/market/priceHistory'
@@ -67,8 +68,6 @@ export function StrategyComparePage() {
   const addStrategyComparison = useAppStore((s) => s.addStrategyComparison)
   const addTradingStrategy = useAppStore((s) => s.addTradingStrategy)
   const addBacktestRun = useAppStore((s) => s.addBacktestRun)
-  const removeBacktestRun = useAppStore((s) => s.removeBacktestRun)
-  const runs = useAppStore((s) => s.backtestRuns)
 
   const today = todayIsoDate()
   const linked = theses.find((t) => t.id === search.get('thesis'))
@@ -113,6 +112,8 @@ export function StrategyComparePage() {
   // Comparisons run on this visit, oldest first.
   const [runIds, setRunIds] = useState<string[]>([])
   const [cards, setCards] = useState<Record<string, string>>({})
+  // Rows whose card already existed: key → that card's name.
+  const [reused, setReused] = useState<Record<string, string>>({})
 
   const forSymbol = comparisons.filter((c) => c.symbol === symbol)
   const current = runIds.length > 0 ? comparisons.find((c) => c.id === runIds.at(-1)) : forSymbol.at(-1)
@@ -192,7 +193,7 @@ export function StrategyComparePage() {
     const codes = c.symbol.split(',').map((x) => x.replace(/^TW:/, '')).join('、')
     const benchIndex = c.rows.findIndex((r) => r.entry.template === 'buy_hold')
     const benchmark = benchIndex >= 0 ? c.rows[benchIndex].stats : null
-    const id = addTradingStrategy({
+    const draft = {
       name: `${row.entry.label}・${codes}`,
       template: row.entry.template,
       params: row.entry.params,
@@ -203,7 +204,12 @@ export function StrategyComparePage() {
       riskPerTradePercent: policy.riskPerTradePercent,
       status: 'dev',
       notes: `由 ${c.createdAt.slice(0, 10)} 的策略比較建立：${row.verdictReason || c.summary.headline}`,
-    })
+    } as const
+    // The same template, parameters and symbols already have a card: the
+    // run goes there instead of a second card.
+    const same = findDuplicate(strategies, draft)
+    const id = same?.id ?? addTradingStrategy(draft)
+    if (same) setReused((m) => ({ ...m, [row.entry.key]: same.name }))
     addBacktestRun({
       strategyId: id,
       label: `${row.entry.label}・${codes}（策略比較）`,
@@ -562,8 +568,8 @@ export function StrategyComparePage() {
                               {r.entry.key !== cardKey &&
                                 runIds.includes(current.id) &&
                                 (cards[r.entry.key] ? (
-                                  <Link to="/sim/strategies" className={linkClass}>
-                                    已建立策略卡
+                                  <Link to={`/sim/strategies?card=${cards[r.entry.key]}`} className={`${linkClass} whitespace-normal`}>
+                                    {reused[r.entry.key] ? `已有相同策略卡「${reused[r.entry.key]}」，回測已存入` : '已建立策略卡'}
                                   </Link>
                                 ) : (
                                   <button type="button" className={linkClass} onClick={() => createCard(current, r, i)}>
@@ -649,44 +655,7 @@ export function StrategyComparePage() {
         </div>
       )}
 
-      {runs.length > 0 && (
-        <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">回測紀錄</h2>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">建立策略卡或深入檢驗時存下的回測；策略卡要有一筆通過，才能進虛擬交易與實單（行動路線 4.2）。</p>
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  {['名稱', '期間', '樣本外年化', '買進持有', '最大回撤', '結果', ''].map((h) => (
-                    <th key={h} className={thClass}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[...runs].reverse().map((r) => (
-                  <tr key={r.id} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
-                    <td className={`${tdClass} whitespace-normal`}>{r.label}</td>
-                    <td className={`${tdClass} text-xs`}>
-                      {r.start}～{r.end}
-                    </td>
-                    <td className={tdClass}>{pct(r.stats.outOfSample?.cagr)}</td>
-                    <td className={tdClass}>{pct(r.benchmark.outOfSample?.cagr)}</td>
-                    <td className={tdClass}>{pct(r.stats.full.maxDrawdown)}</td>
-                    <td className={tdClass}>{backtestPasses(r) ? '✓ 通過' : '✗'}</td>
-                    <td className={tdClass}>
-                      <button type="button" onClick={() => removeBacktestRun(r.id)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
-                        刪除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+      <RunRecords symbols={symbols} />
     </div>
   )
 }

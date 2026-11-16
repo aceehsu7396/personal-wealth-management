@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
+import { groupCards } from '../lib/backtest/cardGroups'
 import {
   cancelOrder,
   paperStats,
@@ -58,13 +59,19 @@ function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: str
       <Field label="連結策略卡">
         <select className={inputClass} value={strategyId} onChange={(e) => setStrategyId(e.target.value)}>
           <option value="">（不連結）</option>
-          {strategies
-            .filter((s) => s.status !== 'retired')
-            .map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
+          {groupCards(
+            strategies.filter((s) => s.status !== 'retired'),
+            'symbol',
+            { runs: [], accounts: [], names: {} },
+          ).map((g) => (
+            <optgroup key={g.key} label={g.label}>
+              {g.cards.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
         </select>
       </Field>
       <Field label="市場">

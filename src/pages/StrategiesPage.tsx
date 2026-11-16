@@ -1,35 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { cardFromTemplate, restoreBuiltIns, useLibrary } from '../lib/backtest/library'
+import { findDuplicate } from '../lib/backtest/cardGroups'
+import { StrategyCardList } from '../components/strategy/StrategyCardList'
 import { SimGuide } from '../components/SimGuide'
-import { StrategyResearchLinks } from '../components/research/StrategyResearchLinks'
 import { useAppStore } from '../lib/storage/appStore'
-import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
-import { liveGate, PAPER_RULES } from '../lib/calculations/strategyProgress'
-import { todayIsoDate } from '../lib/market/twse'
+import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
+import { PAPER_RULES } from '../lib/calculations/strategyProgress'
 import { PageHeader, primaryButton } from '../components/ui'
 import { StrategyForm, type StrategyFormValues, type TemplateFormValues } from '../components/forms/StrategyForm'
-import { StrategyTemplateSchema, type LibraryTemplate, type StrategyStatus } from '../lib/storage/schema'
+import { StrategyTemplateSchema, type LibraryTemplate } from '../lib/storage/schema'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
 const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400'
 
-const STATUS_STYLE: Record<StrategyStatus, string> = {
-  dev: 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200',
-  paper: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
-  live: 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200',
-  retired: 'bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500',
-}
-
 export function StrategiesPage() {
   const strategies = useAppStore((s) => s.tradingStrategies)
-  const runs = useAppStore((s) => s.backtestRuns)
-  const accounts = useAppStore((s) => s.paperAccounts)
   const policy = useAppStore((s) => s.investmentPolicy)
   const addTradingStrategy = useAppStore((s) => s.addTradingStrategy)
   const updateTradingStrategy = useAppStore((s) => s.updateTradingStrategy)
-  const removeTradingStrategy = useAppStore((s) => s.removeTradingStrategy)
 
   // null = form closed, 'new' = creating, otherwise the id being edited
   const navigate = useNavigate()
@@ -70,12 +60,13 @@ export function StrategiesPage() {
   const { library, save: saveLibrary } = useLibrary()
   const inCompare = library.filter((t) => t.inCompare).length
   const missingBuiltIns = restoreBuiltIns(library).length - library.length
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
-  const today = todayIsoDate()
   const editingStrategy = editing && editing !== 'new' ? strategies.find((s) => s.id === editing) : undefined
 
   function applyTemplate(t: LibraryTemplate, thenCompare: boolean) {
-    const id = addTradingStrategy(cardFromTemplate(t, t.symbols, Math.min(policy.riskPerTradePercent, 1)))
+    const draft = cardFromTemplate(t, t.symbols, Math.min(policy.riskPerTradePercent, 1))
+    // 套用並比較 reuses an identical card; 套用 always makes one, as asked.
+    const same = thenCompare ? findDuplicate(strategies, draft) : undefined
+    const id = same?.id ?? addTradingStrategy(draft)
     if (thenCompare) navigate(`/sim/compare?strategy=${id}`)
   }
 
@@ -248,140 +239,8 @@ export function StrategiesPage() {
       </div>
 
       <h2 className="mt-10 text-lg font-semibold text-gray-900 dark:text-gray-100">我的策略卡（{strategies.length}）</h2>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">套用範本或從比較與回測建立的個股策略：開發中 → 回測通過 → 虛擬交易 → 實單。</p>
-
-
-      <div className="mt-6 space-y-4">
-        {strategies.map((s) => {
-          const def = STRATEGY_TEMPLATES[s.template]
-          const gate = liveGate(s, runs, accounts, today)
-          const params = resolveParams(s.template, s.params)
-          const ownRuns = runs.filter((r) => r.strategyId === s.id).length
-          const ownAccounts = accounts.filter((a) => a.strategyId === s.id).length
-          return (
-            <div key={s.id} className="rounded-lg border border-gray-200 bg-white p-5 dark:border-gray-700 dark:bg-gray-800">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{s.name}</h3>
-                <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[s.status]}`}>
-                  {STRATEGY_STATUS_LABELS[s.status]}
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {def.label}・{s.symbols.map(formatSymbol).join('、') || '未設定標的'}・每筆風險 {s.riskPerTradePercent}%
-                </span>
-              </div>
-              {def.params.length > 0 && (
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                  {def.params.map((x) => `${x.label} ${params[x.key]}`).join('｜')}
-                </p>
-              )}
-              <dl className="mt-3 grid grid-cols-1 gap-2 text-sm sm:grid-cols-3">
-                {[
-                  ['優勢', s.edge],
-                  ['進場', s.entryRules],
-                  ['出場', s.exitRules],
-                ].map(([k, v]) => (
-                  <div key={k}>
-                    <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">{k}</dt>
-                    <dd className="whitespace-pre-line text-gray-700 dark:text-gray-300">{v || '—'}</dd>
-                  </div>
-                ))}
-              </dl>
-              <StrategyResearchLinks strategy={s} />
-
-              <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-                {gate.backtestPassed ? '✓' : '☐'} 回測樣本外勝過買進持有（報酬或風險調整後；{ownRuns} 次回測）
-                {gate.paperProven ? '✓' : '☐'} 虛擬交易 {PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆（{ownAccounts} 個帳戶）
-              </p>
-
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                {(() => {
-                  // The one step this card needs next.
-                  // Outlined: the page's one solid button is 「新增策略卡」 in the header (docs/ui-guidelines.md §2).
-                  const btn = 'rounded-md border border-indigo-600 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-300 dark:hover:bg-indigo-900/30'
-                  if (s.status === 'retired') return null
-                  if (s.status === 'live') {
-                    // Real-money entries start from a trade plan.
-                    return (
-                      <Link to={`/portfolio/plans?strategy=${encodeURIComponent(s.id)}`} className={btn}>
-                        下一步：建立計畫單 →
-                      </Link>
-                    )
-                  }
-                  if (def.backtestable && !gate.backtestPassed)
-                    return (
-                      <Link to={`/sim/compare?strategy=${s.id}`} className={btn}>
-                        下一步：比較與回測 →
-                      </Link>
-                    )
-                  if (!gate.paperProven)
-                    return (
-                      <Link to={`/sim/paper?strategy=${s.id}`} className={btn}>
-                        下一步：虛擬交易 →
-                      </Link>
-                    )
-                  if (!gate.allowed) return null
-                  return (
-                    <button type="button" onClick={() => updateTradingStrategy(s.id, { status: 'live' })} className={btn}>
-                      下一步：改為實單
-                    </button>
-                  )
-                })()}
-                {def.backtestable && (
-                  <Link to={`/sim/compare?strategy=${s.id}`} className={linkClass}>
-                    比較與回測
-                  </Link>
-                )}
-                <Link to={`/sim/paper?strategy=${s.id}`} className={linkClass}>
-                  虛擬帳戶
-                </Link>
-                <label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
-                  狀態
-                  <select
-                    className="rounded border border-gray-300 bg-white px-1 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800"
-                    value={s.status}
-                    onChange={(e) => updateTradingStrategy(s.id, { status: e.target.value as StrategyStatus })}
-                  >
-                    {(Object.keys(STRATEGY_STATUS_LABELS) as StrategyStatus[]).map((st) => (
-                      <option key={st} value={st} disabled={st === 'live' && !gate.allowed && s.status !== 'live'}>
-                        {STRATEGY_STATUS_LABELS[st]}
-                        {st === 'live' && !gate.allowed ? '（需通過回測與虛擬交易）' : ''}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type="button" onClick={() => setEditing(s.id)} className={linkClass}>
-                  編輯
-                </button>
-                {pendingDeleteId === s.id ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        removeTradingStrategy(s.id)
-                        setPendingDeleteId(null)
-                      }}
-                      className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                    >
-                      確定刪除
-                    </button>
-                    <button type="button" onClick={() => setPendingDeleteId(null)} className="text-xs text-gray-500 hover:underline">
-                      取消
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setPendingDeleteId(s.id)}
-                    className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
-                  >
-                    刪除
-                  </button>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">套用範本或從比較與回測建立的個股策略：開發中 → 回測通過 → 虛擬交易 → 實單。按卡名展開完整內容。</p>
+      <StrategyCardList onEdit={setEditing} focusId={search.get('card')} />
     </div>
   )
 }
