@@ -3,7 +3,7 @@ import type { Bar } from '../market/priceHistory'
 import type { PaperAccount, TradingStrategy } from '../storage/schema'
 import { createDefaultInvestmentPolicy } from '../storage/schema'
 import { symbolStatus } from '../backtest/engine'
-import { assistantItems, blocked, executionOf, orderChecks, paperScanItems, paperShares, resolveItem, stopWidth, weeklyReview, withSnapshot } from './assistant'
+import { adviceSummary, assistantItems, blocked, executionOf, explainItem, orderChecks, paperScanItems, paperShares, resolveItem, stopWidth, weeklyReview, withSnapshot } from './assistant'
 
 function weekdays(n: number, from = '2024-01-01'): string[] {
   const out: string[] = []
@@ -181,5 +181,27 @@ describe('weeklyReview', () => {
     expect(lines).toContain('成交 3 筆：依助手 1、停損觸發 1、手動 1')
     expect(lines).toContain('手動賣出 1：想先獲利')
     expect(lines.at(-1)).toBe('已實現 2 筆，平均 0.25R')
+  })
+})
+
+describe('explainItem and adviceSummary', () => {
+  const pos = { symbol: 'TW:1', name: '', shares: 100, avgCost: 100, lastPrice: 120, lastPriceDate: '2026-11-13', stopLoss: 95, openedAt: '2026-10-01' }
+  const it0 = (kind: 'enter' | 'raise_stop' | 'hold' | 'wait', extra = {}) => ({ symbol: 'TW:1', kind, date: '2026-11-13', close: 120, reading: '', basis: [], outcome: 'pending' as const, ...extra })
+
+  it('puts the action, money and risk first', () => {
+    const e = explainItem(it0('enter', { shares: 1000, stopLoss: 110 }), account())
+    expect(e.action).toBe('買進 1 1,000 股，約 120,000 元')
+    expect(e.numbers.map((n) => n.label)).toEqual(['停損', '停損時虧損', '部位'])
+    expect(e.numbers[1].value).toContain('10,000 元')
+    const r = explainItem(it0('raise_stop', { raiseTo: 108 }), account([pos]))
+    expect(r.action).toBe('把 1 的停損從 95 上調到 108')
+    expect(r.numbers[1]).toEqual({ label: '停損時鎖住獲利', value: '800 元' })
+  })
+
+  it('sums up the day', () => {
+    expect(adviceSummary([it0('hold'), it0('wait')]).headline).toBe('今天沒有要下單或調整的事')
+    const s = adviceSummary([it0('enter'), it0('raise_stop'), { ...it0('enter'), outcome: 'followed' as const }, it0('wait')])
+    expect(s.headline).toBe('今天有 2 件事要處理（進場 2、上調停損 1）')
+    expect(s.detail).toContain('觀望 1')
   })
 })

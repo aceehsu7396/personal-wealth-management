@@ -323,3 +323,84 @@ export function paperScanItems(accounts: PaperAccount[], strategies: TradingStra
   }
   return out
 }
+
+export interface ItemExplanation {
+  // What to do, in one sentence (the conclusion).
+  action: string
+  // The numbers behind it, at most four.
+  numbers: { label: string; value: string }[]
+  // Which button to press, or why nothing needs doing.
+  todo: string
+}
+
+const signedMoney = (v: number) => `${v >= 0 ? '+' : '−'}${money(Math.abs(v))}`
+
+// One suggestion in plain words (docs/ui-guidelines.md §3): the action,
+// its money and risk, and the next step.
+export function explainItem(item: AssistantItem, account: PaperAccount): ItemExplanation {
+  const sym = formatSymbol(item.symbol)
+  const equity = equityOf(account)
+  const p = account.positions.find((x) => x.symbol === item.symbol)
+  const share = (v: number) => (equity > 0 ? `帳戶 ${pct(v / equity)}` : '')
+  const pnl = p ? (item.close - p.avgCost) * p.shares : 0
+  const position = p ? [{ label: '目前損益', value: `${signedMoney(pnl)}（${pct((item.close - p.avgCost) / p.avgCost)}）` }] : []
+  switch (item.kind) {
+    case 'enter': {
+      if (!item.shares || item.stopLoss === undefined) return { action: `${sym} 觸發進場，但無法計算股數`, numbers: [], todo: 'ATR 資料不足：等資料足夠再產生建議，或按「略過」。' }
+      const cost = item.shares * item.close
+      const risk = item.shares * (item.close - item.stopLoss)
+      return {
+        action: `買進 ${sym} ${item.shares.toLocaleString()} 股，約 ${money(cost)} 元`,
+        numbers: [
+          { label: '停損', value: `${item.stopLoss}（−${pct((item.close - item.stopLoss) / item.close)}）` },
+          { label: '停損時虧損', value: `${money(risk)} 元（${share(risk)}）` },
+          { label: '部位', value: share(cost) },
+        ],
+        todo: '確認股數與停損後按「依建議下單」；不買就按「略過」並寫一句理由。',
+      }
+    }
+    case 'exit':
+      return { action: `賣出 ${sym} 全部 ${item.shares?.toLocaleString() ?? ''} 股`, numbers: position, todo: '策略的出場條件成立：按「依建議賣出」，不要等反彈。' }
+    case 'stop_hit':
+      return {
+        action: `${sym} 收盤 ${item.close} 已跌破停損 ${p?.stopLoss ?? ''}`,
+        numbers: position,
+        todo: '按「更新價格」讓停損單成交賣出；不要為了不賣而下移停損。',
+      }
+    case 'raise_stop': {
+      const to = item.raiseTo ?? 0
+      const locked = p ? (to - p.avgCost) * p.shares : 0
+      return {
+        action: p?.stopLoss === undefined ? `替 ${sym} 設停損 ${to}` : `把 ${sym} 的停損從 ${p.stopLoss} 上調到 ${to}`,
+        numbers: [{ label: '離收盤', value: `−${pct((item.close - to) / item.close)}` }, { label: locked >= 0 ? '停損時鎖住獲利' : '停損時虧損', value: `${money(Math.abs(locked))} 元` }, ...position],
+        todo: `按「套用停損 ${to}」；停損只往上調，不往下移。`,
+      }
+    }
+    case 'near_stop':
+      return {
+        action: `${sym} 離停損 ${p?.stopLoss ?? ''} 只剩 ${p?.stopLoss ? pct((item.close - p.stopLoss) / item.close) : ''}`,
+        numbers: position,
+        todo: '不用下單。不要下移停損：觸及就照規則出場。',
+      }
+    case 'hold':
+      return { action: `續抱 ${sym}`, numbers: position, todo: '規則沒有出場訊號，什麼都不做。' }
+    case 'wait':
+      return { action: `觀望 ${sym}`, numbers: [], todo: '還沒觸發進場條件。' }
+    case 'no_data':
+      return { action: `${sym} 無法判斷`, numbers: [], todo: '價格資料不足，先更新價格或檢查代號。' }
+  }
+}
+
+// The day in one sentence: what needs doing, then what does not.
+export function adviceSummary(items: AssistantItem[]): { headline: string; detail: string; actionable: number } {
+  const count = (k: AssistantKind) => items.filter((i) => i.kind === k).length
+  const parts = (['stop_hit', 'exit', 'enter', 'raise_stop'] as AssistantKind[]).filter((k) => count(k) > 0).map((k) => `${ASSISTANT_KIND_LABELS[k]} ${count(k)}`)
+  const pending = items.filter((i) => ['stop_hit', 'exit', 'enter', 'raise_stop'].includes(i.kind) && i.outcome === 'pending').length
+  const actionable = parts.length > 0 ? items.filter((i) => ['stop_hit', 'exit', 'enter', 'raise_stop'].includes(i.kind)).length : 0
+  const rest = [count('near_stop') > 0 && `接近停損 ${count('near_stop')}`, count('hold') > 0 && `續抱 ${count('hold')}`, count('wait') > 0 && `觀望 ${count('wait')}`, count('no_data') > 0 && `無法判斷 ${count('no_data')}`].filter(Boolean).join('、')
+  return {
+    headline: actionable === 0 ? '今天沒有要下單或調整的事' : pending === 0 ? `今天的 ${actionable} 件事都處理完了` : `今天有 ${pending} 件事要處理（${parts.join('、')}）`,
+    detail: rest ? `其餘：${rest}。照規則什麼都不做，也是一種紀律。` : '',
+    actionable,
+  }
+}

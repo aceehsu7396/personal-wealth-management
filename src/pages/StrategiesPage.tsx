@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { cardFromTemplate, restoreBuiltIns, useLibrary } from '../lib/backtest/library'
 import { SimGuide } from '../components/SimGuide'
@@ -7,6 +7,7 @@ import { useAppStore } from '../lib/storage/appStore'
 import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
 import { liveGate, PAPER_RULES } from '../lib/calculations/strategyProgress'
 import { todayIsoDate } from '../lib/market/twse'
+import { PageHeader, primaryButton } from '../components/ui'
 import { StrategyForm, type StrategyFormValues, type TemplateFormValues } from '../components/forms/StrategyForm'
 import { StrategyTemplateSchema, type LibraryTemplate, type StrategyStatus } from '../lib/storage/schema'
 
@@ -58,6 +59,11 @@ export function StrategiesPage() {
       : undefined,
   )
   const [editing, setEditing] = useState<string | null>(draft ? 'new' : null)
+  const formRef = useRef<HTMLDivElement>(null)
+  // The card form sits at the top: bring it into view when opened from a card below.
+  useEffect(() => {
+    if (editing) formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [editing])
   const [libraryOpen, setLibraryOpen] = useState(true)
   const [libEditing, setLibEditing] = useState<string | null>(null)
   const [pendingLibDelete, setPendingLibDelete] = useState<string | null>(null)
@@ -88,17 +94,44 @@ export function StrategiesPage() {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">範本庫與策略卡</h1>
-      <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        範本庫存放寫好的策略範本，由你新增、修改、決定哪些納入策略比較；套用到個股就成為策略卡：優勢、進出場規則、每筆風險。流程是「開發中 → 回測通過 → 虛擬交易 {PAPER_RULES.months} 個月、
-        {PAPER_RULES.fills} 筆 → 實單」，兩關都過才能改成實單。說明見手冊{' '}
-        <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-          10 交易策略開發與回測
-        </Link>
-        。
-      </p>
+      <PageHeader
+        title="範本庫與策略卡"
+        summary={
+          <>
+            範本庫存放寫好的策略範本，由你新增、修改、決定哪些納入比較；套用到個股就成為策略卡：優勢、進出場規則、每筆風險。流程是「開發中 → 回測通過 → 虛擬交易 {PAPER_RULES.months} 個月、
+            {PAPER_RULES.fills} 筆 → 實單」，兩關都過才能改成實單。說明見手冊{' '}
+            <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+              10 交易策略開發與回測
+            </Link>
+            。
+          </>
+        }
+        action={
+          <button type="button" onClick={() => setEditing('new')} className={primaryButton}>
+            新增策略卡
+          </button>
+        }
+      />
 
       <SimGuide />
+
+      {editing && (
+        <div ref={formRef} className={cardClass}>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {editingStrategy ? `編輯策略卡：${editingStrategy.name}` : '新增策略卡'}
+          </h2>
+          <div className="mt-4">
+            <StrategyForm
+              key={editing}
+              initial={editingStrategy}
+              draft={editing === 'new' ? draft : undefined}
+              defaultRiskPercent={policy.riskPerTradePercent}
+              onSubmit={handleSubmit}
+              onCancel={() => setEditing(null)}
+            />
+          </div>
+        </div>
+      )}
 
       <div className={cardClass}>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -120,7 +153,7 @@ export function StrategiesPage() {
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           寫好優勢與進出場規則的策略範本，由你維護。勾「納入比較」的範本會在
           <Link to="/sim/compare" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-            策略比較
+            比較與回測
           </Link>
           一起回測（{inCompare} 個）；套用後成為你的策略卡（開發中）。建議第一次從「0050 均線趨勢」開始。
         </p>
@@ -179,7 +212,7 @@ export function StrategiesPage() {
                         </button>
                       </>
                     ) : (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">在策略比較輸入標的後，從結果「建立策略卡」</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">在比較與回測輸入標的後，從結果「建立策略卡」</span>
                     )}
                     <button type="button" onClick={() => setLibEditing(t.id)} className={linkClass}>
                       編輯
@@ -205,7 +238,7 @@ export function StrategiesPage() {
                         刪除
                       </button>
                     )}
-                    {!def.backtestable && <span className="text-xs text-gray-500">無法自動回測，套用後直接用虛擬帳戶練習</span>}
+                    {!def.backtestable && <span className="text-xs text-gray-600 dark:text-gray-400">無法自動回測，套用後直接用虛擬帳戶練習</span>}
                   </div>
                 </div>
               )
@@ -215,33 +248,8 @@ export function StrategiesPage() {
       </div>
 
       <h2 className="mt-10 text-lg font-semibold text-gray-900 dark:text-gray-100">我的策略卡（{strategies.length}）</h2>
-      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">套用範本或從策略比較建立的個股策略：開發中 → 回測通過 → 虛擬交易 → 實單。</p>
+      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">套用範本或從比較與回測建立的個股策略：開發中 → 回測通過 → 虛擬交易 → 實單。</p>
 
-      {editing ? (
-        <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {editingStrategy ? `編輯策略卡：${editingStrategy.name}` : '新增策略卡'}
-          </h2>
-          <div className="mt-4">
-            <StrategyForm
-              key={editing}
-              initial={editingStrategy}
-              draft={editing === 'new' ? draft : undefined}
-              defaultRiskPercent={policy.riskPerTradePercent}
-              onSubmit={handleSubmit}
-              onCancel={() => setEditing(null)}
-            />
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setEditing('new')}
-          className="mt-6 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-        >
-          新增策略卡
-        </button>
-      )}
 
       <div className="mt-6 space-y-4">
         {strategies.map((s) => {
@@ -288,7 +296,7 @@ export function StrategiesPage() {
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 {(() => {
                   // The one step this card needs next.
-                  // Outlined: the page's one solid button is 「新增策略卡」 (docs/ui-guidelines.md §2).
+                  // Outlined: the page's one solid button is 「新增策略卡」 in the header (docs/ui-guidelines.md §2).
                   const btn = 'rounded-md border border-indigo-600 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 dark:border-indigo-400 dark:text-indigo-300 dark:hover:bg-indigo-900/30'
                   if (s.status === 'retired') return null
                   if (s.status === 'live') {
