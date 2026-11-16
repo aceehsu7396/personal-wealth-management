@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import type { AssistantItem, InvestmentPolicy, PaperAccount, TradingStrategy } from '../../lib/storage/schema'
 import type { RegimeContext } from '../../lib/market/regime'
-import { ASSISTANT_KIND_LABELS, OUTCOME_LABELS, blocked, executionOf, orderChecks, type OrderCheck } from '../../lib/paper/assistant'
+import { ASSISTANT_KIND_LABELS, OUTCOME_LABELS, blocked, executionOf, orderChecks, weeklyReview, type OrderCheck } from '../../lib/paper/assistant'
+import { coachPrompt } from '../../lib/ai/prompts/agents'
+import { PromptPanel } from '../ai/PromptPanel'
 import { formatSymbol } from '../../lib/backtest/templates'
 import { ADVICE_LABELS, Badge, Disclosure, type Tone } from '../ui'
 import { inputClass } from '../forms/FormField'
@@ -156,6 +158,7 @@ export function PaperAssistant(ctx: Ctx) {
   const holds = items.filter((i) => i.kind === 'hold')
   const waits = items.filter((i) => i.kind === 'wait' || i.kind === 'no_data')
   const ex = executionOf(account)
+  const week = weeklyReview(account, ctx.today)
 
   return (
     <div className="mt-4 rounded-md border border-gray-200 p-4 dark:border-gray-700">
@@ -212,6 +215,17 @@ export function PaperAssistant(ctx: Ctx) {
             </ul>
           </Disclosure>
         )}
+        <Disclosure summary="本週檢討草稿（過去 7 天）">
+          <ul className="mt-1 space-y-0.5">
+            {week.map((l) => (
+              <li key={l}>{l}</li>
+            ))}
+          </ul>
+          <p className="mt-1">依上面的數字補一句：這週最想改的一件事，以及下週怎麼做。</p>
+          <div className="mt-2">
+            <PromptPanel label="AI 交易教練" build={() => coachPrompt({ groups: [], execution: [`虛擬帳戶「${account.name}」（策略卡「${strategy.name}」）`, ...week], pauses: [] })} />
+          </div>
+        </Disclosure>
       </div>
     </div>
   )

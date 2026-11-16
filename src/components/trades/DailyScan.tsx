@@ -6,6 +6,7 @@ import { todayIsoDate } from '../../lib/market/twse'
 import { saveTodaySummary } from '../../lib/push/push'
 import { eventMonitorPrompt } from '../../lib/ai/prompts/agents'
 import { PromptPanel } from '../ai/PromptPanel'
+import { PaperRoutine } from '../paper/PaperRoutine'
 import { ADVICE_LABELS, AdviceList, Card } from '../ui'
 
 const MAX_ITEMS = 8
@@ -26,6 +27,7 @@ export function DailyScan() {
   return (
     <Card
       title="今天要處理的事"
+      action={<PaperRoutine />}
       description={loading ? '讀取持倉價格中…' : items.length > 0 ? '依紀律優先順序排列：先處理停損與出場，再看買點。' : undefined}
     >
       <AdviceList

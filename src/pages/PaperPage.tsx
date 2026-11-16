@@ -10,15 +10,14 @@ import {
   type NewOrder,
   type Quote,
 } from '../lib/paper/paperAccount'
-import { symbolStatus } from '../lib/backtest/engine'
-import { loadChipData, loadPriceData } from '../lib/backtest/data'
 import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList } from '../lib/backtest/templates'
 import { PAPER_RULES, liveGate } from '../lib/calculations/strategyProgress'
-import { assistantItems, orderChecks, resolveItem, withSnapshot } from '../lib/paper/assistant'
+import { orderChecks, resolveItem } from '../lib/paper/assistant'
+import { adviseAccount, fetchQuotes, priceSymbols } from '../lib/paper/routine'
 import { useJourney } from '../lib/useJourney'
 import { useRegime } from '../lib/market/useRegime'
 import { OrderCheckList, PaperAssistant } from '../components/paper/PaperAssistant'
-import { fetchLatestTwseBar, isoDaysAgo, loadSeries, seriesForBacktest, TWSE_REQUEST_GAP_MS } from '../lib/market/priceHistory'
+import { loadSeries, seriesForBacktest } from '../lib/market/priceHistory'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
 import { EquityChart } from '../components/charts/BacktestCharts'
@@ -42,20 +41,6 @@ function money(v: number): string {
 
 function pct(v: number | null | undefined): string {
   return v === null || v === undefined || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(1)}%`
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
-
-// Latest daily bars for TW symbols (TWSE); US prices come from the form.
-async function fetchQuotes(symbols: string[], today: string, onStep: (s: string) => void): Promise<Record<string, Quote>> {
-  const out: Record<string, Quote> = {}
-  for (const [i, symbol] of symbols.filter((s) => s.startsWith('TW:')).entries()) {
-    if (i > 0) await sleep(TWSE_REQUEST_GAP_MS)
-    onStep(`取得 ${formatSymbol(symbol)} 最新收盤價…`)
-    const bar = await fetchLatestTwseBar(symbol.slice(3), today)
-    if (bar) out[symbol] = { price: bar.close, date: bar.date, open: bar.open, high: bar.high, low: bar.low }
-  }
-  return out
 }
 
 function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: string; onCreate: (a: Omit<PaperAccount, 'id' | 'createdAt'>) => void }) {
@@ -172,7 +157,7 @@ export function PaperPage() {
 
   async function refreshPrices() {
     if (!account) return
-    const symbols = [...new Set([...account.positions.map((p) => p.symbol), ...account.orders.filter((o) => o.status === 'open').map((o) => o.symbol)])]
+    const symbols = priceSymbols(account)
     await guarded('更新價格…', async () => {
       const quotes = account.market === 'TW' ? await fetchQuotes(symbols, today, setBusy) : manualQuotes(symbols)
       save(updatePrices(useAppStore.getState().paperAccounts.find((a) => a.id === account.id)!, quotes))
@@ -239,15 +224,7 @@ export function PaperPage() {
   async function makeAdvice() {
     if (!account || !strategy) return
     await guarded('計算今日建議…', async () => {
-      const symbols = [...new Set([...strategy.symbols, ...account.positions.map((p) => p.symbol)])]
-      const data = await loadPriceData(symbols, isoDaysAgo(today, 1), today, (p) => setBusy(`下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}`))
-      const held = Object.fromEntries(account.positions.map((p) => [p.symbol, { shares: p.shares, openedAt: p.openedAt }]))
-      const chips = STRATEGY_TEMPLATES[strategy.template].chipData
-        ? await loadChipData(symbols, isoDaysAgo(today, 1), (p) => setBusy(`下載 ${formatSymbol(p.symbol)} 法人買賣超 ${p.done + 1}/${p.total}`))
-        : undefined
-      const statuses = symbolStatus(strategy.template, strategy.params, data, held, chips)
-      const latest = current()
-      save(withSnapshot(latest, assistantItems({ strategy, account: latest, statuses, data, policy, regime }), new Date().toISOString()))
+      save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy }))
     })
   }
 

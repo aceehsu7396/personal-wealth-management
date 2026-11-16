@@ -3,7 +3,7 @@ import type { Bar } from '../market/priceHistory'
 import type { PaperAccount, TradingStrategy } from '../storage/schema'
 import { createDefaultInvestmentPolicy } from '../storage/schema'
 import { symbolStatus } from '../backtest/engine'
-import { assistantItems, blocked, executionOf, orderChecks, paperScanItems, paperShares, resolveItem, stopWidth, withSnapshot } from './assistant'
+import { assistantItems, blocked, executionOf, orderChecks, paperScanItems, paperShares, resolveItem, stopWidth, weeklyReview, withSnapshot } from './assistant'
 
 function weekdays(n: number, from = '2024-01-01'): string[] {
   const out: string[] = []
@@ -162,5 +162,24 @@ describe('paperScanItems', () => {
     expect(out.every((i) => i.text.startsWith('虛擬・'))).toBe(true)
     expect(paperScanItems([{ ...a, name: '通道・虛擬' }], [card], '2026-11-16')[0].text).toMatch(/^通道・虛擬：/)
     expect(paperScanItems([a], [{ ...card, status: 'live' }], '2026-11-16')).toEqual([])
+  })
+})
+
+describe('weeklyReview', () => {
+  it('drafts the past week from suggestions and fills', () => {
+    const log = (date: string, outcome: 'followed' | 'skipped' | 'missed', note?: string) => ({ symbol: 'TW:1', kind: 'enter' as const, date, close: 100, reading: '', basis: [], outcome, note })
+    const fill = (filledAt: string, reason: string, rMultiple?: number) => ({ id: filledAt + reason, createdAt: filledAt, symbol: 'TW:1', name: '', side: 'sell' as const, type: 'market' as const, shares: 1, status: 'filled' as const, filledAt, reason, rMultiple })
+    const a = {
+      ...account(),
+      signalLog: [log('2026-11-02', 'skipped', '太舊'), log('2026-11-10', 'followed'), log('2026-11-11', 'skipped', '怕追高'), log('2026-11-12', 'missed')],
+      orders: [fill('2026-11-10T07:00:00Z', '策略訊號：…', 1.5), fill('2026-11-12T07:00:00Z', '停損觸發（自動）', -1), fill('2026-11-13T07:00:00Z', '想先獲利')],
+    }
+    const lines = weeklyReview(a, '2026-11-16')
+    expect(lines[0]).toContain('照做 1、修改 0、略過 1、未處理 1')
+    expect(lines.join('\n')).toContain('怕追高')
+    expect(lines.join('\n')).not.toContain('太舊')
+    expect(lines).toContain('成交 3 筆：依助手 1、停損觸發 1、手動 1')
+    expect(lines).toContain('手動賣出 1：想先獲利')
+    expect(lines.at(-1)).toBe('已實現 2 筆，平均 0.25R')
   })
 })

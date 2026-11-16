@@ -263,6 +263,29 @@ export function executionOf(account: PaperAccount): Execution {
 
 const daysBetween = (from: string, to: string) => Math.floor((Date.parse(to) - Date.parse(from)) / 86400000)
 
+const pctText = (v: number | null) => (v === null ? '—' : `${Math.round(v * 100)}%`)
+
+// The past week's draft for the weekly review (handbook 10 §7), from
+// the suggestions and fills alone: the trader adds what to change.
+export function weeklyReview(account: PaperAccount, today: string): string[] {
+  const inWeek = (date: string) => daysBetween(date, today) < 7
+  const week = { ...account, signalLog: account.signalLog.filter((i) => inWeek(i.date)), assistant: account.assistant && inWeek(account.assistant.date) ? account.assistant : undefined }
+  const ex = executionOf(week)
+  const c = ex.counts
+  const lines = [`助手建議 ${c.followed + c.modified + c.skipped + c.missed + c.pending} 筆：照做 ${c.followed}、修改 ${c.modified}、略過 ${c.skipped}、未處理 ${c.missed}、待處理 ${c.pending}，執行率 ${pctText(ex.rate)}`]
+  for (const n of ex.notes) lines.push(`${n.date} ${formatSymbol(n.symbol)} ${ASSISTANT_KIND_LABELS[n.kind]}・${OUTCOME_LABELS[n.outcome]}${n.note ? `：${n.note}` : ''}`)
+  const missed = [...week.signalLog].filter((i) => i.outcome === 'missed')
+  if (missed.length > 0) lines.push(`沒按也沒略過：${missed.map((i) => `${i.date} ${formatSymbol(i.symbol)} ${ASSISTANT_KIND_LABELS[i.kind]}`).join('、')}`)
+  const fills = account.orders.filter((o) => o.status === 'filled' && o.filledAt && inWeek(o.filledAt.slice(0, 10)))
+  const manual = fills.filter((o) => !o.reason.startsWith('策略訊號') && !o.reason.startsWith('停損觸發'))
+  const stops = fills.filter((o) => o.reason.startsWith('停損觸發'))
+  lines.push(`成交 ${fills.length} 筆：依助手 ${fills.length - manual.length - stops.length}、停損觸發 ${stops.length}、手動 ${manual.length}`)
+  for (const o of manual) lines.push(`手動${o.side === 'buy' ? '買進' : '賣出'} ${formatSymbol(o.symbol)}：${o.reason || '（沒寫理由）'}`)
+  const r = fills.filter((o) => o.rMultiple !== undefined).map((o) => o.rMultiple!)
+  if (r.length > 0) lines.push(`已實現 ${r.length} 筆，平均 ${(r.reduce((a, b) => a + b, 0) / r.length).toFixed(2)}R`)
+  return lines
+}
+
 // Paper accounts on the day's list (handbook 04 §0), from what is saved:
 // suggestions not yet acted on, stops to raise or watch, and prices or
 // suggestions that are out of date. Marked 虛擬 to keep them apart from
