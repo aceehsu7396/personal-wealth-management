@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { STRATEGY_TEMPLATES, defaultParams, parseSymbolList, resolveParams } from '../../lib/backtest/templates'
 import { useAppStore } from '../../lib/storage/appStore'
-import type { StrategyTemplate, TradingStrategy } from '../../lib/storage/schema'
+import type { LibraryTemplate, StrategyTemplate, TradingStrategy } from '../../lib/storage/schema'
 import { Field, inputClass, labelClass } from './FormField'
 import { ParamHelp } from '../ParamHelp'
 
 export type StrategyFormValues = Omit<TradingStrategy, 'id' | 'createdAt' | 'updatedAt' | 'status'>
+// A template library entry: the card fields without risk, plus who it
+// suits, its main risk, its role and whether comparisons run it.
+export type TemplateFormValues = Omit<LibraryTemplate, 'id' | 'builtIn'>
 
 interface Props {
   initial?: TradingStrategy
@@ -14,23 +17,31 @@ interface Props {
   defaultRiskPercent: number
   onSubmit: (values: StrategyFormValues) => void
   onCancel: () => void
+  // Template library mode: edits this entry (or a new one) instead.
+  libraryEntry?: LibraryTemplate | 'new'
+  onSubmitTemplate?: (values: TemplateFormValues) => void
 }
 
 // The written trading plan: template + parameters, symbols, the edge it
 // claims, entry/exit rules and risk per trade.
-export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onCancel }: Props) {
-  const start = initial ?? draft
+export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onCancel, libraryEntry, onSubmitTemplate }: Props) {
+  const isTemplate = libraryEntry !== undefined
+  const entry = libraryEntry === 'new' ? undefined : libraryEntry
+  const start: Partial<StrategyFormValues> | undefined = initial ?? entry ?? draft
   const [name, setName] = useState(start?.name ?? '')
   const [template, setTemplate] = useState<StrategyTemplate>(start?.template ?? 'ma_cross')
   const [params, setParams] = useState<Record<string, number>>(
     start?.template ? resolveParams(start.template, start.params ?? {}) : defaultParams('ma_cross'),
   )
-  const [symbols, setSymbols] = useState(start?.symbols?.map((x) => (x.startsWith('TW:') ? x.slice(3) : x)).join(', ') ?? '0050')
+  const [symbols, setSymbols] = useState(start?.symbols?.map((x) => (x.startsWith('TW:') ? x.slice(3) : x)).join(', ') ?? (isTemplate ? '' : '0050'))
   const [edge, setEdge] = useState(start?.edge ?? '')
   const [entryRules, setEntryRules] = useState(start?.entryRules ?? STRATEGY_TEMPLATES[start?.template ?? 'ma_cross'].entry)
   const [exitRules, setExitRules] = useState(start?.exitRules ?? STRATEGY_TEMPLATES[start?.template ?? 'ma_cross'].exit)
   const [risk, setRisk] = useState(String(start?.riskPerTradePercent ?? defaultRiskPercent))
   const [notes, setNotes] = useState(start?.notes ?? '')
+  const [suits, setSuits] = useState(entry?.suits ?? '')
+  const [riskText, setRiskText] = useState(entry?.risk ?? '')
+  const [inCompare, setInCompare] = useState(entry?.inCompare ?? true)
   const [error, setError] = useState<string | null>(null)
 
   const def = STRATEGY_TEMPLATES[template]
@@ -55,6 +66,24 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
     const list = parseSymbolList(symbols)
     const riskPercent = Number(risk)
     if (!name.trim()) return setError('請填寫策略名稱')
+    if (isTemplate) {
+      if (def.multiSymbol && list.length === 1) return setError('動能輪動至少需要 2 個標的，或留空')
+      setError(null)
+      return onSubmitTemplate?.({
+        name: name.trim(),
+        template,
+        params,
+        symbols: list,
+        edge: edge.trim(),
+        entryRules: entryRules.trim(),
+        exitRules: exitRules.trim(),
+        suits: suits.trim(),
+        risk: riskText.trim(),
+        notes: notes.trim(),
+        role: template === 'buy_hold' || template === 'dca' ? 'benchmark' : 'signal',
+        inCompare: inCompare && def.backtestable,
+      })
+    }
     if (def.backtestable && list.length === 0) return setError('請填寫至少一個標的')
     if (def.multiSymbol && list.length < 2) return setError('動能輪動至少需要 2 個標的')
     if (!(riskPercent > 0 && riskPercent <= 5)) return setError('每筆風險須介於 0–5%')
@@ -106,7 +135,7 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
       ))}
 
       <label className="block sm:col-span-2">
-        <span className={labelClass}>標的（逗號分隔；台股直接寫代號，美股寫 US:代號）</span>
+        <span className={labelClass}>{isTemplate ? '預設標的（可留空：比較或套用時用當下輸入的標的）' : '標的（逗號分隔；台股直接寫代號，美股寫 US:代號）'}</span>
         <input className={inputClass} value={symbols} onChange={(e) => setSymbols(e.target.value)} placeholder="0050, 006208, US:SPY" />
         {watchlist.length > 0 && (
           <button type="button" onClick={addFromWatchlist} className="mt-1 text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400">
@@ -126,14 +155,30 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
         <span className={labelClass}>出場規則（含停損）</span>
         <textarea rows={3} className={inputClass} value={exitRules} onChange={(e) => setExitRules(e.target.value)} />
       </label>
-      <div>
-        <Field label="每筆停損風險（占交易部位 %）">
-          <input type="number" step="0.1" className={inputClass} value={risk} onChange={(e) => setRisk(e.target.value)} />
-        </Field>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-          投資政策上限 {defaultRiskPercent}%；策略卡可以設得更低（例如新策略 0.5%），高於上限時以上限為準。回測的風險部位法與實單的交易前檢核都會用這個值。
-        </p>
-      </div>
+      {isTemplate ? (
+        <>
+          <Field label="適合誰">
+            <input className={inputClass} value={suits} onChange={(e) => setSuits(e.target.value)} />
+          </Field>
+          <Field label="主要風險">
+            <input className={inputClass} value={riskText} onChange={(e) => setRiskText(e.target.value)} />
+          </Field>
+          <label className="flex items-center gap-2 text-sm text-gray-700 sm:col-span-2 dark:text-gray-300">
+            <input type="checkbox" checked={inCompare && def.backtestable} disabled={!def.backtestable} onChange={(e) => setInCompare(e.target.checked)} />
+            納入策略比較{!def.backtestable && '（這個範本無法回測）'}
+            {(template === 'buy_hold' || template === 'dca') && <span className="text-xs text-gray-500 dark:text-gray-400">・作為基準</span>}
+          </label>
+        </>
+      ) : (
+        <div>
+          <Field label="每筆停損風險（占交易部位 %）">
+            <input type="number" step="0.1" className={inputClass} value={risk} onChange={(e) => setRisk(e.target.value)} />
+          </Field>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            投資政策上限 {defaultRiskPercent}%；策略卡可以設得更低（例如新策略 0.5%），高於上限時以上限為準。回測的風險部位法與實單的交易前檢核都會用這個值。
+          </p>
+        </div>
+      )}
       <Field label="備註（適用的市場環境、已知弱點）">
         <input className={inputClass} value={notes} onChange={(e) => setNotes(e.target.value)} />
       </Field>
@@ -141,7 +186,7 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
       {error && <p className="text-sm text-red-600 sm:col-span-2 dark:text-red-400">{error}</p>}
       <div className="flex gap-2 sm:col-span-2">
         <button type="submit" className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-          {initial ? '儲存策略卡' : '新增策略卡'}
+          {isTemplate ? (entry ? '儲存範本' : '新增範本') : initial ? '儲存策略卡' : '新增策略卡'}
         </button>
         <button
           type="button"

@@ -37,7 +37,7 @@ export const NAV_GROUPS: NavGroup[] = [
     label: '模擬交易',
     to: '/sim/strategies',
     tabs: [
-      { label: '策略卡', to: '/sim/strategies' },
+      { label: '範本庫', to: '/sim/strategies' },
       { label: '策略比較', to: '/sim/compare' },
       { label: '回測', to: '/sim/backtest' },
       { label: '虛擬帳戶', to: '/sim/paper' },

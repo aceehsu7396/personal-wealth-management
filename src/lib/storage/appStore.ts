@@ -28,6 +28,7 @@ import {
   type TradingStrategy,
   type BacktestRun,
   type CompareEntry,
+  type LibraryTemplate,
   type StrategyComparison,
   type PaperAccount,
   type WatchItem,
@@ -172,6 +173,8 @@ interface AppStore extends AppData {
   addStrategyComparison: (entry: Omit<StrategyComparison, 'id' | 'createdAt'>) => string
   removeStrategyComparison: (id: string) => void
   setCompareSet: (entries: CompareEntry[] | undefined) => void
+  // The whole library, saved on the first change (lib/backtest/library.ts).
+  setStrategyLibrary: (library: LibraryTemplate[]) => void
   addPaperAccount: (entry: Omit<PaperAccount, 'id' | 'createdAt'>) => string
   // Paper-account changes are computed by pure functions and saved whole.
   replacePaperAccount: (account: PaperAccount) => void
@@ -235,6 +238,7 @@ function toAppData(state: AppData): AppData {
     backtestRuns: state.backtestRuns,
     strategyComparisons: state.strategyComparisons,
     compareSet: state.compareSet,
+    strategyLibrary: state.strategyLibrary,
     paperAccounts: state.paperAccounts,
     watchlist: state.watchlist,
     ideaNotes: state.ideaNotes,
@@ -540,6 +544,8 @@ export const useAppStore = create<AppStore>()(
         set((state) => ({ strategyComparisons: state.strategyComparisons.filter((c) => c.id !== id) })),
 
       setCompareSet: (entries) => set({ compareSet: entries }),
+
+      setStrategyLibrary: (library) => set({ strategyLibrary: library }),
 
       addPaperAccount: (entry) => {
         const id = crypto.randomUUID()

@@ -714,6 +714,29 @@ export const CompareEntrySchema = z.object({
 })
 export type CompareEntry = z.infer<typeof CompareEntrySchema>
 
+// One entry in the template library (handbook 10 §6.5): a strategy written
+// out once, applied to strategy cards and run in comparisons.
+export const LibraryTemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  template: StrategyTemplateSchema,
+  params: z.record(z.string(), z.number()).default({}),
+  // Default symbols; empty = whatever symbol is being compared.
+  symbols: z.array(z.string()).default([]),
+  edge: z.string().default(''),
+  entryRules: z.string().default(''),
+  exitRules: z.string().default(''),
+  suits: z.string().default(''),
+  risk: z.string().default(''),
+  notes: z.string().default(''),
+  role: z.enum(['signal', 'benchmark']),
+  inCompare: z.boolean().default(false),
+  // The built-in entry this came from, so a reset can bring back only
+  // what is missing.
+  builtIn: z.string().optional(),
+})
+export type LibraryTemplate = z.infer<typeof LibraryTemplateSchema>
+
 // A saved strategy comparison: every template's summary statistics and a
 // weekly curve per template, in the order of `rows`.
 export const StrategyComparisonSchema = z.object({
@@ -1129,8 +1152,11 @@ export const AppDataSchema = z.object({
   tradingStrategies: z.array(TradingStrategySchema).default([]),
   backtestRuns: z.array(BacktestRunSchema).default([]),
   strategyComparisons: z.array(StrategyComparisonSchema).default([]),
-  // The user's own default comparison set; absent = the system default.
+  // Before the template library: the user's own comparison set. Read once
+  // to build the library; no longer written.
   compareSet: z.array(CompareEntrySchema).optional(),
+  // The template library; absent = the built-in one (lib/backtest/library.ts).
+  strategyLibrary: z.array(LibraryTemplateSchema).optional(),
   paperAccounts: z.array(PaperAccountSchema).default([]),
   watchlist: z.array(WatchItemSchema).default([]),
   ideaNotes: z.array(IdeaNoteSchema).default([]),

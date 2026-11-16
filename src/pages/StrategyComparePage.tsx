@@ -4,7 +4,6 @@ import { useAppStore } from '../lib/storage/appStore'
 import type { BacktestStats, CompareEntry, StrategyComparison, StrategyTemplate } from '../lib/storage/schema'
 import {
   COMPARABLE_TEMPLATES,
-  DEFAULT_COMPARE_SET,
   priorTrialsFor,
   runComparison,
   summarizeComparison,
@@ -14,6 +13,7 @@ import { marketCosts, type ChipSeries } from '../lib/backtest/engine'
 import { loadChipData, loadPriceData } from '../lib/backtest/data'
 import { STRATEGY_TEMPLATES, defaultParams, formatSymbol, parseSymbolList } from '../lib/backtest/templates'
 import { calmarOf } from '../lib/backtest/passRule'
+import { compareEntriesOf, useLibrary, withCompareSet } from '../lib/backtest/library'
 import { thesisForCode } from '../lib/research/strategyLink'
 import { VERDICT_LABELS } from '../lib/calculations/thesisScoring'
 import { isoDaysAgo, type Bar } from '../lib/market/priceHistory'
@@ -57,20 +57,24 @@ export function StrategyComparePage() {
   const theses = useAppStore((s) => s.stockTheses)
   const policy = useAppStore((s) => s.investmentPolicy)
   const comparisons = useAppStore((s) => s.strategyComparisons)
-  const savedSet = useAppStore((s) => s.compareSet)
-  const setCompareSet = useAppStore((s) => s.setCompareSet)
+  const { library, save: saveLibrary } = useLibrary()
   const addStrategyComparison = useAppStore((s) => s.addStrategyComparison)
   const addTradingStrategy = useAppStore((s) => s.addTradingStrategy)
   const addBacktestRun = useAppStore((s) => s.addBacktestRun)
 
   const today = todayIsoDate()
   const linked = theses.find((t) => t.id === search.get('thesis'))
-  const [codeText, setCodeText] = useState(linked?.ticker ?? (parseSymbolList(search.get('symbol') ?? '')[0] ?? '').replace(/^TW:/, ''))
+  const strategies = useAppStore((s) => s.tradingStrategies)
+  // From a strategy card (範本庫「套用並比較」): its first symbol.
+  const fromCard = strategies.find((s) => s.id === search.get('strategy'))
+  const [codeText, setCodeText] = useState(linked?.ticker ?? (fromCard?.symbols[0] ?? parseSymbolList(search.get('symbol') ?? '')[0] ?? '').replace(/^TW:/, ''))
   const symbol = parseSymbolList(codeText)[0] ?? ''
   const code = symbol.replace(/^TW:/, '')
   const thesis = linked && linked.ticker === code ? linked : symbol ? thesisForCode('TW', code, theses) : null
 
-  const defaults = savedSet ?? DEFAULT_COMPARE_SET
+  // The library's ticked templates (範本庫); changes here are for this run
+  // until saved back.
+  const defaults = compareEntriesOf(library, 1)
   const [entries, setEntries] = useState<CompareEntry[]>(defaults)
   const [off, setOff] = useState<string[]>([])
   const [start, setStart] = useState(isoDaysAgo(today, YEARS))
@@ -264,7 +268,7 @@ export function StrategyComparePage() {
           <p className={`mt-2 text-sm ${status.kind === 'error' ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>{status.message}</p>
         )}
 
-        <Disclosure summary={`調整條件（${active.length} 個範本${sameEntries(entries, DEFAULT_COMPARE_SET) ? '，系統預設' : savedSet && sameEntries(entries, savedSet) ? '，我的預設' : '，已調整'}）`}>
+        <Disclosure summary={`調整條件（${active.length} 個範本${sameEntries(entries, defaults) && off.length === 0 ? '，範本庫' : '，已調整'}）`}>
           <div className="space-y-3">
             {entries.map((e) => (
               <div key={e.key} className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
@@ -274,7 +278,7 @@ export function StrategyComparePage() {
                     {e.label}
                   </label>
                   <span className="text-xs text-gray-500 dark:text-gray-400">{e.role === 'benchmark' ? '基準' : STRATEGY_TEMPLATES[e.template].origin}</span>
-                  {!DEFAULT_COMPARE_SET.some((d) => d.key === e.key) && (
+                  {!library.some((t) => t.id === e.key) && (
                     <button type="button" className="text-xs text-gray-500 hover:underline dark:text-gray-400" onClick={() => setEntries((l) => l.filter((x) => x.key !== e.key))}>
                       移除
                     </button>
@@ -309,20 +313,22 @@ export function StrategyComparePage() {
                   </option>
                 ))}
               </select>
-              <button type="button" className={secondaryButton} onClick={() => setCompareSet(entries)}>
-                存成我的預設組合
+              <button type="button" className={secondaryButton} onClick={() => saveLibrary(withCompareSet(library, entries, off))}>
+                存入範本庫
               </button>
               <button
                 type="button"
                 className={secondaryButton}
                 onClick={() => {
-                  setCompareSet(undefined)
-                  setEntries(DEFAULT_COMPARE_SET)
+                  setEntries(defaults)
                   setOff([])
                 }}
               >
-                還原系統預設
+                還原為範本庫
               </button>
+              <Link to="/sim/strategies" className={linkClass}>
+                到範本庫維護
+              </Link>
             </div>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               改完按上方「用目前條件再跑」，會沿用已下載的價格。每多試一組條件，<Term name="折減夏普比率" />就更嚴格：調整越多次，好看的結果越可能只是巧合。
