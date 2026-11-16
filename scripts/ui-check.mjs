@@ -24,7 +24,6 @@ const ALL_PAGES = [
   '/research/stocks',
   '/sim/strategies',
   '/sim/compare',
-  '/sim/backtest',
   '/sim/paper',
   '/today',
   '/goals',

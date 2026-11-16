@@ -79,8 +79,8 @@ const PAGES = {
   review: { to: '/portfolio/review', label: '績效歸因' },
   market: { to: '/research/market', label: '研究分析・市場' },
   stocks: { to: '/research/stocks', label: '研究分析・研究卡' },
-  strategies: { to: '/sim/strategies', label: '模擬交易・策略卡' },
-  backtest: { to: '/sim/backtest', label: '模擬交易・回測' },
+  strategies: { to: '/sim/strategies', label: '模擬交易・範本庫' },
+  backtest: { to: '/sim/compare', label: '模擬交易・比較與回測' },
   paper: { to: '/sim/paper', label: '模擬交易・虛擬帳戶' },
 }
 

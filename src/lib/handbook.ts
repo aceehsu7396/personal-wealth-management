@@ -26,12 +26,12 @@ export const CHAPTER_PAGES: Record<string, { to: string; label: string }> = {
   '07': { to: '/research/stocks', label: '研究分析・研究卡' },
   '08': { to: '/portfolio/risk', label: '風險' },
   '09': { to: '/journey', label: '行動路線' },
-  '10': { to: '/sim/strategies', label: '模擬交易・策略卡' },
+  '10': { to: '/sim/strategies', label: '模擬交易・範本庫' },
   '11': { to: '/goals', label: '目標與政策・全職準備度' },
   '12': { to: '/settings', label: '設定・載入示範資料' },
   附錄B: { to: '/research/screener', label: '研究分析・選股' },
   附錄C: { to: '/goals', label: '目標與政策' },
-  附錄D4: { to: '/sim/backtest', label: '模擬交易・回測' },
+  附錄D4: { to: '/sim/compare', label: '模擬交易・比較與回測' },
 }
 
 export function slugOf(fileName: string): string {

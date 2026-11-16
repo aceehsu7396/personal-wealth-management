@@ -38,8 +38,7 @@ export const NAV_GROUPS: NavGroup[] = [
     to: '/sim/strategies',
     tabs: [
       { label: '範本庫', to: '/sim/strategies' },
-      { label: '策略比較', to: '/sim/compare' },
-      { label: '回測', to: '/sim/backtest' },
+      { label: '比較與回測', to: '/sim/compare' },
       { label: '虛擬帳戶', to: '/sim/paper' },
     ],
   },
@@ -93,4 +92,6 @@ export const LEGACY_REDIRECTS: Record<string, string> = {
   '/trades': '/portfolio/trades',
   '/sim/screener': '/research/screener',
   '/research/industry': '/research/stocks',
+  // The backtest page merged into 比較與回測 (2026-11-16).
+  '/sim/backtest': '/sim/compare',
 }

@@ -1,17 +1,20 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import type { BacktestStats, CompareEntry, StrategyComparison, StrategyTemplate } from '../lib/storage/schema'
+import { DeepDive, type RunDraft } from '../components/backtest/DeepDive'
+import { CsvImport } from '../components/backtest/CsvImport'
+import { ParamHelp } from '../components/ParamHelp'
+import { backtestPasses } from '../lib/calculations/strategyProgress'
 import {
-  COMPARABLE_TEMPLATES,
   priorTrialsFor,
   runComparison,
   summarizeComparison,
   toSavedRows,
 } from '../lib/backtest/compare'
-import { marketCosts, type ChipSeries } from '../lib/backtest/engine'
+import { marketCosts, type BacktestInput, type ChipSeries, type SizingMode } from '../lib/backtest/engine'
 import { loadChipData, loadPriceData } from '../lib/backtest/data'
-import { STRATEGY_TEMPLATES, defaultParams, formatSymbol, parseSymbolList } from '../lib/backtest/templates'
+import { BACKTEST_SETTING_HELP, STRATEGY_TEMPLATES, defaultParams, formatSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
 import { calmarOf } from '../lib/backtest/passRule'
 import { compareEntriesOf, useLibrary, withCompareSet } from '../lib/backtest/library'
 import { thesisForCode } from '../lib/research/strategyLink'
@@ -30,7 +33,6 @@ const thClass = 'py-2 pr-3 text-left text-xs font-medium whitespace-nowrap text-
 const tdClass = 'py-1.5 pr-3 align-top whitespace-nowrap text-gray-700 dark:text-gray-300'
 const linkClass = 'text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400'
 
-const OOS_FRACTION = 0.3
 const YEARS = 5
 
 const pct = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(1)}%`)
@@ -38,6 +40,9 @@ const num = (v: number | null | undefined) => (v === null || v === undefined || 
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`
 const paramText = (e: CompareEntry) => STRATEGY_TEMPLATES[e.template].params.map((p) => `${p.label} ${e.params[p.key] ?? p.default}`).join('、') || '—'
 const sameEntries = (a: CompareEntry[], b: CompareEntry[]) => JSON.stringify(a) === JSON.stringify(b)
+// A comparison's symbols are saved joined: "TW:0050,TW:2330".
+const symbolLabel = (key: string) => key.split(',').map(formatSymbol).join('、')
+const BACKTESTABLE = (Object.keys(STRATEGY_TEMPLATES) as StrategyTemplate[]).filter((t) => STRATEGY_TEMPLATES[t].backtestable)
 
 type Row = StrategyComparison['rows'][number]
 
@@ -49,9 +54,10 @@ interface Loaded {
   chips?: Record<string, ChipSeries>
 }
 
-// Strategy comparison (handbook 10 §6.5): every default template on one
-// research card's stock in one click, an overall reading, and re-runs with
-// adjusted conditions on the data already downloaded.
+// Comparison and backtest (handbook 10 §6, §6.5): the library's templates
+// (or one strategy card) on one or more symbols in one click, an overall
+// reading, re-runs with adjusted conditions on the data already downloaded,
+// and a deep dive into any one template.
 export function StrategyComparePage() {
   const [search] = useSearchParams()
   const theses = useAppStore((s) => s.stockTheses)
@@ -61,27 +67,49 @@ export function StrategyComparePage() {
   const addStrategyComparison = useAppStore((s) => s.addStrategyComparison)
   const addTradingStrategy = useAppStore((s) => s.addTradingStrategy)
   const addBacktestRun = useAppStore((s) => s.addBacktestRun)
+  const removeBacktestRun = useAppStore((s) => s.removeBacktestRun)
+  const runs = useAppStore((s) => s.backtestRuns)
 
   const today = todayIsoDate()
   const linked = theses.find((t) => t.id === search.get('thesis'))
   const strategies = useAppStore((s) => s.tradingStrategies)
-  // From a strategy card (範本庫「套用並比較」): its first symbol.
-  const fromCard = strategies.find((s) => s.id === search.get('strategy'))
-  const [codeText, setCodeText] = useState(linked?.ticker ?? (fromCard?.symbols[0] ?? parseSymbolList(search.get('symbol') ?? '')[0] ?? '').replace(/^TW:/, ''))
-  const symbol = parseSymbolList(codeText)[0] ?? ''
-  const code = symbol.replace(/^TW:/, '')
-  const thesis = linked && linked.ticker === code ? linked : symbol ? thesisForCode('TW', code, theses) : null
+  // From a strategy card (範本庫「套用並比較」、策略卡「下一步」): its own
+  // rules on its symbols, against the benchmarks.
+  const fromCard = strategies.find((s) => s.id === search.get('strategy') && STRATEGY_TEMPLATES[s.template].backtestable)
+  const cardKey = fromCard ? `card:${fromCard.id}` : ''
+  const [codeText, setCodeText] = useState(() =>
+    (linked ? [linked.ticker] : fromCard ? fromCard.symbols : parseSymbolList(search.get('symbols') ?? search.get('symbol') ?? '')).map((x) => x.replace(/^TW:/, '')).join(', '),
+  )
+  const symbols = parseSymbolList(codeText)
+  const symbol = symbols.join(',')
+  const code = symbols.length === 1 ? symbols[0].replace(/^TW:/, '') : ''
+  const thesis = code && symbols[0].startsWith('TW:') ? (linked && linked.ticker === code ? linked : thesisForCode('TW', code, theses)) : null
 
   // The library's ticked templates (範本庫); changes here are for this run
-  // until saved back.
-  const defaults = compareEntriesOf(library, 1)
-  const [entries, setEntries] = useState<CompareEntry[]>(defaults)
-  const [off, setOff] = useState<string[]>([])
+  // until saved back. Rotation runs only on two or more symbols.
+  const defaults = compareEntriesOf(library, 2)
+  const [entries, setEntries] = useState<CompareEntry[]>(() => {
+    let list = fromCard ? [{ key: cardKey, label: `策略卡：${fromCard.name}`, template: fromCard.template, params: resolveParams(fromCard.template, fromCard.params), role: 'signal' as const }, ...defaults] : defaults
+    // From the screener: ?template=momentum_rotation adds it when missing.
+    const linkedTemplate = search.get('template') as StrategyTemplate | null
+    if (linkedTemplate && STRATEGY_TEMPLATES[linkedTemplate]?.backtestable && !list.some((e) => e.template === linkedTemplate))
+      list = [...list, { key: `${linkedTemplate}-link`, label: STRATEGY_TEMPLATES[linkedTemplate].label, template: linkedTemplate, params: defaultParams(linkedTemplate), role: 'signal' }]
+    return list
+  })
+  // A card's own run starts without the library's signal templates.
+  const [off, setOff] = useState<string[]>(() => (fromCard ? defaults.filter((e) => e.role === 'signal').map((e) => e.key) : []))
+  const [discount, setDiscount] = useState(policy.brokerFeeDiscount)
+  const [usFee, setUsFee] = useState(0)
+  const [sizing, setSizing] = useState<SizingMode>('equal')
+  const [risk, setRisk] = useState(Math.min(fromCard?.riskPerTradePercent ?? policy.riskPerTradePercent, policy.riskPerTradePercent))
+  const [oos, setOos] = useState(30)
+  const [dive, setDive] = useState<string | null>(null)
+  const [savedDives, setSavedDives] = useState<string[]>([])
   const [start, setStart] = useState(isoDaysAgo(today, YEARS))
   const [end, setEnd] = useState(today)
   const [capital, setCapital] = useState(1_000_000)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
-  const [status, setStatus] = useState<{ kind: 'idle' | 'loading' | 'error'; message?: string }>({ kind: 'idle' })
+  const [status, setStatus] = useState<{ kind: 'idle' | 'loading' | 'error' | 'info'; message?: string }>({ kind: 'idle' })
   // Comparisons run on this visit, oldest first.
   const [runIds, setRunIds] = useState<string[]>([])
   const [cards, setCards] = useState<Record<string, string>>({})
@@ -89,45 +117,54 @@ export function StrategyComparePage() {
   const forSymbol = comparisons.filter((c) => c.symbol === symbol)
   const current = runIds.length > 0 ? comparisons.find((c) => c.id === runIds.at(-1)) : forSymbol.at(-1)
   const previous = current ? forSymbol.filter((c) => c.createdAt < current.createdAt).at(-1) : undefined
-  const active = entries.filter((e) => !off.includes(e.key))
+  const runnable = (e: CompareEntry) => !STRATEGY_TEMPLATES[e.template].multiSymbol || symbols.length >= 2
+  const active = entries.filter((e) => !off.includes(e.key) && runnable(e))
+
+  // Prices (and flows when a template needs them), reusing what this
+  // visit already loaded.
+  async function ensureData(key: string, from: string, to: string, needChips: boolean): Promise<Loaded> {
+    const list = key.split(',')
+    let source = loaded && loaded.symbol === key && loaded.start === from && loaded.end === to ? loaded : null
+    if (!source) {
+      setStatus({ kind: 'loading', message: '準備資料…' })
+      const data = await loadPriceData(list, from, to, (p) =>
+        setStatus({ kind: 'loading', message: `下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}（證交所限速，首次較久，之後使用快取）` }),
+      )
+      source = { symbol: key, start: from, end: to, data }
+    }
+    if (!source.chips && needChips && list.every((x) => x.startsWith('TW:'))) {
+      try {
+        source = { ...source, chips: await loadChipData(list, from, (p) => setStatus({ kind: 'loading', message: `下載 ${formatSymbol(p.symbol)} 法人買賣超（FinMind）` })) }
+      } catch {
+        // The chip row shows why it did not run; the rest still do.
+      }
+    }
+    setLoaded(source)
+    return source
+  }
 
   async function run() {
-    if (!symbol.startsWith('TW:')) return setStatus({ kind: 'error', message: '請輸入台股或 ETF 代號' })
+    if (symbols.length === 0) return setStatus({ kind: 'error', message: '請輸入代號' })
     if (start >= end) return setStatus({ kind: 'error', message: '開始日期須早於結束日期' })
     if (!active.some((e) => e.role === 'signal')) return setStatus({ kind: 'error', message: '至少要勾選一個訊號範本' })
     try {
-      let source = loaded && loaded.symbol === symbol && loaded.start === start && loaded.end === end ? loaded : null
-      if (!source) {
-        setStatus({ kind: 'loading', message: '準備資料…' })
-        const data = await loadPriceData([symbol], start, end, (p) =>
-          setStatus({ kind: 'loading', message: `下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}（證交所限速，首次較久，之後使用快取）` }),
-        )
-        source = { symbol, start, end, data }
-      }
-      if (!source.chips && active.some((e) => STRATEGY_TEMPLATES[e.template].chipData)) {
-        try {
-          source = { ...source, chips: await loadChipData([symbol], start, () => setStatus({ kind: 'loading', message: `下載 ${code} 法人買賣超（FinMind）` })) }
-        } catch {
-          // The chip row shows why it did not run; the rest still do.
-        }
-      }
-      setLoaded(source)
+      const source = await ensureData(symbol, start, end, active.some((e) => STRATEGY_TEMPLATES[e.template].chipData))
       setStatus({ kind: 'loading', message: '計算中…' })
       // Let the message paint before the synchronous runs.
       await new Promise((r) => setTimeout(r, 0))
       const result = runComparison({
         entries: active,
-        base: { data: source.data, chips: source.chips, start, end, initialCapital: capital, costs: marketCosts(policy.brokerFeeDiscount), sizing: { mode: 'equal', riskPercent: policy.riskPerTradePercent } },
-        oosFraction: OOS_FRACTION,
+        base: { data: source.data, chips: source.chips, start, end, initialCapital: capital, costs: marketCosts(discount, usFee), sizing: { mode: sizing, riskPercent: risk } },
+        oosFraction: oos / 100,
         maxDrawdownLimitPercent: policy.maxDrawdownTolerancePercent,
         priorTrials: priorTrialsFor(symbol, comparisons),
       })
       if (result.equity.length < 2) throw new Error('這段期間沒有足夠的價格資料')
-      const isDefault = sameEntries(active, defaults)
+      const isDefault = sameEntries(active, defaults.filter(runnable))
       const id = addStrategyComparison({
         thesisId: thesis?.id,
         symbol,
-        name: thesis?.name ?? '',
+        name: thesis?.name ?? (fromCard && active.some((e) => e.key === cardKey) ? fromCard.name : ''),
         start,
         end,
         initialCapital: capital,
@@ -139,6 +176,7 @@ export function StrategyComparePage() {
       })
       setRunIds((ids) => [...ids, id])
       setCards({})
+      setDive(null)
       setStatus({ kind: 'idle' })
     } catch (e) {
       setStatus({ kind: 'error', message: describeAiError(e) })
@@ -150,26 +188,28 @@ export function StrategyComparePage() {
   function createCard(c: StrategyComparison, row: Row, index: number) {
     if (!row.stats) return
     const def = STRATEGY_TEMPLATES[row.entry.template]
+    const t = library.find((x) => x.id === row.entry.key)
+    const codes = c.symbol.split(',').map((x) => x.replace(/^TW:/, '')).join('、')
     const benchIndex = c.rows.findIndex((r) => r.entry.template === 'buy_hold')
     const benchmark = benchIndex >= 0 ? c.rows[benchIndex].stats : null
     const id = addTradingStrategy({
-      name: `${row.entry.label}・${code}`,
+      name: `${row.entry.label}・${codes}`,
       template: row.entry.template,
       params: row.entry.params,
-      symbols: [symbol],
-      edge: '',
-      entryRules: def.entry,
-      exitRules: def.exit,
+      symbols: c.symbol.split(','),
+      edge: t?.edge ?? '',
+      entryRules: t?.entryRules || def.entry,
+      exitRules: t?.exitRules || def.exit,
       riskPerTradePercent: policy.riskPerTradePercent,
       status: 'dev',
       notes: `由 ${c.createdAt.slice(0, 10)} 的策略比較建立：${row.verdictReason || c.summary.headline}`,
     })
     addBacktestRun({
       strategyId: id,
-      label: `${row.entry.label}・${code}（策略比較）`,
+      label: `${row.entry.label}・${codes}（策略比較）`,
       template: row.entry.template,
       params: row.entry.params,
-      symbols: [symbol],
+      symbols: c.symbol.split(','),
       start: c.start,
       end: c.end,
       initialCapital: c.initialCapital,
@@ -182,11 +222,60 @@ export function StrategyComparePage() {
         .map((p) => ({ date: p.date, strategy: p.values[index] ?? 0, benchmark: benchIndex >= 0 ? (p.values[benchIndex] ?? 0) : 0 })),
     })
     setCards((m) => ({ ...m, [row.entry.key]: id }))
+    return id
+  }
+
+  // The deep dive's own run saved to the row's card: the card this page
+  // was opened from, one made here, or a new one.
+  function saveDive(c: StrategyComparison, row: Row, index: number, run: RunDraft) {
+    let id = row.entry.key === cardKey && fromCard ? fromCard.id : cards[row.entry.key]
+    if (!id) {
+      const made = createCard(c, row, index)
+      if (!made) return
+      id = made
+    }
+    const name = strategies.find((x) => x.id === id)?.name ?? row.entry.label
+    addBacktestRun({ ...run, strategyId: id, label: `${name}（深入檢驗）` })
+    setSavedDives((l) => [...l, `${c.id}:${row.entry.key}`])
+  }
+
+  async function openDive(key: string) {
+    if (dive === key || !current) return setDive(null)
+    setDive(key)
+    const row = current.rows.find((r) => r.entry.key === key)
+    try {
+      await ensureData(current.symbol, current.start, current.end, row ? !!STRATEGY_TEMPLATES[row.entry.template].chipData : false)
+      setStatus({ kind: 'idle' })
+    } catch (e) {
+      setStatus({ kind: 'error', message: describeAiError(e) })
+    }
   }
 
   function setParam(key: string, param: string, value: number) {
     setEntries((list) => list.map((e) => (e.key === key ? { ...e, params: { ...e.params, [param]: value } } : e)))
   }
+
+  const diveRow = current && dive ? current.rows.find((r) => r.entry.key === dive) : undefined
+  const diveIndex = current && diveRow ? current.rows.indexOf(diveRow) : -1
+  const diveInput = useMemo<BacktestInput | null>(
+    () =>
+      current && diveRow && loaded && loaded.symbol === current.symbol && loaded.start === current.start && loaded.end === current.end
+        ? {
+            template: diveRow.entry.template,
+            params: diveRow.entry.params,
+            data: loaded.data,
+            chips: loaded.chips,
+            start: current.start,
+            end: current.end,
+            initialCapital: current.initialCapital,
+            costs: marketCosts(discount, usFee),
+            sizing: { mode: sizing, riskPercent: risk },
+          }
+        : null,
+    [current, diveRow, loaded, discount, usFee, sizing, risk],
+  )
+  const diveCardId = diveRow ? (diveRow.entry.key === cardKey ? fromCard?.id : cards[diveRow.entry.key]) : undefined
+  const diveCard = strategies.find((x) => x.id === diveCardId)
 
   function addEntry(template: StrategyTemplate) {
     const n = entries.filter((e) => e.template === template).length + 1
@@ -211,12 +300,12 @@ export function StrategyComparePage() {
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <PageHeader
-        title="策略比較"
+        title="比較與回測"
         summary={
           <>
-            研究卡判定後，一鍵用全部預設範本回測同一檔股票 {YEARS} 年，用同一條過關規則（樣本外勝過買進持有，或以少賠勝出）比較，再看整體結論。說明見手冊{' '}
+            一鍵用範本庫勾選的範本（或一張策略卡）回測同一組標的 {YEARS} 年：收盤判斷、隔日開盤成交，計入手續費與證交稅，台股自動還原除權息。用同一條過關規則（樣本外勝過買進持有，或以少賠勝出）比較，再對想用的範本按「深入檢驗」。說明見手冊{' '}
             <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-              10 §6.5
+              10 §6、§6.5
             </Link>
             。
           </>
@@ -232,7 +321,7 @@ export function StrategyComparePage() {
 
       <div className={cardClass}>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
-          <Field label="台股或 ETF 代號">
+          <Field label="代號（可多檔，逗號分隔；美股寫 US:代號）">
             <input className={inputClass} value={codeText} onChange={(e) => setCodeText(e.target.value.toUpperCase())} placeholder="2330" />
           </Field>
           <Field label="開始">
@@ -251,7 +340,11 @@ export function StrategyComparePage() {
               研究卡：{thesis.ticker} {thesis.name}，結論 {thesis.verdict ? VERDICT_LABELS[thesis.verdict] : '尚未判定'}。
               {thesis.verdict === 'pass' && <span className="text-orange-700 dark:text-orange-400"> 結論為不投資，比較結果只供參考，不應建倉。</span>}
             </>
-          ) : symbol ? (
+          ) : fromCard ? (
+            <>策略卡「{fromCard.name}」：按「全部執行」，再對「策略卡」那一列按「深入檢驗」並存成這張卡的回測。要和範本庫一起比，在「調整條件」勾選範本。</>
+          ) : symbols.length > 1 ? (
+            <>多檔時每個範本都以等權組合回測，動能輪動在這些標的之間輪動。</>
+          ) : code ? (
             <>
               這檔還沒有研究卡；
               <Link to={`/research/stocks?new=${code}`} className={linkClass}>
@@ -262,8 +355,48 @@ export function StrategyComparePage() {
           ) : (
             '輸入代號，或從研究卡按「一鍵執行策略比較」。'
           )}{' '}
-          手續費折扣 {policy.brokerFeeDiscount}（投資政策）、最後 {OOS_FRACTION * 100}% 期間為<Term name="樣本外" />。
+          手續費折扣 {discount}、{sizing === 'risk' ? `風險部位法每筆 ${risk}%` : '每個標的等額'}、最後 {oos}% 期間為<Term name="樣本外" />（進階設定）。
         </p>
+        <CsvImport symbols={symbols} onError={(message) => setStatus({ kind: 'error', message })} />
+
+        <Disclosure summary="進階設定（手續費、部位、樣本外）">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <Field label="台股手續費折扣（1 = 無折扣，0.6 = 六折）">
+                <input type="number" step="0.05" min="0" max="1" className={inputClass} value={discount} onChange={(e) => setDiscount(Number(e.target.value))} />
+              </Field>
+              <ParamHelp help={BACKTEST_SETTING_HELP.fees} />
+            </div>
+            <Field label="美股手續費（%）">
+              <input type="number" step="0.01" min="0" className={inputClass} value={usFee} onChange={(e) => setUsFee(Number(e.target.value))} />
+            </Field>
+            <div>
+              <Field label="樣本外比例（%）">
+                <input type="number" step="5" min="0" max="50" className={inputClass} value={oos} onChange={(e) => setOos(Number(e.target.value))} />
+              </Field>
+              <ParamHelp help={BACKTEST_SETTING_HELP.oos} />
+            </div>
+            <div>
+              <Field label="部位大小">
+                <select className={inputClass} value={sizing} onChange={(e) => setSizing(e.target.value as SizingMode)}>
+                  <option value="equal">每個標的等額（全額投入）</option>
+                  <option value="risk">風險部位法（依 ATR 停損）</option>
+                </select>
+              </Field>
+              <ParamHelp help={BACKTEST_SETTING_HELP.sizing} />
+            </div>
+            {sizing === 'risk' && (
+              <div>
+                <Field label={`每筆風險（%）${fromCard ? '・帶入策略卡' : '・帶入投資政策'}`}>
+                  <input type="number" step="0.1" min="0.1" max="5" className={inputClass} value={risk} onChange={(e) => setRisk(Number(e.target.value))} />
+                </Field>
+                {risk > policy.riskPerTradePercent && <p className="mt-1 text-xs text-orange-700 dark:text-orange-400">高於投資政策上限 {policy.riskPerTradePercent}%，實單的交易前檢核不會通過。</p>}
+                <ParamHelp help={BACKTEST_SETTING_HELP.risk} />
+              </div>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">改完按「用目前條件再跑」；價格沿用已下載的資料。</p>
+        </Disclosure>
         {status.kind !== 'idle' && (
           <p className={`mt-2 text-sm ${status.kind === 'error' ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>{status.message}</p>
         )}
@@ -277,6 +410,7 @@ export function StrategyComparePage() {
                     <input type="checkbox" checked={!off.includes(e.key)} onChange={() => setOff((o) => (o.includes(e.key) ? o.filter((k) => k !== e.key) : [...o, e.key]))} />
                     {e.label}
                   </label>
+                  {!runnable(e) && <span className="text-xs text-gray-500 dark:text-gray-400">需 2 檔以上</span>}
                   <span className="text-xs text-gray-500 dark:text-gray-400">{e.role === 'benchmark' ? '基準' : STRATEGY_TEMPLATES[e.template].origin}</span>
                   {!library.some((t) => t.id === e.key) && (
                     <button type="button" className="text-xs text-gray-500 hover:underline dark:text-gray-400" onClick={() => setEntries((l) => l.filter((x) => x.key !== e.key))}>
@@ -307,13 +441,13 @@ export function StrategyComparePage() {
             <div className="flex flex-wrap items-center gap-2">
               <select className={`${inputClass} w-auto`} value="" onChange={(e) => e.target.value && addEntry(e.target.value as StrategyTemplate)}>
                 <option value="">＋ 加入範本…</option>
-                {COMPARABLE_TEMPLATES.map((t) => (
+                {BACKTESTABLE.map((t) => (
                   <option key={t} value={t}>
                     {STRATEGY_TEMPLATES[t].label}
                   </option>
                 ))}
               </select>
-              <button type="button" className={secondaryButton} onClick={() => saveLibrary(withCompareSet(library, entries, off))}>
+              <button type="button" className={secondaryButton} onClick={() => saveLibrary(withCompareSet(library, entries.filter((e) => e.key !== cardKey), off))}>
                 存入範本庫
               </button>
               <button
@@ -342,7 +476,7 @@ export function StrategyComparePage() {
           <div className={cardClass}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                整體分析：{formatSymbol(current.symbol)} {current.name}
+                整體分析：{symbolLabel(current.symbol)} {current.name}
               </h2>
               <span className="text-xs text-gray-500 dark:text-gray-400">
                 {current.start} ～ {current.end}・{current.round === 0 ? '預設條件' : `調整第 ${current.round} 次`}・這檔累計試過 {current.trials} 個訊號範本
@@ -360,7 +494,7 @@ export function StrategyComparePage() {
               </ul>
             )}
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-              下一步：挑一個範本「建立策略卡」，它會帶著這次的回測進入開發中；之後在回測頁做偏誤檢查、再到虛擬帳戶累積紀錄（手冊 10 §6、§7）。
+              下一步：對想用的範本按「深入檢驗」，看解讀、參數敏感度與偏誤檢查，再「建立策略卡」（會帶著這次的回測進入開發中），之後到虛擬帳戶累積紀錄（手冊 10 §6、§7）。
             </p>
           </div>
 
@@ -393,7 +527,7 @@ export function StrategyComparePage() {
                         <td className="w-64 min-w-56 py-1.5 pr-3 align-top text-gray-700 dark:text-gray-300">
                           <div className="font-medium text-gray-900 dark:text-gray-100">
                             {r.entry.label}
-                            {r.entry.role === 'benchmark' && <span className="ml-1 text-xs font-normal text-gray-500">（基準）</span>}
+                            {r.entry.role === 'benchmark' && !r.entry.label.includes('基準') && <span className="ml-1 text-xs font-normal text-gray-500">（基準）</span>}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">{paramText(r.entry)}</div>
                           {r.warnings.length > 0 && <div className="mt-1 text-xs text-orange-700 dark:text-orange-400">{r.warnings.join('；')}</div>}
@@ -420,17 +554,24 @@ export function StrategyComparePage() {
                           </td>
                         )}
                         <td className={tdClass}>
-                          {r.entry.role === 'signal' && r.stats && runIds.includes(current.id) ? (
-                            cards[r.entry.key] ? (
-                              <Link to={`/sim/backtest?strategy=${cards[r.entry.key]}`} className={linkClass}>
-                                已建立，詳細回測 →
-                              </Link>
-                            ) : (
-                              <button type="button" className={linkClass} onClick={() => createCard(current, r, i)}>
-                                建立策略卡
+                          {r.entry.role === 'signal' && r.stats && (
+                            <div className="flex flex-col items-start gap-1">
+                              <button type="button" className={linkClass} aria-expanded={dive === r.entry.key} onClick={() => void openDive(r.entry.key)}>
+                                {dive === r.entry.key ? '收合檢驗' : '深入檢驗'}
                               </button>
-                            )
-                          ) : null}
+                              {r.entry.key !== cardKey &&
+                                runIds.includes(current.id) &&
+                                (cards[r.entry.key] ? (
+                                  <Link to="/sim/strategies" className={linkClass}>
+                                    已建立策略卡
+                                  </Link>
+                                ) : (
+                                  <button type="button" className={linkClass} onClick={() => createCard(current, r, i)}>
+                                    建立策略卡
+                                  </button>
+                                ))}
+                            </div>
+                          )}
                         </td>
                       </tr>
                     )
@@ -438,6 +579,27 @@ export function StrategyComparePage() {
                 </tbody>
               </table>
             </div>
+            {diveRow &&
+              (diveInput ? (
+                <DeepDive
+                  key={`${current.id}:${diveRow.entry.key}`}
+                  label={diveRow.entry.label}
+                  input={diveInput}
+                  oosFraction={oos / 100}
+                  policy={policy}
+                  priorTrials={priorTrialsFor(current.symbol, comparisons)}
+                  card={diveCard}
+                  saved={savedDives.includes(`${current.id}:${diveRow.entry.key}`)}
+                  saveLabel={diveRow.entry.key === cardKey ? '存為這張策略卡的回測' : cards[diveRow.entry.key] ? '存入剛建立的策略卡' : '建立策略卡並儲存回測'}
+                  onSave={(draft) => saveDive(current, diveRow, diveIndex, draft)}
+                  onApplyParam={(key, value) => {
+                    setParam(diveRow.entry.key, key, value)
+                    setStatus({ kind: 'info', message: `已把「${diveRow.entry.label}」的參數改為 ${value}，按「用目前條件再跑」重算。` })
+                  }}
+                />
+              ) : (
+                <p className="mt-4 text-sm text-gray-600 dark:text-gray-400">{status.kind === 'loading' ? status.message : '讀取價格資料中…'}</p>
+              ))}
           </div>
 
           <div className={cardClass}>
@@ -464,8 +626,8 @@ export function StrategyComparePage() {
               .slice(0, 10)
               .map((c) => (
                 <li key={c.id}>
-                  <button type="button" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400" onClick={() => setCodeText(c.symbol.replace(/^TW:/, ''))}>
-                    {formatSymbol(c.symbol)} {c.name}
+                  <button type="button" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400" onClick={() => setCodeText(c.symbol.split(',').map((x) => x.replace(/^TW:/, '')).join(', '))}>
+                    {symbolLabel(c.symbol)} {c.name}
                   </button>
                   ：{c.createdAt.slice(0, 10)}・{c.summary.headline}
                 </li>
@@ -476,7 +638,7 @@ export function StrategyComparePage() {
 
       {forSymbol.length > 1 && (
         <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">這檔的比較紀錄</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">這組標的的比較紀錄</h2>
           <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
             {[...forSymbol].reverse().map((c) => (
               <li key={c.id}>
@@ -484,6 +646,45 @@ export function StrategyComparePage() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {runs.length > 0 && (
+        <div className={cardClass}>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">回測紀錄</h2>
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">建立策略卡或深入檢驗時存下的回測；策略卡要有一筆通過，才能進虛擬交易與實單（行動路線 4.2）。</p>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 dark:border-gray-700">
+                  {['名稱', '期間', '樣本外年化', '買進持有', '最大回撤', '結果', ''].map((h) => (
+                    <th key={h} className={thClass}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...runs].reverse().map((r) => (
+                  <tr key={r.id} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
+                    <td className={`${tdClass} whitespace-normal`}>{r.label}</td>
+                    <td className={`${tdClass} text-xs`}>
+                      {r.start}～{r.end}
+                    </td>
+                    <td className={tdClass}>{pct(r.stats.outOfSample?.cagr)}</td>
+                    <td className={tdClass}>{pct(r.benchmark.outOfSample?.cagr)}</td>
+                    <td className={tdClass}>{pct(r.stats.full.maxDrawdown)}</td>
+                    <td className={tdClass}>{backtestPasses(r) ? '✓ 通過' : '✗'}</td>
+                    <td className={tdClass}>
+                      <button type="button" onClick={() => removeBacktestRun(r.id)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
+                        刪除
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

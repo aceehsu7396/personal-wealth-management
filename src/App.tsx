@@ -4,7 +4,7 @@ import { PageContext } from './components/PageContext'
 import { NotesDrawer } from './components/notes/NotesDrawer'
 import { NotesDrawerProvider } from './components/notes/NotesDrawerContext'
 import { lazy, Suspense } from 'react'
-import { HashRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { NavBar } from './components/layout/NavBar'
 import { ScrollToTop } from './components/layout/ScrollToTop'
 import { PortfolioSnapshotRecorder } from './components/PortfolioSnapshotRecorder'
@@ -25,7 +25,6 @@ import { SettingsPage } from './pages/SettingsPage'
 import { StrategiesPage } from './pages/StrategiesPage'
 import { PaperPage } from './pages/PaperPage'
 import { ScreenerPage } from './pages/ScreenerPage'
-import { BacktestPage } from './pages/BacktestPage'
 import { StrategyComparePage } from './pages/StrategyComparePage'
 import { IdeaNotesPage } from './pages/IdeaNotesPage'
 
@@ -34,6 +33,12 @@ const HandbookPage = lazy(() =>
   import('./pages/HandbookPage').then((m) => ({ default: m.HandbookPage })),
 )
 
+
+// Old links keep their query (/sim/backtest?strategy=… → /sim/compare?strategy=…).
+function RedirectKeepingQuery({ to }: { to: string }) {
+  const { search } = useLocation()
+  return <Navigate to={`${to}${search}`} replace />
+}
 function App() {
   return (
     <HashRouter>
@@ -56,7 +61,6 @@ function App() {
               {/* 模擬交易 */}
               <Route path="/sim/strategies" element={<StrategiesPage />} />
               <Route path="/sim/compare" element={<StrategyComparePage />} />
-              <Route path="/sim/backtest" element={<BacktestPage />} />
               <Route path="/sim/paper" element={<PaperPage />} />
               {/* 投資持有與檢討回顧 */}
               <Route path="/today" element={<DashboardPage />} />
@@ -83,7 +87,7 @@ function App() {
               <Route path="/journey" element={<JourneyPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               {Object.entries(LEGACY_REDIRECTS).map(([from, to]) => (
-                <Route key={from} path={from} element={<Navigate to={to} replace />} />
+                <Route key={from} path={from} element={<RedirectKeepingQuery to={to} />} />
               ))}
               <Route path="*" element={<Navigate to={HOME_PATH} replace />} />
             </Routes>

@@ -301,8 +301,8 @@ export function StrategiesPage() {
                   }
                   if (def.backtestable && !gate.backtestPassed)
                     return (
-                      <Link to={`/sim/backtest?strategy=${s.id}`} className={btn}>
-                        下一步：回測 →
+                      <Link to={`/sim/compare?strategy=${s.id}`} className={btn}>
+                        下一步：比較與回測 →
                       </Link>
                     )
                   if (!gate.paperProven)
@@ -319,8 +319,8 @@ export function StrategiesPage() {
                   )
                 })()}
                 {def.backtestable && (
-                  <Link to={`/sim/backtest?strategy=${s.id}`} className={linkClass}>
-                    回測
+                  <Link to={`/sim/compare?strategy=${s.id}`} className={linkClass}>
+                    比較與回測
                   </Link>
                 )}
                 <Link to={`/sim/paper?strategy=${s.id}`} className={linkClass}>

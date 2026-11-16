@@ -58,7 +58,7 @@ function StockActions({ row, onWatch, watched }: { row: StockRow; onWatch?: () =
           研究卡
         </Link>
       )}
-      <Link to={`/sim/backtest?symbols=TW:${row.code}`} className={linkClass}>
+      <Link to={`/sim/compare?symbols=TW:${row.code}`} className={linkClass}>
         回測
       </Link>
     </span>
@@ -404,7 +404,7 @@ export function ScreenerPage() {
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">觀察名單（{watchlist.length}）</h2>
           {watchlist.length >= 2 && (
             <Link
-              to={`/sim/backtest?template=momentum_rotation&symbols=${watchlist.map((w) => w.symbol).join(',')}`}
+              to={`/sim/compare?template=momentum_rotation&symbols=${watchlist.map((w) => w.symbol).join(',')}`}
               className={linkClass}
             >
               用觀察名單回測動能輪動
