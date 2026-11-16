@@ -123,7 +123,7 @@ export function PaperPage() {
   const [pendingDelete, setPendingDelete] = useState(false)
 
   const { policy } = useJourney()
-  const regime = useRegime().ctx
+  const { ctx: regime, loading: regimeLoading } = useRegime()
   const today = todayIsoDate()
   const account = accounts.find((a) => a.id === selectedId)
   const strategy = strategies.find((s) => s.id === account?.strategyId)
@@ -287,7 +287,7 @@ export function PaperPage() {
         }
         action={
           showAccount ? (
-            <button type="button" disabled={busy !== null} onClick={() => void (canSignal ? makeAdvice() : refreshPrices())} className={primaryButton}>
+            <button type="button" disabled={busy !== null || (canSignal && regimeLoading)} onClick={() => void (canSignal ? makeAdvice() : refreshPrices())} className={primaryButton}>
               {canSignal ? '產生今日建議' : '更新價格'}
             </button>
           ) : undefined

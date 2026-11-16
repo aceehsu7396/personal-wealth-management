@@ -14,7 +14,8 @@ export function PaperRoutine() {
   const strategies = useAppStore((s) => s.tradingStrategies)
   const replacePaperAccount = useAppStore((s) => s.replacePaperAccount)
   const { policy } = useJourney()
-  const regime = useRegime().ctx
+  // Suggestions use the regime's stop width and multiplier: wait for it.
+  const { ctx: regime, loading: regimeLoading } = useRegime()
   const [step, setStep] = useState<string | null>(null)
   const [result, setResult] = useState<RoutineResult | null>(null)
   const count = routineAccounts(accounts, strategies).length
@@ -51,9 +52,9 @@ export function PaperRoutine() {
           {result.failed.map((f) => `・${f.name} 失敗：${describeAiError(f.error)}`).join('')}
         </span>
       ) : (
-        <span>虛擬帳戶 {count} 個：更新價格並產生今日建議</span>
+        <span>{regimeLoading ? '讀取局勢中…' : `虛擬帳戶 ${count} 個：更新價格並產生今日建議`}</span>
       )}
-      <button type="button" className={secondaryButton} disabled={step !== null} onClick={() => void run()}>
+      <button type="button" className={secondaryButton} disabled={step !== null || regimeLoading} onClick={() => void run()}>
         執行今日例行
       </button>
     </div>
