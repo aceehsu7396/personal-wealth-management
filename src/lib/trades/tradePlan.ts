@@ -165,6 +165,10 @@ export const METHOD_OF: Partial<Record<TradingStrategy['template'], TradePlan['e
   rsi_reversion: 'mean_reversion',
   momentum_rotation: 'momentum',
   chip_flow: 'breakout',
+  weekly_ma: 'breakout',
+  weekly_breakout: 'breakout',
+  weekly_rotation: 'momentum',
+  weekly_pullback: 'mean_reversion',
   dca: 'dca',
 }
 

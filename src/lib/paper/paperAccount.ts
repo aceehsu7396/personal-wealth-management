@@ -4,7 +4,8 @@ import { monthsBetween } from '../calculations/traderReadiness'
 
 // Paper trading: pure functions that take an account and return the
 // updated account. Fills use daily data: market orders at the latest
-// close; limit and stop orders when the day's range reaches their price.
+// close, or at the next session's open (weekly cards, as in the backtest);
+// limit and stop orders when the day's range reaches their price.
 
 // The latest daily bar; price is the close.
 export interface Quote {
@@ -35,6 +36,7 @@ export interface NewOrder {
   stopLoss?: number
   reason: string
   emotion?: number
+  fillAt?: 'open'
 }
 
 export class PaperOrderError extends Error {
@@ -126,7 +128,7 @@ export function placeOrder(account: PaperAccount, input: NewOrder, quote?: Quote
   if (input.side === 'buy' && input.type === 'stop') throw new PaperOrderError('停損單只用於賣出')
   const order: PaperOrder = { id: newId(), createdAt: now, status: 'open', ...input, reason: input.reason }
   const withOrder = { ...account, orders: [...account.orders, order] }
-  if (input.type !== 'market') return withOrder
+  if (input.type !== 'market' || input.fillAt === 'open') return withOrder
   if (!quote) throw new PaperOrderError('市價單需要最新價格')
   return snapshot(fill(withOrder, order, quote.price, quote.date), quote.date)
 }
@@ -164,7 +166,19 @@ export function updatePrices(account: PaperAccount, quotes: Record<string, Quote
   for (const order of next.orders.filter((o) => o.status === 'open')) {
     const q = quotes[order.symbol]
     // Orders only fill on bars after the day they were placed.
-    if (!q || q.date <= order.createdAt.slice(0, 10) || order.price === undefined) continue
+    if (!q || q.date <= order.createdAt.slice(0, 10)) continue
+    if (order.type === 'market' && order.fillAt === 'open') {
+      const open = q.open ?? q.price
+      try {
+        // A buy whose stop the open already broke waits for a new decision.
+        if (order.side === 'buy' && order.stopLoss !== undefined && open <= order.stopLoss) next = cancelOrder(next, order.id)
+        else next = fill(next, order, open, q.date)
+      } catch {
+        next = cancelOrder(next, order.id)
+      }
+      continue
+    }
+    if (order.price === undefined) continue
     const price =
       order.type === 'limit' && order.side === 'sell'
         ? touched(q, order.price, 'up')

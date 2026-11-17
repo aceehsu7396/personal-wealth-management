@@ -175,6 +175,8 @@ interface AppStore extends AppData {
   setCompareSet: (entries: CompareEntry[] | undefined) => void
   // The whole library, saved on the first change (lib/backtest/library.ts).
   setStrategyLibrary: (library: LibraryTemplate[]) => void
+  // Monday = 1 … Friday = 5 (lib/backtest/weekly.ts).
+  setWeeklyDecisionDay: (day: number) => void
   addPaperAccount: (entry: Omit<PaperAccount, 'id' | 'createdAt'>) => string
   // Paper-account changes are computed by pure functions and saved whole.
   replacePaperAccount: (account: PaperAccount) => void
@@ -239,6 +241,7 @@ function toAppData(state: AppData): AppData {
     strategyComparisons: state.strategyComparisons,
     compareSet: state.compareSet,
     strategyLibrary: state.strategyLibrary,
+    tradingPrefs: state.tradingPrefs,
     paperAccounts: state.paperAccounts,
     watchlist: state.watchlist,
     ideaNotes: state.ideaNotes,
@@ -546,6 +549,7 @@ export const useAppStore = create<AppStore>()(
       setCompareSet: (entries) => set({ compareSet: entries }),
 
       setStrategyLibrary: (library) => set({ strategyLibrary: library }),
+      setWeeklyDecisionDay: (day) => set({ tradingPrefs: { weeklyDecisionDay: day } }),
 
       addPaperAccount: (entry) => {
         const id = crypto.randomUUID()

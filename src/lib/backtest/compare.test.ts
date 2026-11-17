@@ -68,6 +68,7 @@ describe('summarizeComparison', () => {
     verdict: { passed, route: passed ? 'risk' : null, reason: '' },
     findings: [],
     costSensitive: false,
+    avgHoldDays: null,
     deflatedProbability: 0.99,
     avgR: null,
   })

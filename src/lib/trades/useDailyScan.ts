@@ -33,6 +33,7 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
   const ladder = useAppStore((s) => s.dipLadder)
   const decisions = useAppStore((s) => s.decisions)
   const scenarioSets = useAppStore((s) => s.scenarioSets)
+  const weeklyDecisionDay = useAppStore((s) => s.tradingPrefs?.weeklyDecisionDay)
   const assumptions = useAppStore((s) => s.assumptions)
   const foundation = useAppStore((s) => s.foundation)
   const paperAccounts = useAppStore((s) => s.paperAccounts)
@@ -127,7 +128,7 @@ export function useDailyScan(): { items: ScanItem[]; loading: boolean } {
     }
   }
 
-  items.push(...paperScanItems(paperAccounts, strategies, today))
+  items.push(...paperScanItems(paperAccounts, strategies, today, weeklyDecisionDay))
 
   const discipline = computeDiscipline(trades, holdings, theses, policy, today)
   if (discipline.pendingReviews.length > 0) {

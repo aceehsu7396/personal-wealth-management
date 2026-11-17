@@ -41,17 +41,23 @@ export interface AdviceInput {
   regime: RegimeContext | null
   today: string
   onStep: (s: string) => void
+  // The site-wide weekly decision day, for weekly cards without their own.
+  weeklyDecisionDay?: number
 }
 
 // Today's suggestions for an account (handbook 10 §7), saved on it.
-export async function adviseAccount({ account, strategy, policy, regime, today, onStep }: AdviceInput, deps: RoutineDeps = defaultDeps): Promise<PaperAccount> {
+export async function adviseAccount({ account, strategy, policy, regime, today, onStep, weeklyDecisionDay }: AdviceInput, deps: RoutineDeps = defaultDeps): Promise<PaperAccount> {
   const symbols = [...new Set([...strategy.symbols, ...account.positions.map((p) => p.symbol)])]
   const data = await deps.loadPriceData(symbols, isoDaysAgo(today, 1), today, (p) => onStep(`下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}`))
   const held = Object.fromEntries(account.positions.map((p) => [p.symbol, { shares: p.shares, openedAt: p.openedAt }]))
   const chips = STRATEGY_TEMPLATES[strategy.template].chipData
     ? await deps.loadChipData(symbols, isoDaysAgo(today, 1), (p) => onStep(`下載 ${formatSymbol(p.symbol)} 法人買賣超 ${p.done + 1}/${p.total}`))
     : undefined
-  const statuses = symbolStatus(strategy.template, strategy.params, data, held, chips)
+  const statuses = symbolStatus(strategy.template, strategy.params, data, held, chips, {
+    cadence: strategy.cadence,
+    decisionDay: strategy.decisionDay ?? weeklyDecisionDay,
+    today,
+  })
   return withSnapshot(account, assistantItems({ strategy, account, statuses, data, policy, regime }), new Date().toISOString())
 }
 
@@ -70,6 +76,7 @@ export interface RoutineInput {
   regime: RegimeContext | null
   today: string
   onStep: (s: string) => void
+  weeklyDecisionDay?: number
   // The latest saved account, and where to save it: each step builds
   // on what the previous one saved.
   latest: (id: string) => PaperAccount
@@ -92,7 +99,7 @@ export async function runPaperRoutine(input: RoutineInput, deps: RoutineDeps = d
         const quotes = await deps.fetchQuotes(priceSymbols(input.latest(account.id)), input.today, step)
         input.save(updatePrices(input.latest(account.id), quotes))
       }
-      input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step }, deps))
+      input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay }, deps))
       result.done.push(account.name)
     } catch (error) {
       result.failed.push({ name: account.name, error })

@@ -1,9 +1,19 @@
 import type { BacktestRun, PaperAccount, PaperOrder, TradingStrategy } from '../storage/schema'
 import { monthsBetween } from './traderReadiness'
 import { outOfSampleVerdict } from '../backtest/passRule'
+import { cadenceOf } from '../backtest/weekly'
 
 // A strategy has proven itself on paper after this much forward practice.
 export const PAPER_RULES = { months: 3, fills: 10 } as const
+// Weekly cards trade far less often: the same three months, fewer fills
+// (confirmed 2026-11-17).
+export const WEEKLY_PAPER_RULES = { months: 3, fills: 6 } as const
+
+export type PaperRules = { months: number; fills: number }
+
+export function paperRulesFor(strategy?: Pick<TradingStrategy, 'template' | 'cadence'>): PaperRules {
+  return strategy && cadenceOf(strategy.template, strategy.cadence) === 'weekly' ? WEEKLY_PAPER_RULES : PAPER_RULES
+}
 
 export function paperFills(account: PaperAccount): PaperOrder[] {
   return account.orders
@@ -11,10 +21,10 @@ export function paperFills(account: PaperAccount): PaperOrder[] {
     .sort((a, b) => (a.filledAt ?? '').localeCompare(b.filledAt ?? ''))
 }
 
-export function paperProgress(account: PaperAccount, today: string): { months: number; fills: number; qualifies: boolean } {
+export function paperProgress(account: PaperAccount, today: string, rules: PaperRules = PAPER_RULES): { months: number; fills: number; qualifies: boolean } {
   const fills = paperFills(account)
   const months = fills.length > 0 ? Math.max(monthsBetween(fills[0].filledAt!.slice(0, 10), today), 0) : 0
-  return { months, fills: fills.length, qualifies: months >= PAPER_RULES.months && fills.length >= PAPER_RULES.fills }
+  return { months, fills: fills.length, qualifies: months >= rules.months && fills.length >= rules.fills }
 }
 
 // Out of sample, beats buy-and-hold on return or on risk-adjusted terms.
@@ -29,7 +39,7 @@ export function paperProvenStrategies(
   today: string,
 ): TradingStrategy[] {
   return strategies.filter((s) =>
-    accounts.some((a) => a.strategyId === s.id && paperProgress(a, today).qualifies),
+    accounts.some((a) => a.strategyId === s.id && paperProgress(a, today, paperRulesFor(s)).qualifies),
   )
 }
 
@@ -48,6 +58,6 @@ export function liveGate(
   today: string,
 ): LiveGate {
   const backtestPassed = runs.some((r) => r.strategyId === strategy.id && backtestPasses(r))
-  const paperProven = accounts.some((a) => a.strategyId === strategy.id && paperProgress(a, today).qualifies)
+  const paperProven = accounts.some((a) => a.strategyId === strategy.id && paperProgress(a, today, paperRulesFor(strategy)).qualifies)
   return { backtestPassed, paperProven, allowed: backtestPassed && paperProven }
 }

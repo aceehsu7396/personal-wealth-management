@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import { useAppStore } from '../../lib/storage/appStore'
 import type { StrategyStatus, TradingStrategy } from '../../lib/storage/schema'
 import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, resolveParams } from '../../lib/backtest/templates'
-import { liveGate, PAPER_RULES } from '../../lib/calculations/strategyProgress'
+import { liveGate, paperRulesFor } from '../../lib/calculations/strategyProgress'
+import { cadenceLabel } from '../../lib/backtest/weekly'
 import { GROUP_BY_LABELS, cleanupSuggestions, groupCards, symbolLabel, symbolNames, type GroupBy } from '../../lib/backtest/cardGroups'
 import { todayIsoDate } from '../../lib/market/twse'
 import { StrategyResearchLinks } from '../research/StrategyResearchLinks'
@@ -33,7 +34,7 @@ const FILTERS: { key: 'all' | StrategyStatus; label: string }[] = [
 function readGroupBy(): GroupBy {
   try {
     const v = localStorage.getItem(GROUP_KEY)
-    return v === 'status' || v === 'template' ? v : 'symbol'
+    return v === 'status' || v === 'template' || v === 'cadence' ? v : 'symbol'
   } catch {
     return 'symbol'
   }
@@ -60,6 +61,7 @@ export function StrategyCardList({ onEdit, focusId }: Props) {
   const today = todayIsoDate()
 
   const [by, setBy] = useState<GroupBy>(readGroupBy)
+  const globalDay = useAppStore((s) => s.tradingPrefs?.weeklyDecisionDay)
   const [filter, setFilter] = useState<'all' | StrategyStatus>('all')
   const [query, setQuery] = useState('')
   const [openCards, setOpenCards] = useState<string[]>(focusId ? [focusId] : [])
@@ -139,7 +141,7 @@ export function StrategyCardList({ onEdit, focusId }: Props) {
           </button>
           <span className={`rounded px-2 py-0.5 text-xs font-medium ${STATUS_STYLE[s.status]}`}>{STRATEGY_STATUS_LABELS[s.status]}</span>
           <span className={mutedClass}>
-            {def.label}
+            {def.label}・{cadenceLabel(s, globalDay)}
             {by !== 'symbol' && `・${symbolLabel(s.symbols, names)}`}
           </span>
           <span className={mutedClass}>
@@ -167,7 +169,7 @@ export function StrategyCardList({ onEdit, focusId }: Props) {
             <StrategyResearchLinks strategy={s} />
             <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
               {gate.backtestPassed ? '✓' : '☐'} 回測樣本外勝過買進持有（報酬或風險調整後；{ownRuns} 次回測）
-              {gate.paperProven ? '✓' : '☐'} 虛擬交易 {PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆（{ownAccounts} 個帳戶）
+              {gate.paperProven ? '✓' : '☐'} 虛擬交易 {paperRulesFor(s).months} 個月、{paperRulesFor(s).fills} 筆（{ownAccounts} 個帳戶）
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               {def.backtestable && (

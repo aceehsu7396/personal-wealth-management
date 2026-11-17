@@ -639,6 +639,10 @@ export const StrategyTemplateSchema = z.enum([
   'rsi_reversion',
   'momentum_rotation',
   'chip_flow',
+  'weekly_ma',
+  'weekly_breakout',
+  'weekly_rotation',
+  'weekly_pullback',
   'discretionary',
 ])
 export type StrategyTemplate = z.infer<typeof StrategyTemplateSchema>
@@ -646,6 +650,14 @@ export type StrategyTemplate = z.infer<typeof StrategyTemplateSchema>
 // dev → paper (virtual trading) → live (real money) → retired.
 export const StrategyStatusSchema = z.enum(['dev', 'paper', 'live', 'retired'])
 export type StrategyStatus = z.infer<typeof StrategyStatusSchema>
+
+// How often entries and exits are decided: every close, or once a week at
+// the close of the decision day (stops still trigger any day). The weekly
+// templates are always weekly.
+export const CadenceSchema = z.enum(['daily', 'weekly'])
+export type Cadence = z.infer<typeof CadenceSchema>
+// Monday = 1 … Friday = 5.
+export const DecisionDaySchema = z.number().int().min(1).max(5)
 
 // A strategy card: the written trading plan. Symbols are "TW:0050" or
 // "US:SPY" style keys.
@@ -661,6 +673,9 @@ export const TradingStrategySchema = z.object({
   riskPerTradePercent: z.number().default(1),
   status: StrategyStatusSchema,
   notes: z.string().default(''),
+  // Absent = daily; decisionDay absent = the site-wide setting.
+  cadence: CadenceSchema.optional(),
+  decisionDay: DecisionDaySchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -700,6 +715,8 @@ export const BacktestRunSchema = z.object({
   stats: BacktestSplitSchema,
   benchmark: BacktestSplitSchema,
   equity: z.array(z.object({ date: z.string(), strategy: z.number(), benchmark: z.number() })),
+  cadence: CadenceSchema.optional(),
+  decisionDay: DecisionDaySchema.optional(),
   createdAt: z.string(),
 })
 export type BacktestRun = z.infer<typeof BacktestRunSchema>
@@ -711,6 +728,7 @@ export const CompareEntrySchema = z.object({
   template: StrategyTemplateSchema,
   params: z.record(z.string(), z.number()),
   role: z.enum(['signal', 'benchmark']),
+  cadence: CadenceSchema.optional(),
 })
 export type CompareEntry = z.infer<typeof CompareEntrySchema>
 
@@ -731,6 +749,7 @@ export const LibraryTemplateSchema = z.object({
   notes: z.string().default(''),
   role: z.enum(['signal', 'benchmark']),
   inCompare: z.boolean().default(false),
+  cadence: CadenceSchema.optional(),
   // The built-in entry this came from, so a reset can bring back only
   // what is missing.
   builtIn: z.string().optional(),
@@ -761,9 +780,12 @@ export const StrategyComparisonSchema = z.object({
       costSensitive: z.boolean().nullable(),
       deflatedProbability: z.number().nullable(),
       avgR: z.number().nullable(),
+      avgHoldDays: z.number().nullable().optional(),
       error: z.string().optional(),
     }),
   ),
+  // The weekly rows' decision day (rows carry their cadence).
+  decisionDay: DecisionDaySchema.optional(),
   summary: z.object({ kind: z.enum(['edge', 'few_trades', 'none']), headline: z.string(), details: z.array(z.string()), ranking: z.array(z.string()) }),
   // NaN does not survive JSON; a missing value is null.
   equity: z.array(z.object({ date: z.string(), values: z.array(z.number().nullable()) })),
@@ -794,6 +816,9 @@ export const PaperOrderSchema = z.object({
   price: z.number().optional(),
   shares: z.number(),
   status: z.enum(['open', 'filled', 'cancelled']),
+  // A market order that fills at the next session's open (weekly cards,
+  // as in the backtest) instead of at once at the latest close.
+  fillAt: z.literal('open').optional(),
   filledAt: z.string().optional(),
   fillPrice: z.number().optional(),
   fee: z.number().optional(),
@@ -848,6 +873,8 @@ export const AssistantItemSchema = z.object({
   basis: z.array(z.string()).default([]),
   outcome: SignalOutcomeSchema.default('pending'),
   note: z.string().optional(),
+  // Weekly card, before the decision day: the date that decides.
+  decidesOn: z.string().optional(),
 })
 export type AssistantItem = z.infer<typeof AssistantItemSchema>
 
@@ -1157,6 +1184,8 @@ export const AppDataSchema = z.object({
   compareSet: z.array(CompareEntrySchema).optional(),
   // The template library; absent = the built-in one (lib/backtest/library.ts).
   strategyLibrary: z.array(LibraryTemplateSchema).optional(),
+  // Absent = decide weekly strategies on Friday.
+  tradingPrefs: z.object({ weeklyDecisionDay: DecisionDaySchema }).optional(),
   paperAccounts: z.array(PaperAccountSchema).default([]),
   watchlist: z.array(WatchItemSchema).default([]),
   ideaNotes: z.array(IdeaNoteSchema).default([]),

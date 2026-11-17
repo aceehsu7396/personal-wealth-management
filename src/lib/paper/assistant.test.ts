@@ -205,3 +205,26 @@ describe('explainItem and adviceSummary', () => {
     expect(s.detail).toContain('觀望 1')
   })
 })
+
+describe('weekly paper cards', () => {
+  const card = { ...strategy('weekly_breakout', {}), cadence: 'weekly' as const }
+  const snap = (generatedAt: string) => ({ ...account(), strategyId: 's', assistant: { date: generatedAt.slice(0, 10), generatedAt, items: [] } })
+
+  it('reminds once on the decision day, then only the stops', () => {
+    // 2026-11-20 is a Friday; generated last Friday.
+    const fri = paperScanItems([snap('2026-11-13T10:00:00Z')], [card], '2026-11-20')
+    expect(fri.map((i) => i.text)).toEqual([expect.stringContaining('週五收盤後產生本週建議')])
+    // Saturday, not done yet: still due.
+    expect(paperScanItems([snap('2026-11-13T10:00:00Z')], [card], '2026-11-21')).toHaveLength(1)
+    // Done on Friday: Monday asks nothing without positions.
+    expect(paperScanItems([snap('2026-11-20T10:00:00Z')], [card], '2026-11-23')).toEqual([])
+    // A card's own decision day wins.
+    const wed = paperScanItems([snap('2026-11-13T10:00:00Z')], [{ ...card, decisionDay: 3 }], '2026-11-18')
+    expect(wed[0].text).toContain('週三')
+  })
+
+  it('says when the week decides', () => {
+    const s = adviceSummary([{ symbol: 'TW:1', kind: 'wait', date: '2026-11-18', close: 1, reading: '', basis: [], outcome: 'pending', decidesOn: '2026-11-20' }])
+    expect(s.detail).toContain('11/20 收盤判斷')
+  })
+})

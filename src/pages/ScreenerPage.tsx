@@ -403,12 +403,14 @@ export function ScreenerPage() {
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">觀察名單（{watchlist.length}）</h2>
           {watchlist.length >= 2 && (
-            <Link
-              to={`/sim/compare?template=momentum_rotation&symbols=${watchlist.map((w) => w.symbol).join(',')}`}
-              className={linkClass}
-            >
-              用觀察名單回測動能輪動
-            </Link>
+            <span className="flex flex-wrap gap-3">
+              <Link to={`/sim/compare?template=momentum_rotation&symbols=${watchlist.map((w) => w.symbol).join(',')}`} className={linkClass}>
+                用觀察名單回測動能輪動
+              </Link>
+              <Link to={`/sim/compare?template=weekly_rotation&cadence=weekly&symbols=${watchlist.map((w) => w.symbol).join(',')}`} className={linkClass}>
+                每週動能輪動
+              </Link>
+            </span>
           )}
         </div>
         {watchlist.length === 0 ? (

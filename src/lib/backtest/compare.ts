@@ -15,6 +15,7 @@ import { INTERPRET_RULES, interpretBacktest, type Finding } from './interpret'
 import { calmarOf, outOfSampleVerdict, type PassVerdict } from './passRule'
 import { STARTER_STRATEGIES } from './starterStrategies'
 import { STRATEGY_TEMPLATES, defaultParams } from './templates'
+import { cadenceOf } from './weekly'
 
 // Strategy comparison (handbook 10 §6.5): every default template on one
 // stock over the same period, judged by the same out-of-sample pass rule
@@ -57,6 +58,8 @@ export interface CompareRow {
   // Probability the Sharpe beats luck after this many tries.
   deflatedProbability: number | null
   avgR: number | null
+  // Average calendar days a trade was held.
+  avgHoldDays: number | null
   error?: string
 }
 
@@ -76,6 +79,11 @@ export interface ComparisonInput {
   priorTrials?: number
 }
 
+export function avgHoldDays(result: BacktestResult): number | null {
+  const days = result.trades.map((t) => (Date.parse(t.exitDate) - Date.parse(t.entryDate)) / 86400000)
+  return days.length > 0 ? days.reduce((a, b) => a + b, 0) / days.length : null
+}
+
 const strip = (s: ReturnType<typeof splitStats>): StatsTriple => ({ full: s.full, inSample: s.inSample, outOfSample: s.outOfSample })
 
 export function runComparison({ entries, base, oosFraction, maxDrawdownLimitPercent, priorTrials = 0 }: ComparisonInput): ComparisonResult {
@@ -84,13 +92,16 @@ export function runComparison({ entries, base, oosFraction, maxDrawdownLimitPerc
   const bench = runBacktest(benchmarkInput({ ...base, template: 'buy_hold', params: {} }))
   const benchSplit = splitStats(bench, oosFraction)
   const curves: (BacktestResult | null)[] = []
-  const rows = entries.map((entry): CompareRow => {
-    const empty: CompareRow = { entry, stats: null, verdict: null, findings: [], costSensitive: null, deflatedProbability: null, avgR: null }
+  const rows = entries.map((given): CompareRow => {
+    // Each row records the cadence it ran at.
+    const cadence = cadenceOf(given.template, given.cadence ?? base.cadence)
+    const entry: CompareEntry = cadence === 'weekly' ? { ...given, cadence } : given
+    const empty: CompareRow = { entry, stats: null, verdict: null, findings: [], costSensitive: null, deflatedProbability: null, avgR: null, avgHoldDays: null }
     if (STRATEGY_TEMPLATES[entry.template].chipData && !base.chips) {
       curves.push(null)
       return { ...empty, error: '沒有法人買賣超資料（FinMind 額度用完時稍後再試）' }
     }
-    const input: BacktestInput = { ...base, template: entry.template, params: entry.params }
+    const input: BacktestInput = { ...base, template: entry.template, params: entry.params, cadence }
     const result = entry.template === 'buy_hold' ? bench : runBacktest(input)
     curves.push(result)
     const split = splitStats(result, oosFraction)
@@ -113,6 +124,7 @@ export function runComparison({ entries, base, oosFraction, maxDrawdownLimitPerc
       costSensitive: costSensitivity(input).sensitive,
       deflatedProbability: deflatedSharpe(dailyReturnsOf(result), trials)?.probability ?? null,
       avgR: rs.length > 0 ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
+      avgHoldDays: avgHoldDays(result),
     }
   })
   // Curves share the benchmark's dates; a missing row plots as nothing.
@@ -191,6 +203,7 @@ export function toSavedRows(result: ComparisonResult) {
       costSensitive: r.costSensitive,
       deflatedProbability: r.deflatedProbability,
       avgR: r.avgR,
+      avgHoldDays: r.avgHoldDays,
       ...(r.error ? { error: r.error } : {}),
     })),
     equity: result.equity.map((p) => ({ date: p.date, values: p.values.map((v) => (Number.isFinite(v) ? v : null)) })),

@@ -84,3 +84,21 @@ describe('latestSignals', () => {
     expect(out.map((o) => `${o.side}:${o.symbol}`)).toEqual(['sell:TW:B', 'buy:TW:A'])
   })
 })
+
+describe('next-open orders (weekly cards)', () => {
+  it('waits for the next bar and fills at its open', () => {
+    let a = placeOrder(account(), { symbol: 'TW:0050', name: '', side: 'buy', type: 'market', fillAt: 'open', shares: 100, stopLoss: 90, reason: '策略訊號' }, undefined, '2026-11-21T02:00:00Z')
+    expect(a.orders[0].status).toBe('open')
+    expect(a.cash).toBe(100_000)
+    a = updatePrices(a, { 'TW:0050': { price: 104, date: '2026-11-23', open: 101, low: 100, high: 105 } })
+    expect(a.orders[0]).toMatchObject({ status: 'filled', fillPrice: 101 })
+    expect(a.positions[0]).toMatchObject({ shares: 100, stopLoss: 90, openedAt: '2026-11-23' })
+  })
+
+  it('cancels a buy whose stop the open already broke', () => {
+    let a = placeOrder(account(), { symbol: 'TW:0050', name: '', side: 'buy', type: 'market', fillAt: 'open', shares: 100, stopLoss: 90, reason: '' }, undefined, '2026-11-21T02:00:00Z')
+    a = updatePrices(a, { 'TW:0050': { price: 88, date: '2026-11-23', open: 89 } })
+    expect(a.orders[0].status).toBe('cancelled')
+    expect(a.positions).toHaveLength(0)
+  })
+})

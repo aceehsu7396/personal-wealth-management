@@ -1,7 +1,8 @@
 import type { Bar } from '../market/priceHistory'
-import type { BacktestStats, StrategyTemplate } from '../storage/schema'
+import type { BacktestStats, Cadence, StrategyTemplate } from '../storage/schema'
 import { atr, priorHigh, priorLow, rsi, sma } from './indicators'
 import { parseSymbol, resolveParams, STRATEGY_TEMPLATES } from './templates'
+import { cadenceOf, DEFAULT_DECISION_DAY, decisionDateOf, isWeeklyTemplate, WEEKDAY_LABELS, weeklyBars, type WeeklySeries } from './weekly'
 
 // ---------------------------------------------------------------------------
 // Inputs and outputs
@@ -45,6 +46,17 @@ export interface BacktestInput {
   sizing: { mode: SizingMode; riskPercent: number }
   // Daily foreign net buying (shares) per symbol, for the chip template.
   chips?: Record<string, ChipSeries>
+  // Weekly: entries and exits only at the decision day's close (weekly.ts).
+  cadence?: Cadence
+  decisionDay?: number
+}
+
+// When a live check decides (paper trading): the cadence, and today, to
+// tell whether this week's decision day has passed.
+export interface DecisionTiming {
+  cadence?: Cadence
+  decisionDay?: number
+  today?: string
 }
 
 // date → foreign net shares bought that day.
@@ -97,6 +109,12 @@ interface SymbolData {
   closes: number[]
   atr: number[]
   ind: Record<string, number[]>
+  // Weekly cadence: the weeks, and the weekly templates' indicators (one
+  // value per week).
+  wk?: WeeklySeries
+  // Weekly cadence: the previous decision bar before each bar (−1 if none),
+  // so a cross is "since last week's decision", not "since yesterday".
+  prevDecision?: number[]
 }
 
 type Pending = { side: 'buy' | 'sell'; reason: ExitReason; atrAtSignal?: number }
@@ -128,10 +146,21 @@ function rollingFlow(bars: Bar[], chips: ChipSeries | undefined, days: number): 
   return out
 }
 
-function prepare(template: StrategyTemplate, params: Record<string, number>, bars: Bar[], chips?: ChipSeries): SymbolData {
+function prepare(template: StrategyTemplate, params: Record<string, number>, bars: Bar[], chips?: ChipSeries, timing?: DecisionTiming): SymbolData {
   const closes = bars.map((b) => b.close)
   const ind: Record<string, number[]> = {}
-  if (template === 'ma_cross') {
+  const wk = cadenceOf(template, timing?.cadence) === 'weekly' ? weeklyBars(bars, timing?.decisionDay ?? DEFAULT_DECISION_DAY, timing?.today) : undefined
+  const wCloses = wk ? wk.bars.map((b) => b.close) : []
+  if (template === 'weekly_ma' && wk) {
+    ind.fast = sma(wCloses, params.fastWeeks)
+    ind.slow = sma(wCloses, params.slowWeeks)
+  } else if (template === 'weekly_breakout' && wk) {
+    ind.high = priorHigh(wk.bars, params.entryWeeks)
+    ind.low = priorLow(wk.bars, params.exitWeeks)
+  } else if (template === 'weekly_pullback' && wk) {
+    ind.trend = sma(wCloses, params.trendWeeks)
+    ind.rsi = rsi(wCloses, params.rsiWeeks)
+  } else if (template === 'ma_cross') {
     ind.fast = sma(closes, params.fast)
     ind.slow = sma(closes, params.slow)
   } else if (template === 'donchian') {
@@ -144,7 +173,44 @@ function prepare(template: StrategyTemplate, params: Record<string, number>, bar
     ind.flow = rollingFlow(bars, chips, params.flowDays)
     if (params.trendDays > 0) ind.trend = sma(closes, params.trendDays)
   }
-  return { bars, at: new Map(bars.map((b, i) => [b.date, i])), closes, atr: atr(bars), ind }
+  let prevDecision: number[] | undefined
+  if (wk) {
+    prevDecision = []
+    let last = -1
+    for (let i = 0; i < bars.length; i++) {
+      prevDecision.push(last)
+      if (wk.decision[i]) last = i
+    }
+  }
+  return { bars, at: new Map(bars.map((b, i) => [b.date, i])), closes, atr: atr(bars), ind, wk, prevDecision }
+}
+
+// The weekly templates' rules at the close of week j.
+function weeklySignal(template: StrategyTemplate, params: Record<string, number>, d: SymbolData, i: number, pos: Position | undefined): Pending | null {
+  const { ind, wk } = d
+  if (!wk) return null
+  const j = wk.weekOf[i]
+  const c = wk.bars[j].close
+  if (template === 'weekly_ma') {
+    const [f, s, f0, s0] = [ind.fast[j], ind.slow[j], ind.fast[j - 1], ind.slow[j - 1]]
+    if ([f, s, f0, s0].some((v) => v === undefined || Number.isNaN(v))) return null
+    if (!pos && f > s && f0 <= s0) return { side: 'buy', reason: 'signal', atrAtSignal: d.atr[i] }
+    if (pos && f < s) return { side: 'sell', reason: 'signal' }
+  } else if (template === 'weekly_breakout') {
+    if (!pos && c > ind.high[j]) return { side: 'buy', reason: 'signal', atrAtSignal: d.atr[i] }
+    if (pos && c < ind.low[j]) return { side: 'sell', reason: 'signal' }
+  } else if (template === 'weekly_pullback') {
+    const [r, t, t0] = [ind.rsi[j], ind.trend[j], ind.trend[j - 1]]
+    if ([r, t, t0].some((v) => v === undefined || Number.isNaN(v))) return null
+    if (!pos && c > t && t > t0 && r < params.entryBelow) return { side: 'buy', reason: 'signal', atrAtSignal: d.atr[i] }
+    if (pos && (r > params.exitAbove || weeksHeld(d, i, pos) >= params.maxHoldWeeks)) return { side: 'sell', reason: 'signal' }
+  }
+  return null
+}
+
+// Weeks a position has been held, counting the week it was bought in.
+function weeksHeld(d: SymbolData, i: number, pos: Position): number {
+  return d.wk ? d.wk.weekOf[i] - d.wk.weekOf[Math.min(pos.entryBar, i)] + 1 : 0
 }
 
 // Entry/exit rules evaluated at the close of bar i.
@@ -154,10 +220,16 @@ function signal(
   d: SymbolData,
   i: number,
   pos: Position | undefined,
+  // Live readings ask what the rules say now, decision day or not.
+  anyDay = false,
 ): Pending | null {
   const { ind, closes } = d
+  if (d.wk && !anyDay && !d.wk.decision[i]) return null
+  if (isWeeklyTemplate(template)) return weeklySignal(template, params, d, i, pos)
   if (template === 'ma_cross') {
-    const [f, s, f0, s0] = [ind.fast[i], ind.slow[i], ind.fast[i - 1], ind.slow[i - 1]]
+    const before = d.prevDecision ? d.prevDecision[i] : i - 1
+    const [f, s, f0, s0] = [ind.fast[i], ind.slow[i], ind.fast[before], ind.slow[before]]
+    if (before < 0) return null
     if ([f, s, f0, s0].some(Number.isNaN)) return null
     if (!pos && f > s && f0 <= s0) return { side: 'buy', reason: 'signal', atrAtSignal: d.atr[i] }
     if (pos && f < s) return { side: 'sell', reason: 'signal' }
@@ -190,7 +262,12 @@ export function runBacktest(input: BacktestInput): BacktestResult {
   const { template, costs } = input
   const params = resolveParams(template, input.params)
   const symbols = Object.keys(input.data).filter((s) => input.data[s].length > 0)
-  const data = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, input.data[s], input.chips?.[s])]))
+  const timing: DecisionTiming = { cadence: input.cadence, decisionDay: input.decisionDay }
+  const data = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, input.data[s], input.chips?.[s], timing)]))
+  const weekly = cadenceOf(template, input.cadence) === 'weekly'
+  const day = input.decisionDay ?? DEFAULT_DECISION_DAY
+  // Rotations rebalance at the end of each month, or of each week.
+  const periodOf = (date: string) => (weekly ? decisionDateOf(date, day) : monthOf(date))
   const dates = [...new Set(symbols.flatMap((s) => input.data[s].map((b) => b.date)))]
     .filter((d) => d >= input.start && d <= input.end)
     .sort()
@@ -331,9 +408,9 @@ export function runBacktest(input: BacktestInput): BacktestResult {
     result.index.push(index)
     result.invested.push(positions.size > 0)
 
-    if (template === 'momentum_rotation') {
+    if (template === 'momentum_rotation' || template === 'weekly_rotation') {
       const next = dates[t + 1]
-      if (next && monthOf(next) !== monthOf(date)) rotationTarget = rankMomentum(params, data, date)
+      if (next && periodOf(next) !== periodOf(date)) rotationTarget = rankMomentum(params, data, date)
     } else if (!isDca && template !== 'buy_hold') {
       for (const s of symbols) {
         const i = data[s].at.get(date)
@@ -352,14 +429,20 @@ export function runBacktest(input: BacktestInput): BacktestResult {
 
 const TRADING_DAYS_PER_MONTH = 21
 
-// Momentum rotation: top K by N-month return; with the absolute filter on,
-// only positive momentum qualifies (otherwise stay in cash).
+// Momentum rotation: top K by N-month (or N-week) return; with the
+// absolute filter on, only positive momentum qualifies (otherwise stay in
+// cash). The weekly template measures from the close N weeks back.
 function rankMomentum(params: Record<string, number>, data: Record<string, SymbolData>, date: string): string[] {
   const lookback = params.lookbackMonths * TRADING_DAYS_PER_MONTH
   const scored = Object.entries(data)
     .map(([s, d]) => {
       const i = d.at.get(date)
-      if (i === undefined || i < lookback) return null
+      if (i === undefined) return null
+      if (params.lookbackWeeks !== undefined) {
+        const base = d.wk?.bars[d.wk.weekOf[i] - params.lookbackWeeks]
+        return base ? { s, ret: d.closes[i] / base.close - 1 } : null
+      }
+      if (i < lookback) return null
       return { s, ret: d.closes[i] / d.closes[i - lookback] - 1 }
     })
     .filter((x): x is { s: string; ret: number } => x !== null)
@@ -626,11 +709,12 @@ export function latestSignals(
   held: Record<string, { shares: number; openedAt: string }>,
   equity: number,
   chips?: Record<string, ChipSeries>,
+  timing?: DecisionTiming,
 ): SignalSuggestion[] {
   const params = resolveParams(template, rawParams)
   const symbols = Object.keys(data).filter((s) => data[s].length > 0)
   if (symbols.length === 0) return []
-  const prepared = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, data[s], chips?.[s])]))
+  const prepared = Object.fromEntries(symbols.map((s) => [s, prepare(template, params, data[s], chips?.[s], timing)]))
   const out: SignalSuggestion[] = []
   const last = (s: string) => prepared[s].bars[prepared[s].bars.length - 1]
   const stopFor = (s: string) => {
@@ -639,8 +723,10 @@ export function latestSignals(
     return params.atrStop > 0 && a > 0 ? Math.round((last(s).close - params.atrStop * a) * 100) / 100 : undefined
   }
 
-  if (template === 'momentum_rotation') {
+  if (template === 'momentum_rotation' || template === 'weekly_rotation') {
     const date = symbols.map((s) => last(s).date).sort().pop()!
+    const wk = prepared[symbols[0]].wk
+    if (wk && !wk.decision[wk.decision.length - 1]) return out
     const picks = rankMomentum(params, prepared, date)
     for (const s of symbols) {
       const bar = last(s)
@@ -701,6 +787,9 @@ export interface SymbolStatus {
   // ATR(14) at the latest bar, or null before 14 bars.
   atr: number | null
   reading: string
+  // Weekly cadence, before this week's decision day: the day that decides.
+  // Entries and exits wait for it; the reading is how things stand now.
+  decidesOn?: string
 }
 
 const num = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2))
@@ -712,15 +801,31 @@ export function symbolStatus(
   data: Record<string, Bar[]>,
   held: Record<string, { shares: number; openedAt: string }>,
   chips?: Record<string, ChipSeries>,
+  timing?: DecisionTiming,
 ): SymbolStatus[] {
   const params = resolveParams(template, rawParams)
   const symbols = Object.keys(data)
-  const prepared = Object.fromEntries(symbols.filter((s) => data[s].length > 0).map((s) => [s, prepare(template, params, data[s], chips?.[s])]))
+  const prepared = Object.fromEntries(symbols.filter((s) => data[s].length > 0).map((s) => [s, prepare(template, params, data[s], chips?.[s], timing)]))
   const latest = Object.values(prepared).map((d) => d.bars[d.bars.length - 1].date).sort().pop()
+  const rotation = template === 'momentum_rotation' || template === 'weekly_rotation'
   // The full ranking (absolute filter kept), for rotation's places.
-  const ranking = template === 'momentum_rotation' && latest ? rankMomentum({ ...params, topK: symbols.length }, prepared, latest) : []
+  const ranking = rotation && latest ? rankMomentum({ ...params, topK: symbols.length }, prepared, latest) : []
+  const day = timing?.decisionDay ?? DEFAULT_DECISION_DAY
 
+  // Weekly, before the decision day: say where things stand, but entries
+  // and exits wait for the decision day's close.
   return symbols.map((s): SymbolStatus => {
+    const st = readStatus(s)
+    const wk = prepared[s]?.wk
+    if (!wk || wk.decision[wk.decision.length - 1]) return st
+    const decidesOn = decisionDateOf(st.date, day)
+    const when = `${WEEKDAY_LABELS[day]}（${decidesOn.slice(5).replace('-', '/')}）收盤`
+    if (st.state === 'enter') return { ...st, state: 'wait', decidesOn, reading: `${st.reading.replace(/，(進場|買進)$/, '')}；週頻：${when}仍成立才進場` }
+    if (st.state === 'exit') return { ...st, state: 'hold', decidesOn, reading: `${st.reading.replace(/，(出場|賣出)$/, '')}；週頻：${when}仍成立才出場，停損照常` }
+    return { ...st, decidesOn }
+  })
+
+  function readStatus(s: string): SymbolStatus {
     const d = prepared[s]
     if (!d) return { symbol: s, state: 'no_data', date: '', close: NaN, atr: null, reading: '沒有價格資料' }
     const i = d.bars.length - 1
@@ -735,19 +840,58 @@ export function symbolStatus(
     if (template === 'buy_hold') return h ? at('hold', '買進持有：不賣') : at('enter', '買進持有：尚未持有，買進')
     if (template === 'dca') return at('enter', `每月定期定額 ${params.monthlyAmount.toLocaleString()} 元（本月已買就略過）`)
     if (template === 'discretionary') return at('no_data', '自訂文字規則：系統無法自動判斷，請依策略卡規則自行檢查')
-    if (template === 'momentum_rotation') {
+    if (rotation) {
       const place = ranking.indexOf(s)
       const inTop = place >= 0 && place < params.topK
-      const rank = place >= 0 ? `動能排名第 ${place + 1} 名（取前 ${params.topK} 名）` : params.absoluteFilter ? '動能為負或資料不足，不列入排名' : '資料不足，不列入排名'
+      const period = template === 'weekly_rotation' ? `${params.lookbackWeeks} 週` : `${params.lookbackMonths} 個月`
+      const rank = place >= 0 ? `${period}動能排名第 ${place + 1} 名（取前 ${params.topK} 名）` : params.absoluteFilter ? '動能為負或資料不足，不列入排名' : '資料不足，不列入排名'
       if (h) return inTop ? at('hold', `${rank}，續抱`) : at('exit', `${rank}，跌出前段班，賣出`)
       return inTop ? at('enter', `${rank}，買進`) : at('wait', rank)
     }
 
     const entryBar = h ? Math.max(d.bars.findIndex((b) => b.date >= h.openedAt), 0) : 0
     const pos = h ? { shares: h.shares, entryPrice: 0, entryDate: h.openedAt, entryBar, stop: null, cost: 0 } : undefined
-    const order = signal(template, params, d, i, pos)
+    const order = signal(template, params, d, i, pos, true)
     const enter = !h && order?.side === 'buy'
     const exit = !!h && order?.side === 'sell'
+
+    if (isWeeklyTemplate(template) && d.wk) {
+      const j = d.wk.weekOf[i]
+      const wc = d.wk.bars[j].close
+      const weekClose = `週收盤 ${num(wc)}`
+      if (template === 'weekly_ma') {
+        const [f, sl] = [ind.fast[j], ind.slow[j]]
+        if (Number.isNaN(f) || Number.isNaN(sl)) return at('no_data', `資料不足 ${params.slowWeeks} 週，週均線還算不出來`)
+        const fast = `${params.fastWeeks} 週線 ${num(f)}`
+        const slow = `${params.slowWeeks} 週線 ${num(sl)}`
+        if (enter) return at('enter', `${fast} 上穿 ${slow}，進場`)
+        if (exit) return at('exit', `${fast} 跌破 ${slow}，出場`)
+        if (h) return at('hold', `${fast} 在 ${slow} 之上（高 ${gap(sl, f)}），續抱`)
+        return f > sl
+          ? at('wait', `${fast} 已在 ${slow} 之上，但交叉發生在先前；等下一次由下往上穿越`)
+          : at('wait', `${fast} 低於 ${slow}，還差 ${gap(f, sl)} 才會上穿進場`)
+      }
+      if (template === 'weekly_breakout') {
+        const [hi, lo] = [ind.high[j], ind.low[j]]
+        if (Number.isNaN(hi) || Number.isNaN(lo)) return at('no_data', `資料不足 ${params.entryWeeks} 週`)
+        if (enter) return at('enter', `${weekClose} 突破前 ${params.entryWeeks} 週高點 ${num(hi)}，進場`)
+        if (exit) return at('exit', `${weekClose} 跌破前 ${params.exitWeeks} 週低點 ${num(lo)}，出場`)
+        if (h) return at('hold', `出場線（前 ${params.exitWeeks} 週低點）${num(lo)}，離週收盤 ${gap(wc, lo)}，續抱`)
+        return at('wait', `前 ${params.entryWeeks} 週高點 ${num(hi)}，${weekClose} 還差 ${gap(wc, hi)} 才突破`)
+      }
+      if (template === 'weekly_pullback') {
+        const [r, t, t0] = [ind.rsi[j], ind.trend[j], ind.trend[j - 1]]
+        if ([r, t, t0].some((v) => v === undefined || Number.isNaN(v))) return at('no_data', `資料不足 ${params.trendWeeks} 週`)
+        const rs = `週 RSI(${params.rsiWeeks}) ${r.toFixed(0)}`
+        const held = pos ? weeksHeld(d, i, pos) : 0
+        if (enter) return at('enter', `${weekClose} 在上升的 ${params.trendWeeks} 週線之上，${rs} 低於 ${params.entryBelow}，進場`)
+        if (exit) return at('exit', r > params.exitAbove ? `${rs} 高於 ${params.exitAbove}，出場` : `已持有滿 ${params.maxHoldWeeks} 週，出場`)
+        if (h) return at('hold', `${rs}，高於 ${params.exitAbove} 或持有滿 ${params.maxHoldWeeks} 週出場（第 ${held} 週），續抱`)
+        if (wc <= t) return at('wait', `${weekClose} 在 ${params.trendWeeks} 週線 ${num(t)} 之下，不做多`)
+        if (t <= t0) return at('wait', `${params.trendWeeks} 週線走平或下彎，不做多`)
+        return at('wait', `${rs}，要低於 ${params.entryBelow} 才進場`)
+      }
+    }
 
     if (template === 'ma_cross') {
       const [f, sl] = [ind.fast[i], ind.slow[i]]
@@ -790,7 +934,7 @@ export function symbolStatus(
       return at(h ? 'hold' : 'wait', `${lots}${trend}${h ? '，續抱' : '，等轉為買超'}`)
     }
     return at('no_data', '這個範本沒有每日訊號')
-  })
+  }
 }
 
 // ---------------------------------------------------------------------------

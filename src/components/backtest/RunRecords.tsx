@@ -48,6 +48,7 @@ export function RunRecords({ symbols }: { symbols: string[] }) {
     <>
       <td className={`${tdClass} text-xs`}>
         {r.start}～{r.end}
+        {r.cadence === 'weekly' && <span className="ml-1 text-gray-500 dark:text-gray-400">・每週</span>}
       </td>
       <td className={tdClass}>{pct(r.stats.outOfSample?.cagr)}</td>
       <td className={tdClass}>{pct(r.benchmark.outOfSample?.cagr)}</td>

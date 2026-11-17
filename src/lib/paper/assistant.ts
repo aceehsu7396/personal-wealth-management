@@ -7,6 +7,7 @@ import { STOP_ATR_MULTIPLE } from '../research/signals'
 import { allows, type RegimeContext } from '../market/regime'
 import { ENTRY_METHOD_LABELS, METHOD_OF, scanItem, trailingStop, type ScanItem } from '../trades/tradePlan'
 import { formatSymbol } from '../backtest/templates'
+import { cadenceOf, lastDecisionDate, WEEKDAY_LABELS } from '../backtest/weekly'
 import { equityOf } from './paperAccount'
 
 // The paper-trading entry-exit assistant (handbook 10 §7): the linked
@@ -110,7 +111,7 @@ export function assistantItems({ strategy, account, statuses, data, policy, regi
   let cash = account.cash
   const out: AssistantItem[] = []
   for (const st of statuses) {
-    const base = { symbol: st.symbol, date: st.date, close: st.close, reading: st.reading, basis: [] as string[], outcome: 'pending' as const }
+    const base = { symbol: st.symbol, date: st.date, close: st.close, reading: st.reading, basis: [] as string[], outcome: 'pending' as const, ...(st.decidesOn ? { decidesOn: st.decidesOn } : {}) }
     const p = account.positions.find((x) => x.symbol === st.symbol)
     if (p) {
       const stop = p.stopLoss
@@ -290,7 +291,7 @@ export function weeklyReview(account: PaperAccount, today: string): string[] {
 // suggestions not yet acted on, stops to raise or watch, and prices or
 // suggestions that are out of date. Marked 虛擬 to keep them apart from
 // real money.
-export function paperScanItems(accounts: PaperAccount[], strategies: TradingStrategy[], today: string): ScanItem[] {
+export function paperScanItems(accounts: PaperAccount[], strategies: TradingStrategy[], today: string, weeklyDecisionDay = 5): ScanItem[] {
   const out: ScanItem[] = []
   const weekday = ![0, 6].includes(new Date(`${today}T00:00:00Z`).getUTCDay())
   for (const a of accounts) {
@@ -317,7 +318,17 @@ export function paperScanItems(accounts: PaperAccount[], strategies: TradingStra
     if (priced && daysBetween(priced, today) > 3) {
       out.push(scanItem('housekeeping', `${tag}：持倉價格停在 ${priced}，收盤後更新價格`, '更新價格才會觸發停損與限價單', to))
     }
-    if (weekday && (!snap || snap.generatedAt.slice(0, 10) < today)) {
+    const generated = snap?.generatedAt.slice(0, 10) ?? ''
+    if (cadenceOf(card.template, card.cadence) === 'weekly') {
+      // Weekly: once on the decision day (or later that week until done);
+      // other weekdays only the stops, when something is held.
+      const day = card.decisionDay ?? weeklyDecisionDay
+      if (generated < lastDecisionDate(today, day)) {
+        out.push(scanItem('housekeeping', `${tag}：${WEEKDAY_LABELS[day]}收盤後產生本週建議`, '手冊 10 §6.6：週頻策略每週在判斷日檢查一次', to))
+      } else if (weekday && a.positions.length > 0 && generated < today) {
+        out.push(scanItem('housekeeping', `${tag}：收盤後執行例行，檢查停損`, '週頻只在判斷日決定進出場，停損每天照常', to, 'notice'))
+      }
+    } else if (weekday && generated < today) {
       out.push(scanItem('housekeeping', `${tag}：收盤後產生今日建議`, '手冊 10 §7：每個交易日照策略卡檢查一次', to))
     }
   }
@@ -383,9 +394,9 @@ export function explainItem(item: AssistantItem, account: PaperAccount): ItemExp
         todo: '不用下單。不要下移停損：觸及就照規則出場。',
       }
     case 'hold':
-      return { action: `續抱 ${sym}`, numbers: position, todo: '規則沒有出場訊號，什麼都不做。' }
+      return { action: `續抱 ${sym}`, numbers: position, todo: item.decidesOn ? `週頻：出場等 ${item.decidesOn.slice(5).replace('-', '/')} 收盤判斷；停損照常有效。` : '規則沒有出場訊號，什麼都不做。' }
     case 'wait':
-      return { action: `觀望 ${sym}`, numbers: [], todo: '還沒觸發進場條件。' }
+      return { action: `觀望 ${sym}`, numbers: [], todo: item.decidesOn ? `週頻：進場要等 ${item.decidesOn.slice(5).replace('-', '/')} 收盤判斷，今天不下單。` : '還沒觸發進場條件。' }
     case 'no_data':
       return { action: `${sym} 無法判斷`, numbers: [], todo: '價格資料不足，先更新價格或檢查代號。' }
   }
@@ -398,9 +409,11 @@ export function adviceSummary(items: AssistantItem[]): { headline: string; detai
   const pending = items.filter((i) => ['stop_hit', 'exit', 'enter', 'raise_stop'].includes(i.kind) && i.outcome === 'pending').length
   const actionable = parts.length > 0 ? items.filter((i) => ['stop_hit', 'exit', 'enter', 'raise_stop'].includes(i.kind)).length : 0
   const rest = [count('near_stop') > 0 && `接近停損 ${count('near_stop')}`, count('hold') > 0 && `續抱 ${count('hold')}`, count('wait') > 0 && `觀望 ${count('wait')}`, count('no_data') > 0 && `無法判斷 ${count('no_data')}`].filter(Boolean).join('、')
+  const decidesOn = items.find((i) => i.decidesOn)?.decidesOn
+  const weekly = decidesOn ? `週頻：進出場等 ${decidesOn.slice(5).replace('-', '/')} 收盤判斷，今天只檢查停損。` : ''
   return {
     headline: actionable === 0 ? '今天沒有要下單或調整的事' : pending === 0 ? `今天的 ${actionable} 件事都處理完了` : `今天有 ${pending} 件事要處理（${parts.join('、')}）`,
-    detail: rest ? `其餘：${rest}。照規則什麼都不做，也是一種紀律。` : '',
+    detail: [weekly, rest ? `其餘：${rest}。照規則什麼都不做，也是一種紀律。` : ''].filter(Boolean).join(''),
     actionable,
   }
 }

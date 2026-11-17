@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { STRATEGY_TEMPLATES, defaultParams, parseSymbolList, resolveParams } from '../../lib/backtest/templates'
 import { useAppStore } from '../../lib/storage/appStore'
-import type { LibraryTemplate, StrategyTemplate, TradingStrategy } from '../../lib/storage/schema'
+import type { Cadence, LibraryTemplate, StrategyTemplate, TradingStrategy } from '../../lib/storage/schema'
+import { CADENCE_TEMPLATES, DEFAULT_DECISION_DAY, isWeeklyTemplate, WEEKDAY_LABELS } from '../../lib/backtest/weekly'
 import { Field, inputClass, labelClass } from './FormField'
 import { ParamHelp } from '../ParamHelp'
 
@@ -42,9 +43,21 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
   const [suits, setSuits] = useState(entry?.suits ?? '')
   const [riskText, setRiskText] = useState(entry?.risk ?? '')
   const [inCompare, setInCompare] = useState(entry?.inCompare ?? true)
+  const [cadence, setCadence] = useState<Cadence>(start?.cadence ?? 'daily')
+  // 0 = the site-wide setting.
+  const [decisionDay, setDecisionDay] = useState(initial?.decisionDay ?? draft?.decisionDay ?? 0)
+  const globalDay = useAppStore((s) => s.tradingPrefs?.weeklyDecisionDay ?? DEFAULT_DECISION_DAY)
   const [error, setError] = useState<string | null>(null)
 
   const def = STRATEGY_TEMPLATES[template]
+  const weeklyOnly = isWeeklyTemplate(template)
+  const canChoose = CADENCE_TEMPLATES.includes(template)
+  const effective: Cadence = weeklyOnly ? 'weekly' : canChoose ? cadence : 'daily'
+  // Always written out, so switching back to daily clears a saved weekly.
+  const cadenceFields = (withDay: boolean) => ({
+    cadence: effective,
+    ...(withDay ? { decisionDay: effective === 'weekly' && decisionDay > 0 ? decisionDay : undefined } : {}),
+  })
   const watchlist = useAppStore((s) => s.watchlist)
 
   function addFromWatchlist() {
@@ -82,6 +95,7 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
         notes: notes.trim(),
         role: template === 'buy_hold' || template === 'dca' ? 'benchmark' : 'signal',
         inCompare: inCompare && def.backtestable,
+        ...cadenceFields(false),
       })
     }
     if (def.backtestable && list.length === 0) return setError('請填寫至少一個標的')
@@ -98,6 +112,7 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
       exitRules: exitRules.trim(),
       riskPerTradePercent: riskPercent,
       notes: notes.trim(),
+      ...cadenceFields(true),
     })
   }
 
@@ -116,6 +131,32 @@ export function StrategyForm({ initial, draft, defaultRiskPercent, onSubmit, onC
         </select>
       </Field>
       <p className="text-xs text-gray-500 sm:col-span-2 dark:text-gray-400">{def.summary}</p>
+
+      {(weeklyOnly || canChoose) && (
+        <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-2">
+          <Field label="判斷頻率">
+            <select className={inputClass} value={effective} disabled={weeklyOnly} onChange={(e) => setCadence(e.target.value as Cadence)}>
+              <option value="daily">每日收盤判斷</option>
+              <option value="weekly">每週判斷一次（判斷日收盤，下個交易日開盤）</option>
+            </select>
+          </Field>
+          {effective === 'weekly' && !isTemplate && (
+            <Field label="每週判斷日">
+              <select className={inputClass} value={decisionDay} onChange={(e) => setDecisionDay(Number(e.target.value))}>
+                <option value={0}>依設定（{WEEKDAY_LABELS[globalDay]}）</option>
+                {Object.entries(WEEKDAY_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}收盤
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+          <p className="text-xs text-gray-500 sm:col-span-2 dark:text-gray-400">
+            {weeklyOnly ? '週線範本一律每週判斷。' : '每週判斷時，進出場只在判斷日收盤決定；'}停損每天照常觸發。說明見手冊 10 §6.6。
+          </p>
+        </div>
+      )}
 
       {def.params.map((param) => (
         <div key={param.key}>

@@ -111,6 +111,20 @@ export const PRESET_SCREENS: PresetScreen[] = [
     },
   },
   {
+    id: 'weekly-momentum',
+    name: '週動能',
+    summary: '近 3 個月漲最多的前 10%，近 1 個月仍上漲、成交金額 2 億以上：週頻中短期波段（週線突破、每週動能輪動）的候選清單。',
+    handbook: '10',
+    screen: {
+      filters: [{ field: 'ret1m', min: 0 }, { field: 'tradeValue', min: 2 }],
+      kind: 'stock',
+      industry: null,
+      sortBy: 'ret3m',
+      sortDesc: true,
+      topPercent: 10,
+    },
+  },
+  {
     id: 'income',
     name: '高股息品質',
     summary: '殖利率高、營收沒有衰退、本益比合理：避開「高息但本業在走下坡」的陷阱。',

@@ -1,21 +1,25 @@
 import type { BacktestRun, PaperAccount, StrategyStatus, TradingStrategy } from '../storage/schema'
 import { backtestPasses } from '../calculations/strategyProgress'
 import { STRATEGY_STATUS_LABELS, STRATEGY_TEMPLATES, formatSymbol, resolveParams } from './templates'
+import { cadenceOf } from './weekly'
 
 // Strategy cards sorted into groups (by symbol, status or template), so a
 // list that grows with every comparison stays readable; plus duplicate
 // detection and cards worth retiring.
 
-export type GroupBy = 'symbol' | 'status' | 'template'
+export type GroupBy = 'symbol' | 'status' | 'template' | 'cadence'
 
-export const GROUP_BY_LABELS: Record<GroupBy, string> = { symbol: '標的', status: '狀態', template: '範本' }
+export const GROUP_BY_LABELS: Record<GroupBy, string> = { symbol: '標的', status: '狀態', template: '範本', cadence: '頻率' }
 
-type CardLike = Pick<TradingStrategy, 'template' | 'params' | 'symbols'>
+type CardLike = Pick<TradingStrategy, 'template' | 'params' | 'symbols' | 'cadence' | 'decisionDay'>
 
 const symbolSet = (symbols: string[]) => [...symbols].sort().join(',')
 
-// Same template, parameters and symbols: the same strategy.
-export const cardKey = (c: CardLike) => `${c.template}|${JSON.stringify(resolveParams(c.template, c.params))}|${symbolSet(c.symbols)}`
+// Same template, parameters, symbols and cadence: the same strategy.
+export const cardKey = (c: CardLike) => {
+  const weekly = cadenceOf(c.template, c.cadence) === 'weekly' ? `|weekly${c.decisionDay ?? ''}` : ''
+  return `${c.template}|${JSON.stringify(resolveParams(c.template, c.params))}|${symbolSet(c.symbols)}${weekly}`
+}
 
 export function findDuplicate(strategies: TradingStrategy[], draft: CardLike): TradingStrategy | undefined {
   const key = cardKey(draft)
@@ -73,6 +77,7 @@ export function groupCards(strategies: TradingStrategy[], by: GroupBy, ctx: Card
 
   const keyOf = (c: TradingStrategy): { key: string; label: string; order: number } => {
     if (by === 'symbol') return { key: symbolSet(c.symbols), label: symbolLabel([...c.symbols].sort(), ctx.names), order: c.symbols.length > 1 ? 1 : 0 }
+    if (by === 'cadence') return cadenceOf(c.template, c.cadence) === 'weekly' ? { key: 'weekly', label: '每週判斷', order: 1 } : { key: 'daily', label: '每日判斷', order: 0 }
     if (by === 'template') return { key: c.template, label: STRATEGY_TEMPLATES[c.template].label, order: Object.keys(STRATEGY_TEMPLATES).indexOf(c.template) }
     if (c.status === 'dev') return passed(c) ? { key: 'dev-passed', label: '開發中：回測通過', order: 2 } : { key: 'dev', label: '開發中：未通過或未回測', order: 3 }
     return { key: c.status, label: STRATEGY_STATUS_LABELS[c.status], order: STATUS_ORDER.indexOf(c.status) }

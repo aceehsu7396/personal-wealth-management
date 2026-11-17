@@ -1,15 +1,30 @@
-import { rsi, sma } from '../backtest/indicators'
+import { priorHigh as priorHighs, rsi, sma } from '../backtest/indicators'
+import { DEFAULT_DECISION_DAY, weeklyBars } from '../backtest/weekly'
 import type { EntryMethod } from '../storage/schema'
 import type { Bar } from '../market/priceHistory'
 
 // Entry-condition monitoring (handbook 10 §6.4): three rules checked on
-// the latest daily bar of each watched symbol. A signal only suggests
-// drafting a trade plan; the plan and the pre-trade checklist still decide.
+// the latest daily bar of each watched symbol, and two weekly ones on the
+// latest completed week (§6.6), which stand until the next decision day.
+// A signal only suggests drafting a trade plan; the plan and the
+// pre-trade checklist still decide.
 
-export type EntrySignalKind = 'breakout' | 'pullback' | 'oversold'
+export type EntrySignalKind = 'breakout' | 'pullback' | 'oversold' | 'weekly_breakout' | 'weekly_pullback'
 
-export const ENTRY_SIGNAL_LABELS: Record<EntrySignalKind, string> = { breakout: '突破', pullback: '拉回', oversold: 'RSI 超賣' }
-export const ENTRY_SIGNAL_METHOD: Record<EntrySignalKind, EntryMethod> = { breakout: 'breakout', pullback: 'pullback', oversold: 'mean_reversion' }
+export const ENTRY_SIGNAL_LABELS: Record<EntrySignalKind, string> = {
+  breakout: '突破',
+  pullback: '拉回',
+  oversold: 'RSI 超賣',
+  weekly_breakout: '週線突破',
+  weekly_pullback: '週線拉回',
+}
+export const ENTRY_SIGNAL_METHOD: Record<EntrySignalKind, EntryMethod> = {
+  breakout: 'breakout',
+  pullback: 'pullback',
+  oversold: 'mean_reversion',
+  weekly_breakout: 'breakout',
+  weekly_pullback: 'pullback',
+}
 
 export const ENTRY_RULES = {
   breakoutDays: 55,
@@ -19,6 +34,10 @@ export const ENTRY_RULES = {
   pullbackRsiHigh: 50,
   slopeSessions: 20,
   oversoldRsi: 10,
+  breakoutWeeks: 20,
+  trendWeeks: 30,
+  pullbackRsiWeeks: 3,
+  pullbackRsiBelow: 30,
   maxSymbols: 15,
 } as const
 
@@ -31,7 +50,7 @@ export interface EntrySignal {
 
 const at = (xs: number[], i: number) => (i >= 0 && Number.isFinite(xs[i]) ? xs[i] : NaN)
 
-export function entrySignals(bars: Bar[]): EntrySignal[] {
+export function entrySignals(bars: Bar[], weekly: { decisionDay?: number; today?: string } = {}): EntrySignal[] {
   const n = bars.length
   if (n < 210) return []
   const closes = bars.map((b) => b.close)
@@ -58,5 +77,24 @@ export function entrySignals(bars: Bar[]): EntrySignal[] {
 
   const rsi2 = at(r2, i)
   if (last.close > at(s200, i) && rsi2 < R.oversoldRsi) out.push({ kind: 'oversold', date: last.date, close: last.close, detail: `在 200 日線之上，RSI(2) ${rsi2.toFixed(0)}` })
+  out.push(...weeklyEntrySignals(bars, weekly.decisionDay ?? DEFAULT_DECISION_DAY, weekly.today))
+  return out
+}
+
+function weeklyEntrySignals(bars: Bar[], day: number, today?: string): EntrySignal[] {
+  const w = weeklyBars(bars, day, today)
+  // The latest completed week: this one once its decision day closed.
+  const j = w.decision[w.decision.length - 1] ? w.bars.length - 1 : w.bars.length - 2
+  if (j < ENTRY_RULES.trendWeeks + 1) return []
+  const closes = w.bars.map((b) => b.close)
+  const week = w.bars[j]
+  const out: EntrySignal[] = []
+  const high = at(priorHighs(w.bars, ENTRY_RULES.breakoutWeeks), j)
+  if (week.close > high) out.push({ kind: 'weekly_breakout', date: week.date, close: week.close, detail: `週收盤 ${week.close} 突破前 ${ENTRY_RULES.breakoutWeeks} 週高點 ${high}` })
+  const trend = sma(closes, ENTRY_RULES.trendWeeks)
+  const r = at(rsi(closes, ENTRY_RULES.pullbackRsiWeeks), j)
+  if (week.close > at(trend, j) && at(trend, j) > at(trend, j - 1) && r < ENTRY_RULES.pullbackRsiBelow) {
+    out.push({ kind: 'weekly_pullback', date: week.date, close: week.close, detail: `${ENTRY_RULES.trendWeeks} 週線向上，週 RSI(${ENTRY_RULES.pullbackRsiWeeks}) ${r.toFixed(0)}` })
+  }
   return out
 }

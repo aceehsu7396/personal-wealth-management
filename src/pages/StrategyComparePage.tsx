@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
-import type { BacktestStats, CompareEntry, StrategyComparison, StrategyTemplate } from '../lib/storage/schema'
+import type { BacktestStats, Cadence, CompareEntry, StrategyComparison, StrategyTemplate } from '../lib/storage/schema'
 import { DeepDive, type RunDraft } from '../components/backtest/DeepDive'
 import { CsvImport } from '../components/backtest/CsvImport'
 import { ParamHelp } from '../components/ParamHelp'
@@ -17,6 +17,7 @@ import { BACKTEST_SETTING_HELP, STRATEGY_TEMPLATES, defaultParams, formatSymbol,
 import { calmarOf } from '../lib/backtest/passRule'
 import { compareEntriesOf, useLibrary, withCompareSet } from '../lib/backtest/library'
 import { findDuplicate } from '../lib/backtest/cardGroups'
+import { DEFAULT_DECISION_DAY, isWeeklyTemplate, WEEKDAY_LABELS } from '../lib/backtest/weekly'
 import { RunRecords } from '../components/backtest/RunRecords'
 import { thesisForCode } from '../lib/research/strategyLink'
 import { VERDICT_LABELS } from '../lib/calculations/thesisScoring'
@@ -39,6 +40,10 @@ const YEARS = 5
 const pct = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(1)}%`)
 const num = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(2))
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`
+// Weekly rows say so in their name.
+const entryLabel = (e: CompareEntry) => (e.cadence === 'weekly' && !isWeeklyTemplate(e.template) ? `${e.label}（週）` : e.label)
+// Calendar days held, in weeks once past two.
+const holdText = (days: number) => (days >= 14 ? `${(days / 7).toFixed(1)} 週` : `${Math.round(days)} 天`)
 const paramText = (e: CompareEntry) => STRATEGY_TEMPLATES[e.template].params.map((p) => `${p.label} ${e.params[p.key] ?? p.default}`).join('、') || '—'
 const sameEntries = (a: CompareEntry[], b: CompareEntry[]) => JSON.stringify(a) === JSON.stringify(b)
 // A comparison's symbols are saved joined: "TW:0050,TW:2330".
@@ -72,6 +77,7 @@ export function StrategyComparePage() {
   const today = todayIsoDate()
   const linked = theses.find((t) => t.id === search.get('thesis'))
   const strategies = useAppStore((s) => s.tradingStrategies)
+  const weeklyDecisionDay = useAppStore((s) => s.tradingPrefs?.weeklyDecisionDay ?? DEFAULT_DECISION_DAY)
   // From a strategy card (範本庫「套用並比較」、策略卡「下一步」): its own
   // rules on its symbols, against the benchmarks.
   const fromCard = strategies.find((s) => s.id === search.get('strategy') && STRATEGY_TEMPLATES[s.template].backtestable)
@@ -88,7 +94,9 @@ export function StrategyComparePage() {
   // until saved back. Rotation runs only on two or more symbols.
   const defaults = compareEntriesOf(library, 2)
   const [entries, setEntries] = useState<CompareEntry[]>(() => {
-    let list = fromCard ? [{ key: cardKey, label: `策略卡：${fromCard.name}`, template: fromCard.template, params: resolveParams(fromCard.template, fromCard.params), role: 'signal' as const }, ...defaults] : defaults
+    let list = fromCard
+      ? [{ key: cardKey, label: `策略卡：${fromCard.name}`, template: fromCard.template, params: resolveParams(fromCard.template, fromCard.params), role: 'signal' as const, cadence: fromCard.cadence ?? 'daily' }, ...defaults]
+      : defaults
     // From the screener: ?template=momentum_rotation adds it when missing.
     const linkedTemplate = search.get('template') as StrategyTemplate | null
     if (linkedTemplate && STRATEGY_TEMPLATES[linkedTemplate]?.backtestable && !list.some((e) => e.template === linkedTemplate))
@@ -102,6 +110,10 @@ export function StrategyComparePage() {
   const [sizing, setSizing] = useState<SizingMode>('equal')
   const [risk, setRisk] = useState(Math.min(fromCard?.riskPerTradePercent ?? policy.riskPerTradePercent, policy.riskPerTradePercent))
   const [oos, setOos] = useState(30)
+  // The daily templates' cadence for this run; the weekly templates and a
+  // card's own row keep theirs.
+  const [cadence, setCadence] = useState<Cadence>(search.get('cadence') === 'weekly' ? 'weekly' : 'daily')
+  const [decisionDay, setDecisionDay] = useState(fromCard?.decisionDay ?? weeklyDecisionDay)
   const [dive, setDive] = useState<string | null>(null)
   const [savedDives, setSavedDives] = useState<string[]>([])
   const [start, setStart] = useState(isoDaysAgo(today, YEARS))
@@ -155,7 +167,7 @@ export function StrategyComparePage() {
       await new Promise((r) => setTimeout(r, 0))
       const result = runComparison({
         entries: active,
-        base: { data: source.data, chips: source.chips, start, end, initialCapital: capital, costs: marketCosts(discount, usFee), sizing: { mode: sizing, riskPercent: risk } },
+        base: { data: source.data, chips: source.chips, start, end, initialCapital: capital, costs: marketCosts(discount, usFee), sizing: { mode: sizing, riskPercent: risk }, cadence, decisionDay },
         oosFraction: oos / 100,
         maxDrawdownLimitPercent: policy.maxDrawdownTolerancePercent,
         priorTrials: priorTrialsFor(symbol, comparisons),
@@ -173,6 +185,7 @@ export function StrategyComparePage() {
         round: isDefault ? 0 : comparisons.filter((c) => runIds.includes(c.id) && c.round > 0).length + 1,
         trials: result.trials,
         summary: summarizeComparison(result.rows),
+        ...(result.rows.some((r) => r.entry.cadence === 'weekly') ? { decisionDay } : {}),
         ...toSavedRows(result),
       })
       setRunIds((ids) => [...ids, id])
@@ -193,8 +206,9 @@ export function StrategyComparePage() {
     const codes = c.symbol.split(',').map((x) => x.replace(/^TW:/, '')).join('、')
     const benchIndex = c.rows.findIndex((r) => r.entry.template === 'buy_hold')
     const benchmark = benchIndex >= 0 ? c.rows[benchIndex].stats : null
+    const weekly = row.entry.cadence === 'weekly'
     const draft = {
-      name: `${row.entry.label}・${codes}`,
+      name: `${entryLabel(row.entry)}・${codes}`,
       template: row.entry.template,
       params: row.entry.params,
       symbols: c.symbol.split(','),
@@ -204,6 +218,7 @@ export function StrategyComparePage() {
       riskPerTradePercent: policy.riskPerTradePercent,
       status: 'dev',
       notes: `由 ${c.createdAt.slice(0, 10)} 的策略比較建立：${row.verdictReason || c.summary.headline}`,
+      ...(weekly ? { cadence: 'weekly' as const, ...(c.decisionDay ? { decisionDay: c.decisionDay } : {}) } : {}),
     } as const
     // The same template, parameters and symbols already have a card: the
     // run goes there instead of a second card.
@@ -212,7 +227,8 @@ export function StrategyComparePage() {
     if (same) setReused((m) => ({ ...m, [row.entry.key]: same.name }))
     addBacktestRun({
       strategyId: id,
-      label: `${row.entry.label}・${codes}（策略比較）`,
+      label: `${entryLabel(row.entry)}・${codes}（策略比較）`,
+      ...(weekly ? { cadence: 'weekly' as const, decisionDay: c.decisionDay ?? DEFAULT_DECISION_DAY } : {}),
       template: row.entry.template,
       params: row.entry.params,
       symbols: c.symbol.split(','),
@@ -241,7 +257,8 @@ export function StrategyComparePage() {
       id = made
     }
     const name = strategies.find((x) => x.id === id)?.name ?? row.entry.label
-    addBacktestRun({ ...run, strategyId: id, label: `${name}（深入檢驗）` })
+    const weekly = row.entry.cadence === 'weekly' ? { cadence: 'weekly' as const, decisionDay: c.decisionDay ?? DEFAULT_DECISION_DAY } : {}
+    addBacktestRun({ ...run, ...weekly, strategyId: id, label: `${name}（深入檢驗）` })
     setSavedDives((l) => [...l, `${c.id}:${row.entry.key}`])
   }
 
@@ -276,6 +293,8 @@ export function StrategyComparePage() {
             initialCapital: current.initialCapital,
             costs: marketCosts(discount, usFee),
             sizing: { mode: sizing, riskPercent: risk },
+            cadence: diveRow.entry.cadence,
+            decisionDay: current.decisionDay,
           }
         : null,
     [current, diveRow, loaded, discount, usFee, sizing, risk],
@@ -339,6 +358,30 @@ export function StrategyComparePage() {
           <Field label="本金">
             <input type="number" className={inputClass} value={capital} min={10000} step={10000} onChange={(e) => setCapital(Number(e.target.value) || 0)} />
           </Field>
+        </div>
+        <div className="mt-4 flex flex-wrap items-end gap-4">
+          <div className="w-56">
+            <Field label="判斷頻率（日線範本）">
+              <select className={inputClass} value={cadence} onChange={(e) => setCadence(e.target.value as Cadence)}>
+                <option value="daily">每日收盤判斷</option>
+                <option value="weekly">每週判斷一次</option>
+              </select>
+            </Field>
+          </div>
+          <div className="w-40">
+            <Field label="每週判斷日">
+              <select className={inputClass} value={decisionDay} onChange={(e) => setDecisionDay(Number(e.target.value))}>
+                {Object.entries(WEEKDAY_LABELS).map(([k, label]) => (
+                  <option key={k} value={k}>
+                    {label}收盤
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <p className="max-w-md pb-1 text-xs text-gray-500 dark:text-gray-400">
+            週線範本（週線趨勢、週線突破、週線拉回、每週動能輪動）一律每週判斷；選「每週」時，日線範本也改成只在判斷日收盤決定進出場、下個交易日開盤成交，停損每天照常。
+          </p>
         </div>
         <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
           {thesis ? (
@@ -532,7 +575,7 @@ export function StrategyComparePage() {
                       <tr key={r.entry.key} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
                         <td className="w-64 min-w-56 py-1.5 pr-3 align-top text-gray-700 dark:text-gray-300">
                           <div className="font-medium text-gray-900 dark:text-gray-100">
-                            {r.entry.label}
+                            {entryLabel(r.entry)}
                             {r.entry.role === 'benchmark' && !r.entry.label.includes('基準') && <span className="ml-1 text-xs font-normal text-gray-500">（基準）</span>}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">{paramText(r.entry)}</div>
@@ -547,7 +590,10 @@ export function StrategyComparePage() {
                             <td className={tdClass}>{pct(s.maxDrawdown)}</td>
                             <td className={tdClass}>{num(s.sharpe)}</td>
                             <td className={tdClass}>{num(calmarOf(s))}</td>
-                            <td className={tdClass}>{s.trades}</td>
+                            <td className={tdClass}>
+                              {s.trades}
+                              {r.avgHoldDays != null && <div className="text-[11px] text-gray-500 dark:text-gray-400">平均持有 {holdText(r.avgHoldDays)}</div>}
+                            </td>
                             <td className={tdClass}>{s.winRate === null ? '—' : pct(s.winRate)}</td>
                             <td className={tdClass} title={r.verdictReason}>
                               {r.passed === null ? '—' : r.passed ? <Badge tone="good">通過</Badge> : <Badge tone="warn">未通過</Badge>}
@@ -589,7 +635,7 @@ export function StrategyComparePage() {
               (diveInput ? (
                 <DeepDive
                   key={`${current.id}:${diveRow.entry.key}`}
-                  label={diveRow.entry.label}
+                  label={entryLabel(diveRow.entry)}
                   input={diveInput}
                   oosFraction={oos / 100}
                   policy={policy}
@@ -613,7 +659,7 @@ export function StrategyComparePage() {
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">虛線為基準；數字見上表。</p>
             <div className="mt-3">
               <CompareChart
-                series={current.rows.map((r) => ({ key: r.entry.key, label: r.entry.label, benchmark: r.entry.role === 'benchmark' }))}
+                series={current.rows.map((r) => ({ key: r.entry.key, label: entryLabel(r.entry), benchmark: r.entry.role === 'benchmark' }))}
                 points={current.equity}
                 oosStart={current.outOfSampleStart}
               />

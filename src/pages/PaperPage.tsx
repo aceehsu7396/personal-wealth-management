@@ -12,7 +12,8 @@ import {
   type Quote,
 } from '../lib/paper/paperAccount'
 import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList } from '../lib/backtest/templates'
-import { PAPER_RULES, liveGate } from '../lib/calculations/strategyProgress'
+import { liveGate, paperRulesFor } from '../lib/calculations/strategyProgress'
+import { cadenceOf, DEFAULT_DECISION_DAY, WEEKDAY_LABELS } from '../lib/backtest/weekly'
 import { orderChecks, resolveItem } from '../lib/paper/assistant'
 import { adviseAccount, fetchQuotes, priceSymbols } from '../lib/paper/routine'
 import { useJourney } from '../lib/useJourney'
@@ -134,6 +135,12 @@ export function PaperPage() {
   const today = todayIsoDate()
   const account = accounts.find((a) => a.id === selectedId)
   const strategy = strategies.find((s) => s.id === account?.strategyId)
+  const weeklyDecisionDay = useAppStore((s) => s.tradingPrefs?.weeklyDecisionDay)
+  // Weekly cards decide at the decision day's close and fill at the next
+  // open, as in the backtest (handbook 10 §6.6).
+  const weekly = !!strategy && cadenceOf(strategy.template, strategy.cadence) === 'weekly'
+  const decisionDay = strategy?.decisionDay ?? weeklyDecisionDay ?? DEFAULT_DECISION_DAY
+  const rules = paperRulesFor(strategy)
   const current = () => useAppStore.getState().paperAccounts.find((a) => a.id === account?.id)!
 
   function save(next: PaperAccount) {
@@ -176,7 +183,7 @@ export function PaperPage() {
     if (!account) throw new Error('沒有選取帳戶')
     {
       let quote: Quote | undefined
-      if (input.type === 'market') {
+      if (input.type === 'market' && input.fillAt !== 'open') {
         if (account.market === 'TW') quote = (await fetchQuotes([input.symbol], today, setBusy))[input.symbol]
         else {
           // US prices are typed in: the order form's price, or the price
@@ -203,6 +210,7 @@ export function PaperPage() {
         name: account?.positions.find((p) => p.symbol === item.symbol)?.name ?? '',
         side: item.side ?? 'buy',
         type: 'market',
+        ...(weekly ? { fillAt: 'open' as const } : {}),
         shares,
         stopLoss: item.side === 'buy' ? stopLoss : undefined,
         reason: `策略訊號：${item.reading}${modified ? '（修改股數或停損）' : ''}`,
@@ -231,7 +239,7 @@ export function PaperPage() {
   async function makeAdvice() {
     if (!account || !strategy) return
     await guarded('計算今日建議…', async () => {
-      save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy }))
+      save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay }))
     })
   }
 
@@ -285,7 +293,7 @@ export function PaperPage() {
         title="虛擬帳戶"
         summary={
           <>
-            用虛擬資金照策略卡下單，成本與回測相同。連結策略卡的帳戶操作滿 {PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆成交，就完成行動路線 4.3。說明見手冊{' '}
+            用虛擬資金照策略卡下單，成本與回測相同。連結策略卡的帳戶操作滿 {rules.months} 個月、{rules.fills} 筆成交{weekly ? `（週頻卡，每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤判斷、下個交易日開盤成交）` : ''}，就完成行動路線 4.3。說明見手冊{' '}
             <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
               10 §7
             </Link>
@@ -295,7 +303,7 @@ export function PaperPage() {
         action={
           showAccount ? (
             <button type="button" disabled={busy !== null || (canSignal && regimeLoading)} onClick={() => void (canSignal ? makeAdvice() : refreshPrices())} className={primaryButton}>
-              {canSignal ? '產生今日建議' : '更新價格'}
+              {canSignal ? (weekly ? '產生本週建議' : '產生今日建議') : '更新價格'}
             </button>
           ) : undefined
         }
@@ -356,8 +364,8 @@ export function PaperPage() {
             />
             <StatCard
               label="4.3 進度"
-              value={`${Math.min(stats.months, PAPER_RULES.months)}/${PAPER_RULES.months} 月`}
-              hint={`${Math.min(stats.fills, PAPER_RULES.fills)}/${PAPER_RULES.fills} 筆成交${account.strategyId ? '' : '（需連結策略卡）'}`}
+              value={`${Math.min(stats.months, rules.months)}/${rules.months} 月`}
+              hint={`${Math.min(stats.fills, rules.fills)}/${rules.fills} 筆成交${account.strategyId ? '' : '（需連結策略卡）'}`}
             />
           </div>
 
@@ -376,7 +384,11 @@ export function PaperPage() {
                 </button>
               )}
               <span className="text-xs text-gray-600 dark:text-gray-400">
-                {canSignal ? '每天收盤後：先更新價格（觸發停損與限價單），再按頁首「產生今日建議」。' : '每天收盤後按頁首「更新價格」，觸發停損與限價單。'}
+                {canSignal && weekly
+                  ? `每天收盤後更新價格（觸發停損）；每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤後再按頁首「產生本週建議」，下單在下個交易日開盤成交。`
+                  : canSignal
+                    ? '每天收盤後：先更新價格（觸發停損與限價單），再按頁首「產生今日建議」。'
+                    :'每天收盤後按頁首「更新價格」，觸發停損與限價單。'}
               </span>
             </div>
 
@@ -529,7 +541,7 @@ export function PaperPage() {
                 <ul className="mt-1 space-y-1 text-sm">
                   {openOrders.map((o) => (
                     <li key={o.id} className="flex flex-wrap items-center gap-3 text-gray-700 dark:text-gray-300">
-                      {o.side === 'buy' ? '買進' : '賣出'} {formatSymbol(o.symbol)} {o.shares} 股・{o.type === 'limit' ? '限價' : '停損'} {o.price}
+                      {o.side === 'buy' ? '買進' : '賣出'} {formatSymbol(o.symbol)} {o.shares} 股・{o.type === 'market' ? '市價，下個交易日開盤成交' : o.type === 'limit' ? '限價' : '停損'} {o.price}
                       <span className="text-xs text-gray-500 dark:text-gray-400">{o.createdAt.slice(0, 10)}</span>
                       <button type="button" className="text-xs text-gray-600 hover:underline dark:text-gray-400" onClick={() => save(cancelOrder(account, o.id))}>
                         取消

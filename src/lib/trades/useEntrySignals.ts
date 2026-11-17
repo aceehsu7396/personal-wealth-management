@@ -21,6 +21,7 @@ export function useEntrySignals(): { items: WatchedSignal[]; loading: boolean } 
   const watchlist = useAppStore((s) => s.watchlist)
   const theses = useAppStore((s) => s.stockTheses)
   const strategies = useAppStore((s) => s.tradingStrategies)
+  const decisionDay = useAppStore((s) => s.tradingPrefs?.weeklyDecisionDay)
   const targets = useMemo(() => {
     const out = new Map<string, Omit<WatchedSignal, 'signals'>>()
     const add = (symbol: string, name: string, extra: Partial<WatchedSignal> = {}) => {
@@ -48,7 +49,7 @@ export function useEntrySignals(): { items: WatchedSignal[]; loading: boolean } 
       for (const k of key.split(',')) {
         const [market, ticker] = k.split('|') as ['TW' | 'US', string]
         const bars = await yearBars(ticker, market, today)
-        out[k] = bars ? entrySignals(bars) : []
+        out[k] = bars ? entrySignals(bars, { decisionDay, today }) : []
       }
       if (alive) {
         setSignals(out)
@@ -58,7 +59,7 @@ export function useEntrySignals(): { items: WatchedSignal[]; loading: boolean } 
     return () => {
       alive = false
     }
-  }, [key])
+  }, [key, decisionDay])
 
   return { items: targets.map((t) => ({ ...t, signals: signals[`${t.market}|${t.ticker}`] ?? [] })), loading }
 }

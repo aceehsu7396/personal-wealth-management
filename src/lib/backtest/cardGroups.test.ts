@@ -77,3 +77,25 @@ describe('card groups', () => {
     expect(names).toEqual({ 'TW:2330': '台積電', 'TW:2317': '鴻海', 'US:AAPL': 'Apple' })
   })
 })
+
+describe('cadence in card keys', () => {
+  it('tells a weekly card from a daily one with the same rules', () => {
+    const base = { template: 'ma_cross' as const, params: {}, symbols: ['TW:2330'] }
+    expect(cardKey(base)).not.toBe(cardKey({ ...base, cadence: 'weekly' }))
+    expect(cardKey(base)).toBe(cardKey({ ...base, cadence: 'daily' }))
+    expect(cardKey({ template: 'weekly_ma', params: {}, symbols: ['TW:2330'] })).toContain('weekly')
+  })
+})
+
+describe('grouping by cadence', () => {
+  it('puts weekly cards apart from daily ones', () => {
+    const daily = card('a', ['TW:2330'])
+    const weekly = card('b', ['TW:2330'], 'dev', { cadence: 'weekly' })
+    const wt = card('c', ['TW:0050'], 'dev', { template: 'weekly_breakout' })
+    const groups = groupCards([daily, weekly, wt], 'cadence', { runs: [], accounts: [], names: {} })
+    expect(groups.map((g) => [g.label, g.cards.length])).toEqual([
+      ['每日判斷', 1],
+      ['每週判斷', 2],
+    ])
+  })
+})

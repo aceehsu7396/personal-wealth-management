@@ -13,6 +13,7 @@ export function PaperRoutine() {
   const accounts = useAppStore((s) => s.paperAccounts)
   const strategies = useAppStore((s) => s.tradingStrategies)
   const replacePaperAccount = useAppStore((s) => s.replacePaperAccount)
+  const weeklyDecisionDay = useAppStore((s) => s.tradingPrefs?.weeklyDecisionDay)
   const { policy } = useJourney()
   // Suggestions use the regime's stop width and multiplier: wait for it.
   const { ctx: regime, loading: regimeLoading } = useRegime()
@@ -33,6 +34,7 @@ export function PaperRoutine() {
           regime,
           today: todayIsoDate(),
           onStep: setStep,
+          weeklyDecisionDay,
           latest: (id) => useAppStore.getState().paperAccounts.find((a) => a.id === id)!,
           save: replacePaperAccount,
         }),

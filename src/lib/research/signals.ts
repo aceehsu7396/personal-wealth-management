@@ -144,6 +144,22 @@ export function technicalSignals(t: TechnicalSnapshot): ObservedSignal[] {
       out.push({ key: 'rsi', tone: 'neutral', label: `RSI ${t.rsi14.toFixed(0)}：中性`, detail: '介於 30～70' })
     }
   }
+  const w = t.weekly
+  if (w && w.sma10w !== null && w.sma30w !== null) {
+    const up = w.sma10w > w.sma30w && w.sma30wRising === true
+    const down = w.sma10w < w.sma30w && w.sma30wRising === false
+    const parts = [
+      `10 週線 ${w.sma10w}${w.sma10w > w.sma30w ? '在' : '低於'} 30 週線 ${w.sma30w}，30 週線${w.sma30wRising ? '向上' : '走平或向下'}`,
+      w.rsi3w !== null ? `週 RSI(3) ${w.rsi3w.toFixed(0)}` : null,
+      w.high20w !== null ? (t.close > w.high20w ? `已突破前 20 週高點 ${w.high20w}` : `離前 20 週高點 ${w.high20w} 還差 ${pct(gap(t.close, w.high20w))}`) : null,
+    ]
+    out.push({
+      key: 'weekly',
+      tone: up ? 'bull' : down ? 'bear' : 'neutral',
+      label: up ? '週線多頭（週頻）' : down ? '週線空頭（週頻）' : '週線整理（週頻）',
+      detail: parts.filter(Boolean).join('；'),
+    })
+  }
   if (t.ret12m !== null || t.ret6m !== null) {
     const main = t.ret12m ?? t.ret6m!
     const parts = [t.ret6m !== null ? `近 6 個月 ${pct(t.ret6m)}` : null, t.ret12m !== null ? `近 12 個月 ${pct(t.ret12m)}` : null]

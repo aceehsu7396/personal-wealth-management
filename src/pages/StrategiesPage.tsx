@@ -6,7 +6,8 @@ import { StrategyCardList } from '../components/strategy/StrategyCardList'
 import { SimGuide } from '../components/SimGuide'
 import { useAppStore } from '../lib/storage/appStore'
 import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList, resolveParams } from '../lib/backtest/templates'
-import { PAPER_RULES } from '../lib/calculations/strategyProgress'
+import { PAPER_RULES, WEEKLY_PAPER_RULES } from '../lib/calculations/strategyProgress'
+import { cadenceOf } from '../lib/backtest/weekly'
 import { PageHeader, primaryButton } from '../components/ui'
 import { StrategyForm, type StrategyFormValues, type TemplateFormValues } from '../components/forms/StrategyForm'
 import { StrategyTemplateSchema, type LibraryTemplate } from '../lib/storage/schema'
@@ -90,7 +91,7 @@ export function StrategiesPage() {
         summary={
           <>
             範本庫存放寫好的策略範本，由你新增、修改、決定哪些納入比較；套用到個股就成為策略卡：優勢、進出場規則、每筆風險。流程是「開發中 → 回測通過 → 虛擬交易 {PAPER_RULES.months} 個月、
-            {PAPER_RULES.fills} 筆 → 實單」，兩關都過才能改成實單。說明見手冊{' '}
+            {PAPER_RULES.fills} 筆（週頻 {WEEKLY_PAPER_RULES.fills} 筆）→ 實單」，兩關都過才能改成實單。說明見手冊{' '}
             <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
               10 交易策略開發與回測
             </Link>
@@ -178,7 +179,7 @@ export function StrategiesPage() {
                     )}
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {def.label}（{def.origin}）{t.symbols.length > 0 ? `・${t.symbols.map(formatSymbol).join('、')}` : '・標的不限'}
+                    {def.label}（{def.origin}）{cadenceOf(t.template, t.cadence) === 'weekly' ? '・每週判斷' : ''}{t.symbols.length > 0 ? `・${t.symbols.map(formatSymbol).join('、')}` : '・標的不限'}
                   </p>
                   {def.params.length > 0 && (
                     <p className="text-xs text-gray-500 dark:text-gray-400">{def.params.map((x) => `${x.label} ${resolveParams(t.template, t.params)[x.key]}`).join('｜')}</p>

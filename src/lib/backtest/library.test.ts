@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest'
 import { DEFAULT_COMPARE_SET } from './compare'
 import { STARTER_STRATEGIES } from './starterStrategies'
-import { builtInLibrary, cardFromTemplate, compareEntriesOf, defaultLibrary, restoreBuiltIns, withCompareSet } from './library'
+import { builtInLibrary, cardFromTemplate, compareEntriesOf, defaultLibrary, restoreBuiltIns, WEEKLY_COMPARE_SET, withCompareSet } from './library'
 
 describe('template library', () => {
   it('merges the starters and the comparison set, keeping comparison keys', () => {
     const lib = builtInLibrary()
-    expect(lib.filter((t) => t.builtIn && !t.builtIn.startsWith('compare:'))).toHaveLength(STARTER_STRATEGIES.length)
-    // Every default comparison entry is in the library under its key.
+    expect(lib.filter((t) => t.builtIn && !t.builtIn.startsWith('compare:') && !t.builtIn.startsWith('weekly:'))).toHaveLength(STARTER_STRATEGIES.length)
+    // Every default comparison entry is in the library under its key, and
+    // the weekly templates (rotation only with several symbols).
     const one = compareEntriesOf(lib, 1)
-    expect(one.map((e) => e.key).sort()).toEqual(DEFAULT_COMPARE_SET.map((e) => e.key).sort())
+    const weeklyOne = WEEKLY_COMPARE_SET.filter((e) => e.template !== 'weekly_rotation')
+    expect(one.map((e) => e.key).sort()).toEqual([...DEFAULT_COMPARE_SET, ...weeklyOne].map((e) => e.key).sort())
+    expect(one.filter((e) => e.cadence === 'weekly')).toHaveLength(3)
+    expect(compareEntriesOf(lib, 2).some((e) => e.template === 'weekly_rotation')).toBe(true)
     expect(lib.find((t) => t.id === 'ma_200')?.builtIn).toBe('tw50-200d-filter')
   })
 

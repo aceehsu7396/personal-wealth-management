@@ -3,7 +3,7 @@ import { computeRequiredReturn } from './requiredReturn'
 import { computeDiscipline } from './disciplineScore'
 import { summarizeAttribution } from './attribution'
 import { isSatellite } from './portfolioRisk'
-import { backtestPasses, PAPER_RULES, paperProgress, paperProvenStrategies } from './strategyProgress'
+import { backtestPasses, PAPER_RULES, paperProgress, paperProvenStrategies, paperRulesFor, WEEKLY_PAPER_RULES } from './strategyProgress'
 import { computeTraderReadiness } from './traderReadiness'
 
 export type JourneyState = Pick<
@@ -116,7 +116,10 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
   )
   const passedBacktests = state.backtestRuns.filter(backtestPasses)
   const bestPaper = state.paperAccounts
-    .map((a) => paperProgress(a, today))
+    .map((a) => {
+      const rules = paperRulesFor(state.tradingStrategies.find((s) => s.id === a.strategyId))
+      return { ...paperProgress(a, today, rules), rules }
+    })
     .sort((a, b) => Number(b.qualifies) - Number(a.qualifies) || b.fills - a.fills)[0]
 
   const stages: Omit<JourneyStage, 'done'>[] = [
@@ -248,10 +251,10 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
         },
         {
           id: '4.3',
-          title: `虛擬交易 ${PAPER_RULES.months} 個月、${PAPER_RULES.fills} 筆`,
+          title: `虛擬交易 ${PAPER_RULES.months} 個月、${PAPER_RULES.fills} 筆（週頻 ${WEEKLY_PAPER_RULES.fills} 筆）`,
           done: bestPaper?.qualifies ?? false,
           detail: bestPaper
-            ? `最佳帳戶：${Math.min(bestPaper.months, PAPER_RULES.months)}/${PAPER_RULES.months} 個月、${Math.min(bestPaper.fills, PAPER_RULES.fills)}/${PAPER_RULES.fills} 筆成交`
+            ? `最佳帳戶：${Math.min(bestPaper.months, bestPaper.rules.months)}/${bestPaper.rules.months} 個月、${Math.min(bestPaper.fills, bestPaper.rules.fills)}/${bestPaper.rules.fills} 筆成交`
             : '建立虛擬帳戶並照策略卡下單',
           page: PAGES.paper,
           handbookSlug: '10',

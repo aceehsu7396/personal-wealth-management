@@ -3,7 +3,8 @@ import type { CompareEntry, LibraryTemplate, TradingStrategy } from '../storage/
 import { useAppStore } from '../storage/appStore'
 import { STARTER_STRATEGIES } from './starterStrategies'
 import { DEFAULT_COMPARE_SET } from './compare'
-import { STRATEGY_TEMPLATES, resolveParams } from './templates'
+import { STRATEGY_TEMPLATES, defaultParams, resolveParams } from './templates'
+import { WEEKLY_TEMPLATES } from './weekly'
 
 // The template library (handbook 10 §6.5): the starter strategies and the
 // comparison set in one list the trader maintains. A comparison runs the
@@ -11,7 +12,9 @@ import { STRATEGY_TEMPLATES, resolveParams } from './templates'
 
 const roleOf = (t: LibraryTemplate['template']): LibraryTemplate['role'] => (t === 'buy_hold' || t === 'dca' ? 'benchmark' : 'signal')
 const sameParams = (a: CompareEntry | LibraryTemplate, b: CompareEntry | LibraryTemplate) =>
-  a.template === b.template && JSON.stringify(resolveParams(a.template, a.params)) === JSON.stringify(resolveParams(b.template, b.params))
+  a.template === b.template &&
+  (a.cadence ?? 'daily') === (b.cadence ?? 'daily') &&
+  JSON.stringify(resolveParams(a.template, a.params)) === JSON.stringify(resolveParams(b.template, b.params))
 
 function fromEntry(e: CompareEntry, builtIn?: string): LibraryTemplate {
   const def = STRATEGY_TEMPLATES[e.template]
@@ -30,8 +33,25 @@ function fromEntry(e: CompareEntry, builtIn?: string): LibraryTemplate {
     role: e.role,
     inCompare: true,
     builtIn,
+    ...(e.cadence ? { cadence: e.cadence } : {}),
   }
 }
+
+// The weekly templates (handbook 10 §6.6), in comparisons by default.
+const WEEKLY_SUITS: Record<string, { suits: string; risk: string }> = {
+  weekly_ma: { suits: '趨勢明確的權值股與市值型 ETF；一週看一次就好的人。', risk: '盤整期會來回停損；週中大跌只靠停損單保護。' },
+  weekly_breakout: { suits: '有題材、波動較大的個股；中短期波段 2～8 週。', risk: '勝率低（常 30～40%），要能承受連續幾次小賠。' },
+  weekly_rotation: { suits: '3～6 檔相關性低的 ETF 或權值股，每週換到最強的。', risk: '換手多，成本與證交稅吃報酬；一定要用實際折扣回測。' },
+  weekly_pullback: { suits: '長期多頭中的龍頭股，等短暫回檔再買。', risk: '趨勢反轉時，回檔會變成下跌，靠停損與持有上限出場。' },
+}
+export const WEEKLY_COMPARE_SET: CompareEntry[] = WEEKLY_TEMPLATES.map((t) => ({
+  key: t,
+  label: STRATEGY_TEMPLATES[t].label,
+  template: t,
+  params: defaultParams(t),
+  role: 'signal',
+  cadence: 'weekly',
+}))
 
 // The built-in library. A starter matching a comparison entry takes the
 // entry's key as id, so earlier comparisons still line up row by row.
@@ -50,6 +70,7 @@ export function builtInLibrary(): LibraryTemplate[] {
     if (match) Object.assign(match, { id: e.key, inCompare: true })
     else out.push(fromEntry(e, `compare:${e.key}`))
   }
+  for (const e of WEEKLY_COMPARE_SET) out.push({ ...fromEntry(e, `weekly:${e.key}`), ...WEEKLY_SUITS[e.key] })
   // Rotation joins comparisons of two or more symbols.
   for (const t of out) if (STRATEGY_TEMPLATES[t.template].multiSymbol) t.inCompare = true
   return out
@@ -80,7 +101,7 @@ export function restoreBuiltIns(library: LibraryTemplate[]): LibraryTemplate[] {
 export function compareEntriesOf(library: LibraryTemplate[], symbolCount: number): CompareEntry[] {
   return library
     .filter((t) => t.inCompare && STRATEGY_TEMPLATES[t.template].backtestable && (!STRATEGY_TEMPLATES[t.template].multiSymbol || symbolCount >= 2))
-    .map((t) => ({ key: t.id, label: t.name, template: t.template, params: resolveParams(t.template, t.params), role: t.role }))
+    .map((t) => ({ key: t.id, label: t.name, template: t.template, params: resolveParams(t.template, t.params), role: t.role, ...(t.cadence ? { cadence: t.cadence } : {}) }))
 }
 
 // A strategy card from a library entry (status 開發中).
@@ -96,6 +117,7 @@ export function cardFromTemplate(t: LibraryTemplate, symbols: string[], riskPerc
     riskPerTradePercent: riskPercent,
     status: 'dev',
     notes: t.notes,
+    ...(t.cadence ? { cadence: t.cadence } : {}),
   }
 }
 
