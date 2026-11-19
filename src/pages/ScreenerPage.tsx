@@ -26,6 +26,8 @@ import { ENTRY_SIGNAL_LABELS } from '../lib/trades/entrySignals'
 import { BATCH_SUGGESTED_MAX, draftThesis, researchBatch } from '../lib/research/batchResearch'
 import { todayIsoDate } from '../lib/market/twse'
 import { primaryButton, secondaryButton } from '../components/ui'
+import { ListGroup } from '../components/research/ListGroup'
+import { actionGroupOf, groupItems, matchesQuery, openByDefault } from '../lib/research/actionGroups'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -36,6 +38,8 @@ const MAX_ROWS = 100
 
 type ResultKey = 'code' | 'industry' | 'close' | NumericField
 type WatchKey = 'code' | 'added' | 'change' | 'advice' | 'pe' | 'ret6m'
+
+const WATCH_SORT_LABELS: Record<WatchKey, string> = { code: '代號', added: '加入日期', change: '加入以來', advice: '研究卡建議', pe: '本益比', ret6m: '6 個月' }
 
 const COLUMNS: NumericField[] = ['pe', 'dividendYield', 'pb', 'revenueYoy', 'ret6m', 'ret12m', 'marketCap', 'tradeValue']
 
@@ -114,7 +118,6 @@ export function ScreenerPage() {
   }, [screened, resultSort])
   const sortResults = (key: ResultKey) => setResultSort((s) => nextSort(s, key, key !== 'code' && key !== 'industry'))
   const [watchSort, setWatchSort] = useState<SortState<WatchKey> | null>(null)
-  const sortWatch = (key: WatchKey) => setWatchSort((s) => nextSort(s, key, key !== 'code' && key !== 'advice'))
   const bySymbol = useMemo(() => new Map((data?.stocks ?? []).map((s) => [`TW:${s.code}`, s])), [data])
   const preset = PRESET_SCREENS.find((p) => p.id === presetId)
 
@@ -191,6 +194,85 @@ export function ScreenerPage() {
     return row ? fieldValue(row, key) : null
   }
   const sortedWatchlist = watchSort ? sortRows(watchlist, (w) => watchValue(w, watchSort.key), watchSort.desc) : watchlist
+  const [watchQuery, setWatchQuery] = useState('')
+  const [openWatch, setOpenWatch] = useState<string[]>([])
+  const [watchToggled, setWatchToggled] = useState<Record<string, boolean>>({})
+  const shownWatchlist = sortedWatchlist.filter((w) => matchesQuery(watchQuery, [w.symbol.replace('TW:', ''), w.name, w.industry, w.note]))
+  const watchGroups = groupItems(shownWatchlist, (w) => {
+    const advice = cardAdvice(w.symbol)
+    return advice ? actionGroupOf(advice.signals?.action ?? null) : 'nocard'
+  })
+  const toggleWatch = (symbol: string) => setOpenWatch((l) => (l.includes(symbol) ? l.filter((x) => x !== symbol) : [...l, symbol]))
+
+  // One line per watched name; where it came from, valuation, the note and
+  // actions open under it.
+  function watchRow(w: (typeof watchlist)[number]) {
+    const row = bySymbol.get(w.symbol)
+    const change = row?.close && w.priceAtAdd ? row.close / w.priceAtAdd - 1 : null
+    const advice = cardAdvice(w.symbol)
+    const open = openWatch.includes(w.symbol)
+    const sigs = entry.items.find((x) => `${x.market}:${x.ticker}` === w.symbol || x.ticker === w.symbol)?.signals ?? []
+    const muted = 'text-xs text-gray-600 dark:text-gray-400'
+    return (
+      <li key={w.symbol} className="border-b border-gray-100 py-2 last:border-0 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <button type="button" onClick={() => toggleWatch(w.symbol)} aria-expanded={open} className="min-w-0 text-left text-gray-700 hover:underline dark:text-gray-300">
+            {open ? '▾' : '▸'} <span className="font-medium text-gray-900 dark:text-gray-100">{w.symbol.replace('TW:', '')}</span> {w.name}
+          </button>
+          {advice && (
+            <Link to={`/research/stocks?new=${advice.code}`} className="flex items-center gap-1.5 hover:underline" title="研究卡建議">
+              {advice.signals ? (
+                <>
+                  <ActionBadge action={advice.signals.action} title={advice.signals.headline} />
+                  {advice.distance && advice.distance.label !== '—' && <span className="text-xs text-gray-700 dark:text-gray-300">{advice.distance.label}</span>}
+                </>
+              ) : (
+                <span className={muted}>尚未體檢</span>
+              )}
+            </Link>
+          )}
+          <span className={`text-xs whitespace-nowrap ${change !== null && change < 0 ? 'text-orange-700 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`} title="加入以來">
+            加入以來 {change === null ? '—' : `${(change * 100).toFixed(1)}%`}
+          </span>
+          {sigs.length > 0 ? (
+            <span className="flex flex-wrap gap-1">
+              {sigs.map((sg) => (
+                <span key={sg.kind} title={sg.detail} className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
+                  {ENTRY_SIGNAL_LABELS[sg.kind]}
+                </span>
+              ))}
+            </span>
+          ) : (
+            entry.loading && <span className={muted}>進場條件讀取中</span>
+          )}
+          {w.note && <span className={`max-w-xs truncate ${muted}`} title={w.note}>{w.note}</span>}
+        </div>
+        {open && (
+          <div className="mt-2 space-y-2 pl-4 text-sm">
+            <p className={muted}>
+              {w.source}・加入 {w.addedAt}
+              {w.priceAtAdd !== null && `・${w.priceAtAdd}`}
+              ・本益比 {row ? formatField(row, 'pe') : '—'}・6 個月 {row ? formatField(row, 'ret6m') : '—'}
+              {sigs.length === 0 && !entry.loading && '・進場條件：—'}
+            </p>
+            <input
+              className="w-full max-w-md rounded border border-gray-300 px-2 py-1 text-xs dark:border-gray-600 dark:bg-gray-800"
+              defaultValue={w.note}
+              placeholder="為什麼觀察？"
+              aria-label={`${w.symbol.replace('TW:', '')} 備註`}
+              onBlur={(e) => updateWatchItem(w.symbol, { note: e.target.value })}
+            />
+            <span className="flex gap-3">
+              {row && <StockActions row={row} />}
+              <button type="button" onClick={() => removeWatchItem(w.symbol)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
+                移除
+              </button>
+            </span>
+          </div>
+        )}
+      </li>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
@@ -418,100 +500,47 @@ export function ScreenerPage() {
             還沒有觀察中的標的。在上方結果按「觀察」加入；加入後會追蹤加入以來的漲跌，並可一鍵寫研究卡或回測。
           </p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-gray-700">
-                  {(
-                    [
-                      ['code', '代號／名稱'],
-                      ['added', '加入'],
-                      ['change', '加入以來'],
-                      ['advice', '研究卡建議'],
-                      ['pe', '本益比'],
-                      ['ret6m', '6 個月'],
-                    ] as [WatchKey, string][]
-                  ).map(([k, h]) => (
-                    <SortableTh key={k} sortKey={k} label={h} sort={watchSort} onSort={sortWatch} className={thClass} />
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <div className="w-64">
+                <input className={`${inputClass} py-1 text-xs`} value={watchQuery} onChange={(e) => setWatchQuery(e.target.value)} placeholder="搜尋代號、名稱、產業或備註" aria-label="搜尋觀察名單" />
+              </div>
+              <label className="flex items-center gap-1 text-xs whitespace-nowrap text-gray-600 dark:text-gray-300">
+                排序
+                <select
+                  className={`${inputClass} w-32 py-1 text-xs`}
+                  value={watchSort?.key ?? ''}
+                  onChange={(e) => setWatchSort(e.target.value ? { key: e.target.value as WatchKey, desc: watchSort?.desc ?? (e.target.value !== 'code' && e.target.value !== 'advice') } : null)}
+                >
+                  <option value="">加入順序</option>
+                  {(Object.keys(WATCH_SORT_LABELS) as WatchKey[]).map((k) => (
+                    <option key={k} value={k}>
+                      {WATCH_SORT_LABELS[k]}
+                    </option>
                   ))}
-                  <th className={thClass}>進場條件</th>
-                  <th className={thClass}>備註</th>
-                  <th className={thClass} />
-                </tr>
-              </thead>
-              <tbody>
-                {sortedWatchlist.map((w) => {
-                  const row = bySymbol.get(w.symbol)
-                  const change = row?.close && w.priceAtAdd ? row.close / w.priceAtAdd - 1 : null
-                  const advice = cardAdvice(w.symbol)
+                </select>
+              </label>
+              {watchSort && (
+                <button type="button" onClick={() => setWatchSort({ ...watchSort, desc: !watchSort.desc })} className={linkClass}>
+                  {watchSort.desc ? '由大到小' : '由小到大'}
+                </button>
+              )}
+            </div>
+            {watchGroups.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">沒有符合的標的。</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {watchGroups.map((g) => {
+                  const open = watchToggled[g.key] ?? openByDefault(g.key, shownWatchlist.length, watchQuery.trim() !== '')
                   return (
-                    <tr key={w.symbol} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
-                      <td className={tdClass}>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">{w.symbol.replace('TW:', '')}</span> {w.name}
-                        <span className="block text-xs text-gray-600 dark:text-gray-400">{w.source}</span>
-                      </td>
-                      <td className={`${tdClass} text-xs`}>
-                        {w.addedAt}
-                        {w.priceAtAdd !== null && `・${w.priceAtAdd}`}
-                      </td>
-                      <td className={`${tdClass} ${change !== null && change < 0 ? 'text-orange-700 dark:text-orange-400' : ''}`}>
-                        {change === null ? '—' : `${(change * 100).toFixed(1)}%`}
-                      </td>
-                      <td className={tdClass}>
-                        {!advice ? (
-                          <span className="text-xs text-gray-600 dark:text-gray-400">—</span>
-                        ) : (
-                          <Link to={`/research/stocks?new=${advice.code}`} className="flex items-center gap-1.5 hover:underline">
-                            {advice.signals ? (
-                              <>
-                                <ActionBadge action={advice.signals.action} title={advice.signals.headline} />
-                                <span className="text-xs">{advice.distance?.label}</span>
-                              </>
-                            ) : (
-                              <span className="text-xs text-gray-500 dark:text-gray-400">尚未體檢</span>
-                            )}
-                          </Link>
-                        )}
-                      </td>
-                      <td className={tdClass}>{row ? formatField(row, 'pe') : '—'}</td>
-                      <td className={tdClass}>{row ? formatField(row, 'ret6m') : '—'}</td>
-                      <td className={tdClass}>
-                        {(() => {
-                          const sigs = entry.items.find((x) => `${x.market}:${x.ticker}` === w.symbol || x.ticker === w.symbol)?.signals ?? []
-                          if (sigs.length === 0) return <span className="text-xs text-gray-600 dark:text-gray-400">{entry.loading ? '讀取中' : '—'}</span>
-                          return (
-                            <span className="flex flex-wrap gap-1">
-                              {sigs.map((sg) => (
-                                <span key={sg.kind} title={sg.detail} className="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200">
-                                  {ENTRY_SIGNAL_LABELS[sg.kind]}
-                                </span>
-                              ))}
-                            </span>
-                          )
-                        })()}
-                      </td>
-                      <td className={tdClass}>
-                        <input
-                          className="w-40 rounded border border-gray-300 px-1 py-0.5 text-xs dark:border-gray-600 dark:bg-gray-800"
-                          defaultValue={w.note}
-                          placeholder="為什麼觀察？"
-                          onBlur={(e) => updateWatchItem(w.symbol, { note: e.target.value })}
-                        />
-                      </td>
-                      <td className={tdClass}>
-                        <span className="flex gap-2">
-                          {row && <StockActions row={row} />}
-                          <button type="button" onClick={() => removeWatchItem(w.symbol)} className="text-xs text-gray-600 hover:underline dark:text-gray-400">
-                            移除
-                          </button>
-                        </span>
-                      </td>
-                    </tr>
+                    <ListGroup key={g.key} label={g.label} count={g.items.length} open={open} onToggle={() => setWatchToggled((t) => ({ ...t, [g.key]: !open }))}>
+                      {g.items.map(watchRow)}
+                    </ListGroup>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

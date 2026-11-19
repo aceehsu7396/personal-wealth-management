@@ -24,6 +24,9 @@ import { usePriceAutoRefresh } from '../lib/market/usePriceAutoRefresh'
 import { StatCard } from '../components/StatCard'
 import { IndustryAnalysisPanel } from '../components/research/IndustryAnalysisPanel'
 import type { ThesisStatus } from '../lib/storage/schema'
+import { inputClass } from '../components/forms/FormField'
+import { ListGroup } from '../components/research/ListGroup'
+import { actionGroupOf, groupItems, matchesQuery, openByDefault } from '../lib/research/actionGroups'
 
 const cardClass =
   'mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800'
@@ -156,6 +159,135 @@ export function StocksPage() {
   const queued = queue.map((code) => theses.find((t) => t.ticker === code)).filter((t) => t !== undefined)
   const undecided = queued.filter((t) => !t.verdict)
 
+  const [query, setQuery] = useState('')
+  const [openRows, setOpenRows] = useState<string[]>([])
+  const [toggled, setToggled] = useState<Record<string, boolean>>({})
+  const shown = evaluated.filter(({ thesis: t }) => matchesQuery(query, [t.ticker, t.name, t.sector]))
+  const groups = groupItems(shown, ({ thesis: t, signals }) => actionGroupOf(signals?.action ?? null, t.status === 'exited'))
+  const toggleRow = (id: string) => setOpenRows((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
+  const muted = 'text-xs text-gray-600 dark:text-gray-400'
+
+  // One line per card; the rating, valuation, health check and actions
+  // open under it.
+  function cardRow({ thesis: t, evaluation: e, signals, distance }: (typeof evaluated)[number]) {
+    const open = openRows.includes(t.id)
+    const link = signals ? signalTradeLink(signals, t) : null
+    return (
+      <li key={t.id} className="border-b border-gray-100 py-2 last:border-0 dark:border-gray-700">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <button type="button" onClick={() => toggleRow(t.id)} aria-expanded={open} className="min-w-0 text-left font-medium text-gray-900 hover:underline dark:text-gray-100">
+            {open ? '▾' : '▸'} {t.ticker} {t.name}
+          </button>
+          {signals && <ActionBadge action={signals.action} title={signals.headline} />}
+          {distance && distance.label !== '—' && (
+            <span className={`text-xs whitespace-nowrap ${distance.rank === 0 ? 'font-medium text-indigo-700 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'}`}>{distance.label}</span>
+          )}
+          <span className="text-xs whitespace-nowrap text-gray-700 dark:text-gray-300">
+            {t.currentPrice}
+            {t.kind !== 'etf' && t.fairValueBase > 0 && ` / ${t.fairValueBase.toFixed(1)}`}
+          </span>
+          {t.verdict ? (
+            <span
+              className={`rounded px-2 py-0.5 text-xs font-medium ${
+                t.verdict === 'invest'
+                  ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300'
+                  : t.verdict === 'pass'
+                    ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
+                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
+              }`}
+              title={t.verdictNote}
+            >
+              {VERDICT_LABELS[t.verdict]}
+            </span>
+          ) : (
+            <span className="text-xs text-orange-700 dark:text-orange-400">待選結論</span>
+          )}
+          <span className={muted}>
+            {t.kind === 'etf' ? 'ETF' : `${t.sector}・${LYNCH_LABELS[e.lynchCategory]}`}・{STATUS_LABELS[t.status]}
+          </span>
+          {link && (
+            <Link to={link.to} className="ml-auto text-xs font-medium whitespace-nowrap text-indigo-700 hover:underline dark:text-indigo-400">
+              {link.label} →
+            </Link>
+          )}
+        </div>
+        {open && (
+          <div className="mt-2 space-y-2 pl-4 text-sm">
+            {signals && <p className="text-gray-700 dark:text-gray-300">{signals.headline}</p>}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className={muted}>觀察評等</span>
+              {e.rating ? <AutoRatingBar rating={e.rating} compact /> : <span className={muted}>—</span>}
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className={muted}>
+                本益比位置：{t.auto?.stock?.valuation.pe?.percentile != null ? `第 ${t.auto.stock.valuation.pe.percentile} 百分位` : '—'}
+              </span>
+              <span className={`flex items-center gap-1 ${muted}`}>
+                價位：{t.kind === 'etf' || !t.auto ? '—' : <PriceZoneBadge zone={e.priceZone} />}
+              </span>
+            </div>
+            {t.verdictNote && <p className={muted}>結論備註：{t.verdictNote}</p>}
+            {t.market === 'TW' ? (
+              <p className={muted}>
+                {t.auto ? `體檢 ${t.auto.fetchedAt.slice(0, 10)}` : '尚未體檢'}
+                {' · '}
+                <button
+                  type="button"
+                  disabled={refreshing !== null}
+                  onClick={() => void refresh(t.id)}
+                  className="font-medium text-indigo-700 hover:underline disabled:opacity-50 dark:text-indigo-400"
+                >
+                  {refreshing === t.id ? '更新中…' : '更新體檢'}
+                </button>
+              </p>
+            ) : (
+              <p className="text-xs text-orange-700 dark:text-orange-400">美股：無自動資料</p>
+            )}
+            <div className="flex flex-wrap gap-3">
+              {t.market === 'TW' && t.verdict && t.verdict !== 'pass' && (
+                <Link to={`/sim/compare?symbol=TW:${t.ticker}&thesis=${t.id}`} className="text-xs font-medium whitespace-nowrap text-indigo-700 hover:underline dark:text-indigo-400">
+                  策略比較
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setPendingDeleteId(null)
+                  setEditing(t.id)
+                }}
+                className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
+              >
+                編輯
+              </button>
+              {pendingDeleteId === t.id ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      removeStockThesis(t.id)
+                      setPendingDeleteId(null)
+                      if (editing === t.id) setEditing(null)
+                    }}
+                    className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                  >
+                    確定刪除
+                  </button>
+                  <button type="button" onClick={() => setPendingDeleteId(null)} className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400">
+                    取消
+                  </button>
+                </>
+              ) : (
+                <button type="button" onClick={() => setPendingDeleteId(t.id)} className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400">
+                  刪除
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </li>
+    )
+  }
+
   function handleSubmit(values: StockThesisFormValues) {
     if (editingThesis) updateStockThesis(editingThesis.id, values)
     else addStockThesis(values)
@@ -275,163 +407,27 @@ export function StocksPage() {
           </div>
         </div>
         {refreshError && <p className="mt-2 text-sm text-red-600 dark:text-red-400">{refreshError}</p>}
-        {evaluated.length === 0 ? (
+        {theses.length > 0 && (
+          <div className="mt-3 w-64">
+            <input className={`${inputClass} py-1 text-xs`} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="搜尋代號、名稱或產業" aria-label="搜尋研究卡" />
+          </div>
+        )}
+        {theses.length === 0 ? (
           <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">
             還沒有研究卡。先從能力圈內、最熟悉的公司開始。
           </p>
+        ) : groups.length === 0 ? (
+          <p className="mt-4 text-sm text-gray-500 dark:text-gray-400">沒有符合的研究卡。</p>
         ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
-                  <th className="py-2 pr-4">標的</th>
-                  <th className="py-2 pr-4">觀察評等</th>
-                  <th className="py-2 pr-4">結論</th>
-                  <th className="py-2 pr-4">現價 / 基準合理價</th>
-                  <th className="py-2 pr-4">本益比位置</th>
-                  <th className="py-2 pr-4">價位</th>
-                  <th className="py-2 pr-4">距買點</th>
-                  <th className="py-2 pr-4">建議</th>
-                  <th className="py-2 pr-4 text-right">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {evaluated.map(({ thesis: t, evaluation: e, signals, distance }) => (
-                  <tr key={t.id} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
-                    <td className="py-2 pr-4">
-                      <div className="font-medium text-gray-900 dark:text-gray-100">
-                        {t.ticker} {t.name}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {t.kind === 'etf' ? 'ETF' : `${t.sector}・${LYNCH_LABELS[e.lynchCategory]}`}・{STATUS_LABELS[t.status]}
-                      </div>
-                      {t.market === 'TW' ? (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {t.auto ? `體檢 ${t.auto.fetchedAt.slice(0, 10)}` : '尚未體檢'}
-                          {' · '}
-                          <button
-                            type="button"
-                            disabled={refreshing !== null}
-                            onClick={() => void refresh(t.id)}
-                            className="font-medium text-indigo-700 hover:underline disabled:opacity-50 dark:text-indigo-400"
-                          >
-                            {refreshing === t.id ? '更新中…' : '更新體檢'}
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-orange-700 dark:text-orange-400">美股：無自動資料</div>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {e.rating ? <AutoRatingBar rating={e.rating} compact /> : <span className="text-xs text-gray-500 dark:text-gray-400">—</span>}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {t.verdict ? (
-                        <span
-                          className={`rounded px-2 py-0.5 text-xs font-medium ${
-                            t.verdict === 'invest'
-                              ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300'
-                              : t.verdict === 'pass'
-                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200'
-                                : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'
-                          }`}
-                          title={t.verdictNote}
-                        >
-                          {VERDICT_LABELS[t.verdict]}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-orange-700 dark:text-orange-400">待選結論</span>
-                      )}
-                      {t.verdictNote && <div className="mt-1 max-w-40 text-xs text-gray-500 dark:text-gray-400">{t.verdictNote}</div>}
-                    </td>
-                    <td className="py-2 pr-4 whitespace-nowrap text-gray-700 dark:text-gray-300">
-                      {t.currentPrice}
-                      {t.kind !== 'etf' && t.fairValueBase > 0 && ` / ${t.fairValueBase.toFixed(1)}`}
-                    </td>
-                    <td className="py-2 pr-4 text-gray-700 dark:text-gray-300">
-                      {t.auto?.stock?.valuation.pe?.percentile != null ? `第 ${t.auto.stock.valuation.pe.percentile} 百分位` : '—'}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {t.kind === 'etf' || !t.auto ? <span className="text-xs text-gray-500 dark:text-gray-400">—</span> : <PriceZoneBadge zone={e.priceZone} />}
-                    </td>
-                    <td
-                      className={`py-2 pr-4 text-xs whitespace-nowrap ${
-                        distance?.rank === 0 ? 'font-medium text-indigo-700 dark:text-indigo-400' : 'text-gray-700 dark:text-gray-300'
-                      }`}
-                    >
-                      {distance?.label ?? '—'}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {signals ? (
-                        <>
-                          <ActionBadge action={signals.action} title={signals.headline} />
-                          <div className="mt-1 max-w-48 text-xs text-gray-500 dark:text-gray-400">{signals.headline}</div>
-                          {(() => {
-                            const link = signalTradeLink(signals, t)
-                            return link ? (
-                              <Link to={link.to} className="mt-1 inline-block text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400">
-                                {link.label} →
-                              </Link>
-                            ) : null
-                          })()}
-                        </>
-                      ) : (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="py-2 pr-4">
-                      <div className="flex justify-end gap-2">
-                        {t.market === 'TW' && t.verdict && t.verdict !== 'pass' && (
-                          <Link to={`/sim/compare?symbol=TW:${t.ticker}&thesis=${t.id}`} className="text-xs font-medium whitespace-nowrap text-indigo-700 hover:underline dark:text-indigo-400">
-                            策略比較
-                          </Link>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPendingDeleteId(null)
-                            setEditing(t.id)
-                          }}
-                          className="text-xs font-medium text-indigo-700 hover:underline dark:text-indigo-400"
-                        >
-                          編輯
-                        </button>
-                        {pendingDeleteId === t.id ? (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                removeStockThesis(t.id)
-                                setPendingDeleteId(null)
-                                if (editing === t.id) setEditing(null)
-                              }}
-                              className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
-                            >
-                              確定刪除
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setPendingDeleteId(null)}
-                              className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
-                            >
-                              取消
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setPendingDeleteId(t.id)}
-                            className="text-xs font-medium text-gray-500 hover:underline dark:text-gray-400"
-                          >
-                            刪除
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-3 space-y-2">
+            {groups.map((g) => {
+              const open = toggled[g.key] ?? openByDefault(g.key, shown.length, query.trim() !== '')
+              return (
+                <ListGroup key={g.key} label={g.label} count={g.items.length} open={open} onToggle={() => setToggled((t) => ({ ...t, [g.key]: !open }))}>
+                  {g.items.map(cardRow)}
+                </ListGroup>
+              )
+            })}
           </div>
         )}
         <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
