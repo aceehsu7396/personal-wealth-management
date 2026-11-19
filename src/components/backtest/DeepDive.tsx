@@ -301,7 +301,7 @@ export function DeepDive({ label, input, oosFraction, policy, priorTrials, card,
             <div className="mt-3">
               <p className={`rounded-md border p-2 text-sm ${sweep.isolatedPeak || fewSweepTrades ? FINDING_STYLE.warning : sweep.cagrSpread > 0.08 ? FINDING_STYLE.caution : FINDING_STYLE.ok}`}>
                 {fewSweepTrades
-                  ? `${FINDING_MARK.warning} 每個數值的交易次數都少於 ${INTERPRET_RULES.minTrades} 筆（最多 ${Math.max(...sweep.points.map((p) => p.trades))} 筆），差異多半是運氣，不能用來選參數。先延長回測期間（建議 5 年以上），再掃描。`
+                  ? `${FINDING_MARK.warning} 每個數值的交易次數都少於 ${INTERPRET_RULES.minTrades} 筆（最多 ${Math.max(...sweep.points.map((p) => p.trades))} 筆），差異多半是運氣，不能用來選參數。先用上方「交易筆數不足」的按鈕加入同類標的一起驗證，或延長到 10 年，再掃描。`
                   : sweep.isolatedPeak
                     ? `${FINDING_MARK.warning} 最佳值是孤立的高峰：前後數值都差 3 個百分點以上，換個期間很可能失效。改選高原中間的值。`
                     : sweep.cagrSpread > 0.08

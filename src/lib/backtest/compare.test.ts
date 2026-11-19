@@ -54,6 +54,21 @@ describe('runComparison', () => {
     expect(out.oosStart).not.toBeNull()
   })
 
+  it('checks each symbol of a basket on its own', () => {
+    const basket = { ...base, data: { 'TW:2330': data['TW:2330'], 'TW:2317': bars(1300).map((b) => ({ ...b, close: b.close * 0.5, open: b.open * 0.5, high: b.high * 0.5, low: b.low * 0.5 })) } }
+    const entries = [...DEFAULT_COMPARE_SET.filter((e) => e.key === 'donchian' || e.key === 'buy_hold'), { key: 'rot', label: '動能輪動', template: 'momentum_rotation' as const, params: {}, role: 'signal' as const }]
+    const out = runComparison({ entries, base: basket, oosFraction: 0.3, maxDrawdownLimitPercent: 30 })
+    const donchian = out.rows.find((r) => r.entry.key === 'donchian')!
+    expect(donchian.perSymbol?.map((x) => x.symbol)).toEqual(['TW:2330', 'TW:2317'])
+    for (const x of donchian.perSymbol!) expect(x.trades).toBeGreaterThan(0)
+    // Rotation is about the basket as a whole; one stock alone says nothing.
+    expect(out.rows.find((r) => r.entry.key === 'rot')?.perSymbol).toBeUndefined()
+    expect(toSavedRows(out).rows.find((r) => r.entry.key === 'donchian')?.perSymbol).toHaveLength(2)
+    // A single stock has no per-symbol check.
+    const single = runComparison({ entries, base, oosFraction: 0.3, maxDrawdownLimitPercent: 30 })
+    expect(single.rows.find((r) => r.entry.key === 'donchian')?.perSymbol).toBeUndefined()
+  })
+
   it('counts earlier tries on the same stock', () => {
     const out = runComparison({ entries: DEFAULT_COMPARE_SET.slice(0, 2), base, oosFraction: 0.3, maxDrawdownLimitPercent: 30, priorTrials: 5 })
     expect(out.trials).toBe(7)
@@ -83,6 +98,16 @@ describe('summarizeComparison', () => {
   it('flags too few trades and the no-edge case', () => {
     expect(summarizeComparison([row('a', true, stats(0.1, -0.1), 5)]).kind).toBe('few_trades')
     expect(summarizeComparison([row('a', false, stats(0.1, -0.1))]).kind).toBe('none')
+  })
+
+  it('reads a basket by its total trades and per-symbol consistency', () => {
+    const checks = (n: number) => ['A', 'B', 'C', 'D'].map((symbol, i) => ({ symbol, trades: 3, passed: i < n }))
+    const few = summarizeComparison([{ ...row('a', true, stats(0.1, -0.1), 12), perSymbol: checks(3) }])
+    expect(few.headline).toContain('4 檔合計')
+    expect(few.details.find((d) => d.startsWith('一致性'))).toContain('4 檔中有 3 檔')
+    const narrow = summarizeComparison([{ ...row('a', true, stats(0.1, -0.1)), perSymbol: checks(1) }])
+    expect(narrow.kind).toBe('edge')
+    expect(narrow.details.find((d) => d.startsWith('一致性'))).toContain('集中在少數標的')
   })
 })
 

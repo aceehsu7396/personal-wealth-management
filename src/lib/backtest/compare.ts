@@ -60,7 +60,16 @@ export interface CompareRow {
   avgR: number | null
   // Average calendar days a trade was held.
   avgHoldDays: number | null
+  // Two or more symbols: the same rules on each symbol alone, against its
+  // own buy-and-hold, to see whether the edge is broad or one stock's.
+  perSymbol?: SymbolCheck[]
   error?: string
+}
+
+export interface SymbolCheck {
+  symbol: string
+  trades: number
+  passed: boolean
 }
 
 export interface ComparisonResult {
@@ -82,6 +91,18 @@ export interface ComparisonInput {
 export function avgHoldDays(result: BacktestResult): number | null {
   const days = result.trades.map((t) => (Date.parse(t.exitDate) - Date.parse(t.entryDate)) / 86400000)
   return days.length > 0 ? days.reduce((a, b) => a + b, 0) / days.length : null
+}
+
+// Each symbol on its own, for a basket run of a single-stock template.
+export function perSymbolChecks(input: BacktestInput, oosFraction: number): SymbolCheck[] | undefined {
+  const symbols = Object.keys(input.data)
+  if (symbols.length < 2 || STRATEGY_TEMPLATES[input.template].multiSymbol) return undefined
+  return symbols.map((symbol) => {
+    const one: BacktestInput = { ...input, data: { [symbol]: input.data[symbol] }, ...(input.chips ? { chips: { [symbol]: input.chips[symbol] } } : {}) }
+    const result = runBacktest(one)
+    const bench = splitStats(runBacktest(benchmarkInput(one)), oosFraction)
+    return { symbol, trades: result.trades.length, passed: outOfSampleVerdict(splitStats(result, oosFraction).outOfSample, bench.outOfSample).passed }
+  })
 }
 
 const strip = (s: ReturnType<typeof splitStats>): StatsTriple => ({ full: s.full, inSample: s.inSample, outOfSample: s.outOfSample })
@@ -125,6 +146,7 @@ export function runComparison({ entries, base, oosFraction, maxDrawdownLimitPerc
       deflatedProbability: deflatedSharpe(dailyReturnsOf(result), trials)?.probability ?? null,
       avgR: rs.length > 0 ? rs.reduce((a, b) => a + b, 0) / rs.length : null,
       avgHoldDays: avgHoldDays(result),
+      perSymbol: perSymbolChecks(input, oosFraction),
     }
   })
   // Curves share the benchmark's dates; a missing row plots as nothing.
@@ -165,7 +187,8 @@ export function summarizeComparison(rows: CompareRow[]): ComparisonSummary {
     headline = `${reliable.map((r) => r.entry.label).join('、')}在樣本外通過過關規則；以「${best.entry.label}」最佳（${best.verdict?.route === 'risk' ? '以少賠通過' : '報酬勝過買進持有'}）。`
   } else if (passed.length > 0) {
     kind = 'few_trades'
-    headline = `${passed.map((r) => r.entry.label).join('、')}通過，但交易少於 ${INTERPRET_RULES.minTrades} 筆，結論不可靠。`
+    const basket = passed[0].perSymbol?.length
+    headline = `${passed.map((r) => r.entry.label).join('、')}通過，但${basket ? `${basket} 檔合計` : ''}交易少於 ${INTERPRET_RULES.minTrades} 筆，結論不可靠。`
   } else {
     kind = 'none'
     headline = '沒有範本在樣本外勝過買進持有：這檔較適合核心持有、定期定額，或不做交易部位。'
@@ -180,6 +203,14 @@ export function summarizeComparison(rows: CompareRow[]): ComparisonSummary {
     .map((r) => ({ r, gap: r.stats.inSample!.cagr - r.stats.outOfSample!.cagr }))
     .sort((a, b) => b.gap - a.gap)[0]
   if (decay && decay.gap > 0) details.push(`樣本內外落差最大：${decay.r.entry.label}（${pct(decay.r.stats.inSample!.cagr)} → ${pct(decay.r.stats.outOfSample!.cagr)}），可能過度擬合`)
+  for (const r of passed) {
+    if (!r.perSymbol) continue
+    const n = r.perSymbol.filter((x) => x.passed).length
+    const total = r.perSymbol.length
+    details.push(
+      `一致性：${r.entry.label}在 ${total} 檔中有 ${n} 檔各自勝過買進持有（合計 ${r.stats.full.trades} 筆）${n * 2 < total ? '，優勢可能集中在少數標的' : ''}`,
+    )
+  }
   const costly = signals.filter((r) => r.costSensitive).map((r) => r.entry.label)
   if (costly.length > 0) details.push(`對交易成本敏感（成本加倍、年化少一半以上）：${costly.join('、')}`)
   const lucky = passed.filter((r) => r.deflatedProbability !== null && r.deflatedProbability < 0.95).map((r) => r.entry.label)
@@ -204,6 +235,7 @@ export function toSavedRows(result: ComparisonResult) {
       deflatedProbability: r.deflatedProbability,
       avgR: r.avgR,
       avgHoldDays: r.avgHoldDays,
+      ...(r.perSymbol ? { perSymbol: r.perSymbol } : {}),
       ...(r.error ? { error: r.error } : {}),
     })),
     equity: result.equity.map((p) => ({ date: p.date, values: p.values.map((v) => (Number.isFinite(v) ? v : null)) })),

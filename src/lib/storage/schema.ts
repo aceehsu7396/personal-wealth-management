@@ -781,6 +781,7 @@ export const StrategyComparisonSchema = z.object({
       deflatedProbability: z.number().nullable(),
       avgR: z.number().nullable(),
       avgHoldDays: z.number().nullable().optional(),
+      perSymbol: z.array(z.object({ symbol: z.string(), trades: z.number(), passed: z.boolean() })).optional(),
       error: z.string().optional(),
     }),
   ),

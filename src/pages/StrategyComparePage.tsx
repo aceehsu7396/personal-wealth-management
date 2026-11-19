@@ -19,6 +19,7 @@ import { compareEntriesOf, useLibrary, withCompareSet } from '../lib/backtest/li
 import { findDuplicate } from '../lib/backtest/cardGroups'
 import { DEFAULT_DECISION_DAY, isWeeklyTemplate, WEEKDAY_LABELS } from '../lib/backtest/weekly'
 import { RunRecords } from '../components/backtest/RunRecords'
+import { FewTradesPanel } from '../components/backtest/FewTradesPanel'
 import { thesisForCode } from '../lib/research/strategyLink'
 import { VERDICT_LABELS } from '../lib/calculations/thesisScoring'
 import { isoDaysAgo, type Bar } from '../lib/market/priceHistory'
@@ -116,7 +117,8 @@ export function StrategyComparePage() {
   const [decisionDay, setDecisionDay] = useState(fromCard?.decisionDay ?? weeklyDecisionDay)
   const [dive, setDive] = useState<string | null>(null)
   const [savedDives, setSavedDives] = useState<string[]>([])
-  const [start, setStart] = useState(isoDaysAgo(today, YEARS))
+  const [startDate, setStart] = useState(isoDaysAgo(today, YEARS))
+  const start = startDate
   const [end, setEnd] = useState(today)
   const [capital, setCapital] = useState(1_000_000)
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -156,7 +158,17 @@ export function StrategyComparePage() {
     return source
   }
 
-  async function run() {
+  // A basket or a longer period from the few-trades panel runs at once,
+  // with the inputs updated to match.
+  async function run(over: { codes?: string[]; start?: string } = {}) {
+    const symbols = over.codes ?? parseSymbolList(codeText)
+    const symbol = symbols.join(',')
+    const start = over.start ?? startDate
+    if (over.codes) setCodeText(symbols.map((x) => x.replace(/^TW:/, '')).join(', '))
+    if (over.start) setStart(over.start)
+    const canRun = (e: CompareEntry) => !STRATEGY_TEMPLATES[e.template].multiSymbol || symbols.length >= 2
+    const active = entries.filter((e) => !off.includes(e.key) && canRun(e))
+    const runThesis = symbols.length === 1 ? thesis : null
     if (symbols.length === 0) return setStatus({ kind: 'error', message: '請輸入代號' })
     if (start >= end) return setStatus({ kind: 'error', message: '開始日期須早於結束日期' })
     if (!active.some((e) => e.role === 'signal')) return setStatus({ kind: 'error', message: '至少要勾選一個訊號範本' })
@@ -173,11 +185,11 @@ export function StrategyComparePage() {
         priorTrials: priorTrialsFor(symbol, comparisons),
       })
       if (result.equity.length < 2) throw new Error('這段期間沒有足夠的價格資料')
-      const isDefault = sameEntries(active, defaults.filter(runnable))
+      const isDefault = sameEntries(active, defaults.filter(canRun))
       const id = addStrategyComparison({
-        thesisId: thesis?.id,
+        thesisId: runThesis?.id,
         symbol,
-        name: thesis?.name ?? (fromCard && active.some((e) => e.key === cardKey) ? fromCard.name : ''),
+        name: runThesis?.name ?? (fromCard && active.some((e) => e.key === cardKey) ? fromCard.name : ''),
         start,
         end,
         initialCapital: capital,
@@ -542,6 +554,7 @@ export function StrategyComparePage() {
                 ))}
               </ul>
             )}
+            <FewTradesPanel comparison={current} today={today} busy={status.kind === 'loading'} onRun={(over) => void run(over)} />
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
               下一步：對想用的範本按「深入檢驗」，看解讀、參數敏感度與偏誤檢查，再「建立策略卡」（會帶著這次的回測進入開發中），之後到虛擬帳戶累積紀錄（手冊 10 §6、§7）。
             </p>
@@ -591,7 +604,12 @@ export function StrategyComparePage() {
                             <td className={tdClass}>{num(s.sharpe)}</td>
                             <td className={tdClass}>{num(calmarOf(s))}</td>
                             <td className={tdClass}>
-                              {s.trades}
+                              {r.perSymbol ? `合計 ${s.trades}` : s.trades}
+                              {r.perSymbol && (
+                                <div className="text-[11px] text-gray-500 dark:text-gray-400" title={r.perSymbol.map((x) => `${formatSymbol(x.symbol)}：${x.trades} 筆，${x.passed ? '通過' : '未通過'}`).join('\n')}>
+                                  各檔 {r.perSymbol.filter((x) => x.passed).length}/{r.perSymbol.length} 通過
+                                </div>
+                              )}
                               {r.avgHoldDays != null && <div className="text-[11px] text-gray-500 dark:text-gray-400">平均持有 {holdText(r.avgHoldDays)}</div>}
                             </td>
                             <td className={tdClass}>{s.winRate === null ? '—' : pct(s.winRate)}</td>
