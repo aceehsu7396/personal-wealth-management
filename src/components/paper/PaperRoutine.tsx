@@ -54,7 +54,7 @@ export function PaperRoutine() {
           {result.failed.map((f) => `・${f.name} 失敗：${describeAiError(f.error)}`).join('')}
         </span>
       ) : (
-        <span>{regimeLoading ? '讀取局勢中…' : `虛擬帳戶 ${count} 個：更新價格並產生今日建議`}</span>
+        <span>{regimeLoading ? '讀取局勢中…' : `虛擬帳戶 ${count} 個：更新收盤價並產生建議`}</span>
       )}
       <button type="button" className={secondaryButton} disabled={step !== null || regimeLoading} onClick={() => void run()}>
         執行今日例行

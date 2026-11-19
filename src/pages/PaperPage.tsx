@@ -45,6 +45,49 @@ function pct(v: number | null | undefined): string {
   return v === null || v === undefined || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(1)}%`
 }
 
+// The latest close of every symbol the account follows, linked card or
+// not: what the day's update fetched (handbook 10 §7).
+function LatestCloses({ account, symbols, today }: { account: PaperAccount; symbols: string[]; today: string }) {
+  if (symbols.length === 0) return null
+  const name = (s: string) => account.positions.find((p) => p.symbol === s)?.name ?? ''
+  const role = (s: string) =>
+    account.positions.some((p) => p.symbol === s) ? '持倉' : account.orders.some((o) => o.status === 'open' && o.symbol === s) ? '掛單' : '策略卡標的'
+  return (
+    <div className="mt-4">
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">最新收盤價</h3>
+      <div className="mt-1 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 dark:border-gray-700">
+              {['標的', '收盤價', '資料日期', ''].map((h) => (
+                <th key={h} className={thClass}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {symbols.map((s) => {
+              const q = account.quotes?.[s]
+              const old = q ? Math.floor((Date.parse(today) - Date.parse(q.date)) / 86400000) > 3 : false
+              return (
+                <tr key={s} className="border-b border-gray-100 last:border-0 dark:border-gray-700">
+                  <td className={tdClass}>
+                    {formatSymbol(s)} {name(s)}
+                  </td>
+                  <td className={tdClass}>{q ? q.price.toLocaleString('zh-TW') : '—'}</td>
+                  <td className={`${tdClass} ${old ? 'text-amber-700 dark:text-amber-400' : ''}`}>{q ? `${q.date}${old ? '（較舊）' : ''}` : '尚未更新'}</td>
+                  <td className={`${tdClass} text-xs text-gray-500 dark:text-gray-400`}>{role(s)}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: string; onCreate: (a: Omit<PaperAccount, 'id' | 'createdAt'>) => void }) {
   const strategies = useAppStore((s) => s.tradingStrategies)
   const [name, setName] = useState('')
@@ -169,12 +212,19 @@ export function PaperPage() {
     )
   }
 
-  async function refreshPrices() {
+  // The day's one step: the latest closes (positions, open orders and the
+  // card's symbols, whatever the template), which fill orders and trigger
+  // stops, then the assistant's suggestions when the card has rules.
+  async function updateAndAdvise() {
     if (!account) return
-    const symbols = priceSymbols(account)
-    await guarded('更新價格…', async () => {
+    const symbols = priceSymbols(account, strategy)
+    await guarded('更新收盤價…', async () => {
       const quotes = account.market === 'TW' ? await fetchQuotes(symbols, today, setBusy) : manualQuotes(symbols)
-      save(updatePrices(useAppStore.getState().paperAccounts.find((a) => a.id === account.id)!, quotes))
+      save(updatePrices(current(), quotes))
+      if (canSignal && strategy) {
+        setBusy(weekly ? '計算本週建議…' : '計算今日建議…')
+        save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay }))
+      }
     })
   }
 
@@ -236,12 +286,6 @@ export function PaperPage() {
     })
   }
 
-  async function makeAdvice() {
-    if (!account || !strategy) return
-    await guarded('計算今日建議…', async () => {
-      save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay }))
-    })
-  }
 
   // Equity vs 0050 (when its prices are cached), both starting at 100.
   function equityPoints() {
@@ -302,8 +346,8 @@ export function PaperPage() {
         }
         action={
           showAccount ? (
-            <button type="button" disabled={busy !== null || (canSignal && regimeLoading)} onClick={() => void (canSignal ? makeAdvice() : refreshPrices())} className={primaryButton}>
-              {canSignal ? (weekly ? '產生本週建議' : '產生今日建議') : '更新價格'}
+            <button type="button" disabled={busy !== null || (canSignal && regimeLoading)} onClick={() => void updateAndAdvise()} className={primaryButton}>
+              {canSignal ? '更新收盤價並產生建議' : '更新收盤價'}
             </button>
           ) : undefined
         }
@@ -377,24 +421,17 @@ export function PaperPage() {
                 {ownRun?.stats.full && `・回測年化 ${pct(ownRun.stats.full.cagr)}`}
               </span>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              {canSignal && (
-                <button type="button" disabled={busy !== null} onClick={() => void refreshPrices()} className={secondaryButton}>
-                  更新價格（觸發停損與限價單）
-                </button>
-              )}
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                {canSignal && weekly
-                  ? `每天收盤後更新價格（觸發停損）；每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤後再按頁首「產生本週建議」，下單在下個交易日開盤成交。`
-                  : canSignal
-                    ? '每天收盤後：先更新價格（觸發停損與限價單），再按頁首「產生今日建議」。'
-                    :'每天收盤後按頁首「更新價格」，觸發停損與限價單。'}
-              </span>
-            </div>
+            <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
+              {canSignal && weekly
+                ? `每天收盤後按頁首「更新收盤價並產生建議」：一次完成最新收盤價、停損與掛單觸發，以及助手建議。週頻卡只在每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤判斷進出場，其他日子只檢查停損；下單在下個交易日開盤成交。`
+                : canSignal
+                  ? '每天收盤後按頁首「更新收盤價並產生建議」：一次完成最新收盤價、停損與掛單觸發，以及助手建議。'
+                  : `每天收盤後按頁首「更新收盤價」：取得持倉、掛單${strategy ? '與策略卡標的' : ''}的最新收盤價，並觸發停損與限價單。${strategy ? '這張策略卡是文字規則，助手無法自動判斷，請對照下方收盤價自行檢查。' : ''}`}
+            </p>
 
             {account.market === 'US' && (
               <div className="mt-3 flex flex-wrap gap-3 text-sm">
-                {[...new Set([...account.positions.map((p) => p.symbol), ...openOrders.map((o) => o.symbol)])].map((s) => (
+                {priceSymbols(account, strategy).map((s) => (
                   <label key={s} className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300">
                     {formatSymbol(s)} 最新價
                     <input
@@ -408,6 +445,8 @@ export function PaperPage() {
                 ))}
               </div>
             )}
+
+            <LatestCloses account={account} symbols={priceSymbols(account, strategy)} today={today} />
 
             {canSignal && strategy && (
               <PaperAssistant

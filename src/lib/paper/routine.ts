@@ -21,9 +21,14 @@ export async function fetchQuotes(symbols: string[], today: string, onStep: (s: 
   return out
 }
 
-// Symbols whose price an account needs: positions and open orders.
-export const priceSymbols = (account: PaperAccount) => [
-  ...new Set([...account.positions.map((p) => p.symbol), ...account.orders.filter((o) => o.status === 'open').map((o) => o.symbol)]),
+// Symbols whose price an account needs: positions, open orders and the
+// linked card's symbols in the account's market.
+export const priceSymbols = (account: PaperAccount, strategy?: Pick<TradingStrategy, 'symbols'>) => [
+  ...new Set([
+    ...account.positions.map((p) => p.symbol),
+    ...account.orders.filter((o) => o.status === 'open').map((o) => o.symbol),
+    ...(strategy?.symbols ?? []).filter((s) => s.startsWith(`${account.market}:`)),
+  ]),
 ]
 
 export interface RoutineDeps {
@@ -96,7 +101,7 @@ export async function runPaperRoutine(input: RoutineInput, deps: RoutineDeps = d
     const step = (s: string) => input.onStep(`${account.name}：${s}`)
     try {
       if (account.market === 'TW') {
-        const quotes = await deps.fetchQuotes(priceSymbols(input.latest(account.id)), input.today, step)
+        const quotes = await deps.fetchQuotes(priceSymbols(input.latest(account.id), strategy), input.today, step)
         input.save(updatePrices(input.latest(account.id), quotes))
       }
       input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay }, deps))

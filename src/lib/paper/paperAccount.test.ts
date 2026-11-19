@@ -102,3 +102,12 @@ describe('next-open orders (weekly cards)', () => {
     expect(a.positions).toHaveLength(0)
   })
 })
+
+describe('latest closes', () => {
+  it('keeps every quote, held or not, and never an older one', () => {
+    let a = updatePrices(account(), { 'TW:2330': { price: 1000, date: '2026-11-18' }, 'TW:0050': { price: 95, date: '2026-11-18' } })
+    expect(a.quotes).toEqual({ 'TW:2330': { price: 1000, date: '2026-11-18' }, 'TW:0050': { price: 95, date: '2026-11-18' } })
+    a = updatePrices(a, { 'TW:2330': { price: 990, date: '2026-11-17' } })
+    expect(a.quotes?.['TW:2330'].price).toBe(1000)
+  })
+})

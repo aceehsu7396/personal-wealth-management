@@ -120,7 +120,7 @@ export function assistantItems({ strategy, account, statuses, data, policy, regi
         continue
       }
       if (stop !== undefined && st.close <= stop) {
-        out.push({ ...base, kind: 'stop_hit', basis: [`收盤 ${st.close} 已跌破停損 ${stop}；更新價格時若盤中觸及會自動賣出`] })
+        out.push({ ...base, kind: 'stop_hit', basis: [`收盤 ${st.close} 已跌破停損 ${stop}；更新收盤價時若盤中觸及會自動賣出`] })
         continue
       }
       if (stop === undefined && st.atr) {
@@ -186,7 +186,7 @@ export function orderChecks(input: OrderCheckInput): OrderCheck[] {
   const { side, price, shares, stopLoss, date, today, account, policy, strategy, regime } = input
   const out: OrderCheck[] = []
   const age = date ? Math.floor((Date.parse(today) - Date.parse(date)) / 86400000) : Infinity
-  out.push({ level: 'required', text: age <= STALE_DAYS ? `價格是最近的收盤（${date}）` : `價格太舊（${date || '沒有日期'}），請先更新價格`, passed: age <= STALE_DAYS })
+  out.push({ level: 'required', text: age <= STALE_DAYS ? `價格是最近的收盤（${date}）` : `價格太舊（${date || '沒有日期'}），請先更新收盤價`, passed: age <= STALE_DAYS })
   if (side === 'sell') return out
   const hasStop = stopLoss !== undefined && stopLoss > 0 && stopLoss < price
   out.push({ level: 'required', text: hasStop ? `已設停損 ${stopLoss}` : '買進必須設停損，且低於買進價', passed: hasStop })
@@ -305,7 +305,7 @@ export function paperScanItems(accounts: PaperAccount[], strategies: TradingStra
     const items = fresh ? snap.items : []
     for (const i of items.filter((x) => x.outcome === 'pending')) {
       const sym = formatSymbol(i.symbol)
-      if (i.kind === 'stop_hit') out.push(scanItem('stop_hit', `${tag}：${sym} 收盤跌破停損，更新價格以觸發賣出`, basis, to, 'suggest'))
+      if (i.kind === 'stop_hit') out.push(scanItem('stop_hit', `${tag}：${sym} 收盤跌破停損，更新收盤價以觸發賣出`, basis, to, 'suggest'))
       else if (i.kind === 'raise_stop') out.push(scanItem('raise_stop', `${tag}：${sym} 停損上調到 ${i.raiseTo}`, basis, to))
       else if (i.kind === 'near_stop') out.push(scanItem('raise_stop', `${tag}：${sym} 接近停損，不要下移停損`, basis, to, 'notice'))
     }
@@ -316,7 +316,7 @@ export function paperScanItems(accounts: PaperAccount[], strategies: TradingStra
     }
     const priced = a.positions.map((p) => p.lastPriceDate).sort()[0]
     if (priced && daysBetween(priced, today) > 3) {
-      out.push(scanItem('housekeeping', `${tag}：持倉價格停在 ${priced}，收盤後更新價格`, '更新價格才會觸發停損與限價單', to))
+      out.push(scanItem('housekeeping', `${tag}：持倉價格停在 ${priced}，收盤後更新收盤價`, '更新收盤價才會觸發停損與限價單', to))
     }
     const generated = snap?.generatedAt.slice(0, 10) ?? ''
     if (cadenceOf(card.template, card.cadence) === 'weekly') {
@@ -376,7 +376,7 @@ export function explainItem(item: AssistantItem, account: PaperAccount): ItemExp
       return {
         action: `${sym} 收盤 ${item.close} 已跌破停損 ${p?.stopLoss ?? ''}`,
         numbers: position,
-        todo: '按「更新價格」讓停損單成交賣出；不要為了不賣而下移停損。',
+        todo: '按「更新收盤價並產生建議」讓停損單成交賣出；不要為了不賣而下移停損。',
       }
     case 'raise_stop': {
       const to = item.raiseTo ?? 0
@@ -398,7 +398,7 @@ export function explainItem(item: AssistantItem, account: PaperAccount): ItemExp
     case 'wait':
       return { action: `觀望 ${sym}`, numbers: [], todo: item.decidesOn ? `週頻：進場要等 ${item.decidesOn.slice(5).replace('-', '/')} 收盤判斷，今天不下單。` : '還沒觸發進場條件。' }
     case 'no_data':
-      return { action: `${sym} 無法判斷`, numbers: [], todo: '價格資料不足，先更新價格或檢查代號。' }
+      return { action: `${sym} 無法判斷`, numbers: [], todo: '價格資料不足，先更新收盤價或檢查代號。' }
   }
 }
 

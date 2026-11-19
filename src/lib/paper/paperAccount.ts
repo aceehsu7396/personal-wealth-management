@@ -154,10 +154,14 @@ function snapshot(account: PaperAccount, date: string): PaperAccount {
 }
 
 // Applies new daily quotes: marks positions, triggers stops (position stop
-// losses and stop orders), fills limit orders, then records equity.
+// losses and stop orders), fills limit orders, then records equity. Every
+// quote is kept as the symbol's latest close.
 export function updatePrices(account: PaperAccount, quotes: Record<string, Quote>): PaperAccount {
+  const kept = { ...account.quotes }
+  for (const [s, q] of Object.entries(quotes)) if (!kept[s] || kept[s].date <= q.date) kept[s] = { price: q.price, date: q.date }
   let next: PaperAccount = {
     ...account,
+    quotes: kept,
     positions: account.positions.map((p) =>
       quotes[p.symbol] ? { ...p, lastPrice: quotes[p.symbol].price, lastPriceDate: quotes[p.symbol].date } : p,
     ),

@@ -846,6 +846,9 @@ export const PaperAccountSchema = z.object({
   // earlier ones (handbook 10 §7).
   assistant: z.lazy(() => AssistantSnapshotSchema).optional(),
   signalLog: z.array(z.lazy(() => AssistantItemSchema)).default([]),
+  // The latest close of every symbol the account follows (its card's
+  // symbols, positions and open orders), whatever the card's template.
+  quotes: z.record(z.string(), z.object({ price: z.number(), date: z.string() })).optional(),
   createdAt: z.string(),
 })
 export type PaperAccount = z.infer<typeof PaperAccountSchema>

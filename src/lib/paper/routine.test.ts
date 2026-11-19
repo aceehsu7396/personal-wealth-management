@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Bar } from '../market/priceHistory'
 import type { PaperAccount, TradingStrategy } from '../storage/schema'
 import { createDefaultInvestmentPolicy } from '../storage/schema'
-import { routineAccounts, runPaperRoutine, type RoutineDeps } from './routine'
+import { priceSymbols, routineAccounts, runPaperRoutine, type RoutineDeps } from './routine'
 
 const bars: Bar[] = Array.from({ length: 60 }, (_, i) => {
   const d = new Date(Date.UTC(2026, 7, 1 + i))
@@ -66,5 +66,12 @@ describe('runPaperRoutine', () => {
     )
     expect(res.done).toEqual(['b'])
     expect(res.failed.map((f) => f.name)).toEqual(['a'])
+  })
+})
+
+describe('price symbols', () => {
+  it('adds the card symbols in the account market', () => {
+    const a = { id: 'a', name: '', market: 'TW' as const, initialCash: 1, cash: 1, positions: [], orders: [], equityHistory: [], signalLog: [], createdAt: '' }
+    expect(priceSymbols(a, { symbols: ['TW:2330', 'US:SPY'] })).toEqual(['TW:2330'])
   })
 })
