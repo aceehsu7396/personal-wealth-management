@@ -7,7 +7,6 @@ import {
   paperStats,
   placeOrder,
   setStopLoss,
-  updatePrices,
   type NewOrder,
   type Quote,
 } from '../lib/paper/paperAccount'
@@ -15,7 +14,7 @@ import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList } from '../lib/backte
 import { liveGate, paperRulesFor } from '../lib/calculations/strategyProgress'
 import { cadenceOf, DEFAULT_DECISION_DAY, WEEKDAY_LABELS } from '../lib/backtest/weekly'
 import { orderChecks, resolveItem } from '../lib/paper/assistant'
-import { adviseAccount, fetchQuotes, priceSymbols } from '../lib/paper/routine'
+import { adviseAccount, fetchQuotes, priceSymbols, routineAccounts, runPaperRoutine } from '../lib/paper/routine'
 import { useJourney } from '../lib/useJourney'
 import { useRegime } from '../lib/market/useRegime'
 import { OrderCheckList, PaperAssistant } from '../components/paper/PaperAssistant'
@@ -169,6 +168,8 @@ export function PaperPage() {
   const [creating, setCreating] = useState(accounts.length === 0 || (presetStrategy !== '' && !preset))
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Symbols the last update could not get a close for.
+  const [missing, setMissing] = useState<string[]>([])
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({})
   const [order, setOrder] = useState({ symbol: '', side: 'buy' as 'buy' | 'sell', type: 'market' as PaperOrder['type'], shares: '', price: '', stopLoss: '', reason: '', emotion: 3 })
   const [pendingDelete, setPendingDelete] = useState(false)
@@ -212,16 +213,28 @@ export function PaperPage() {
     )
   }
 
-  // The day's one step: the latest closes (positions, open orders and the
-  // card's symbols, whatever the template), which fill orders and trigger
-  // stops, then the assistant's suggestions when the card has rules.
+  // The day's one step: the latest closes for every account, whatever its
+  // card (positions, open orders and the card's symbols; fills orders and
+  // triggers stops), then the suggestions: for every account on a paper
+  // card, and for this one whenever its card has rules.
   async function updateAndAdvise() {
     if (!account) return
-    const symbols = priceSymbols(account, strategy)
     await guarded('更新收盤價…', async () => {
-      const quotes = account.market === 'TW' ? await fetchQuotes(symbols, today, setBusy) : manualQuotes(symbols)
-      save(updatePrices(current(), quotes))
-      if (canSignal && strategy) {
+      const res = await runPaperRoutine({
+        accounts,
+        strategies,
+        policy,
+        regime,
+        today,
+        onStep: setBusy,
+        weeklyDecisionDay,
+        manual: manualQuotes(priceSymbols(account, strategy)),
+        latest: (id) => useAppStore.getState().paperAccounts.find((a) => a.id === id)!,
+        save: replacePaperAccount,
+      })
+      setMissing(res.missing)
+      if (res.failed.length > 0) throw new Error(res.failed.map((f) => `${f.name}：${describeAiError(f.error)}`).join('；'))
+      if (canSignal && strategy && !routineAccounts([current()], strategies).length) {
         setBusy(weekly ? '計算本週建議…' : '計算今日建議…')
         save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay }))
       }
@@ -234,14 +247,12 @@ export function PaperPage() {
     {
       let quote: Quote | undefined
       if (input.type === 'market' && input.fillAt !== 'open') {
-        if (account.market === 'TW') quote = (await fetchQuotes([input.symbol], today, setBusy))[input.symbol]
-        else {
-          // US prices are typed in: the order form's price, or the price
-          // entered for that symbol above.
-          const price = Number(order.price) || Number(manualPrices[input.symbol])
-          if (price > 0) quote = { price, date: today }
-        }
-        if (!quote) throw new Error(account.market === 'TW' ? '取不到最新收盤價（上櫃股票不支援）' : '請填寫成交價')
+        // A US price typed in (the order form, or the field above) wins;
+        // otherwise the latest close.
+        const typed = Number(order.price) || Number(manualPrices[input.symbol])
+        if (account.market === 'US' && typed > 0) quote = { price: typed, date: today }
+        else quote = (await fetchQuotes([input.symbol], today, setBusy))[input.symbol]
+        if (!quote) throw new Error('取不到最新收盤價：請確認代號，美股可在上方手動填價')
       }
       return placeOrder(current(), input, quote)
     }
@@ -394,6 +405,11 @@ export function PaperPage() {
       )}
 
       {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {missing.length > 0 && (
+        <p className="mt-4 text-sm text-amber-700 dark:text-amber-400">
+          {missing.length} 檔取不到收盤價：{missing.map(formatSymbol).join('、')}。證交所與 FinMind 都沒有資料，可能是代號有誤、停牌或剛上市；FinMind 免費額度用完時，約 10 分鐘後再試。
+        </p>
+      )}
       {busy && <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">{busy}</p>}
 
       {showAccount && account && stats && (

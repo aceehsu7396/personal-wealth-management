@@ -1,6 +1,7 @@
 import type { InvestmentPolicy, PaperAccount, TradingStrategy } from '../storage/schema'
 import type { RegimeContext } from '../market/regime'
 import { fetchLatestTwseBar, isoDaysAgo, TWSE_REQUEST_GAP_MS } from '../market/priceHistory'
+import { fetchDataset } from '../research/finmind'
 import { symbolStatus } from '../backtest/engine'
 import { loadChipData, loadPriceData } from '../backtest/data'
 import { STRATEGY_TEMPLATES, formatSymbol } from '../backtest/templates'
@@ -9,14 +10,53 @@ import { assistantItems, withSnapshot } from './assistant'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// Latest daily bars for TW symbols (TWSE); US prices come from the form.
-export async function fetchQuotes(symbols: string[], today: string, onStep: (s: string) => void): Promise<Record<string, Quote>> {
+// The latest daily bar from FinMind: OTC (上櫃) and US symbols, and the
+// fallback when TWSE has nothing.
+async function finMindBar(symbol: string, today: string): Promise<Quote | null> {
+  const [market, code] = symbol.split(':')
+  const start = new Date(Date.parse(`${today}T00:00:00Z`) - 14 * 86400000).toISOString().slice(0, 10)
+  if (market === 'US') {
+    const rows = await fetchDataset<{ date: string; Open: number; High: number; Low: number; Close: number }>('USStockPrice', code, start)
+    const r = rows.filter((x) => x.Close > 0).at(-1)
+    return r ? { price: r.Close, date: r.date, open: r.Open, high: r.High, low: r.Low } : null
+  }
+  const rows = await fetchDataset<{ date: string; open: number; max: number; min: number; close: number }>('TaiwanStockPrice', code, start)
+  const r = rows.filter((x) => x.close > 0).at(-1)
+  return r ? { price: r.close, date: r.date, open: r.open, high: r.max, low: r.min } : null
+}
+
+// Latest daily bars: listed TW symbols from TWSE, then FinMind for OTC
+// and US ones (or when TWSE fails). A symbol that fails is reported to
+// `onMiss` and skipped, so the others still update.
+export async function fetchQuotes(
+  symbols: string[],
+  today: string,
+  onStep: (s: string) => void,
+  onMiss: (symbol: string) => void = () => {},
+): Promise<Record<string, Quote>> {
   const out: Record<string, Quote> = {}
-  for (const [i, symbol] of symbols.filter((s) => s.startsWith('TW:')).entries()) {
-    if (i > 0) await sleep(TWSE_REQUEST_GAP_MS)
+  let twse = 0
+  for (const symbol of symbols) {
     onStep(`取得 ${formatSymbol(symbol)} 最新收盤價…`)
-    const bar = await fetchLatestTwseBar(symbol.slice(3), today)
-    if (bar) out[symbol] = { price: bar.close, date: bar.date, open: bar.open, high: bar.high, low: bar.low }
+    let quote: Quote | null = null
+    if (symbol.startsWith('TW:')) {
+      if (twse++ > 0) await sleep(TWSE_REQUEST_GAP_MS)
+      try {
+        const bar = await fetchLatestTwseBar(symbol.slice(3), today)
+        if (bar) quote = { price: bar.close, date: bar.date, open: bar.open, high: bar.high, low: bar.low }
+      } catch {
+        // Fall back to FinMind below.
+      }
+    }
+    if (!quote) {
+      try {
+        quote = await finMindBar(symbol, today)
+      } catch {
+        quote = null
+      }
+    }
+    if (quote) out[symbol] = quote
+    else onMiss(symbol)
   }
   return out
 }
@@ -66,7 +106,8 @@ export async function adviseAccount({ account, strategy, policy, regime, today, 
   return withSnapshot(account, assistantItems({ strategy, account, statuses, data, policy, regime }), new Date().toISOString())
 }
 
-// Accounts the daily routine runs: linked to a card in paper trading.
+// Accounts the daily routine gives suggestions: linked to a card in paper
+// trading. Every account gets the latest closes.
 export function routineAccounts(accounts: PaperAccount[], strategies: TradingStrategy[]): { account: PaperAccount; strategy: TradingStrategy }[] {
   return accounts.flatMap((account) => {
     const strategy = strategies.find((s) => s.id === account.strategyId && s.status === 'paper')
@@ -82,6 +123,8 @@ export interface RoutineInput {
   today: string
   onStep: (s: string) => void
   weeklyDecisionDay?: number
+  // Prices typed in by hand (US accounts), over what was fetched.
+  manual?: Record<string, Quote>
   // The latest saved account, and where to save it: each step builds
   // on what the previous one saved.
   latest: (id: string) => PaperAccount
@@ -91,20 +134,33 @@ export interface RoutineInput {
 export interface RoutineResult {
   done: string[]
   failed: { name: string; error: unknown }[]
+  // Symbols no source had a close for.
+  missing: string[]
 }
 
-// The day's paper work in one go: update prices (fills open orders and
-// triggers stops), then today's suggestions. Orders stay with the trader.
+// The day's paper work in one go: the latest closes for every account,
+// whatever its card (fills open orders and triggers stops; each symbol
+// fetched once), then suggestions for the accounts on paper cards. Orders
+// stay with the trader.
 export async function runPaperRoutine(input: RoutineInput, deps: RoutineDeps = defaultDeps): Promise<RoutineResult> {
-  const result: RoutineResult = { done: [], failed: [] }
-  for (const { account, strategy } of routineAccounts(input.accounts, input.strategies)) {
+  const result: RoutineResult = { done: [], failed: [], missing: [] }
+  const advised = routineAccounts(input.accounts, input.strategies)
+  const fetched: Record<string, Quote> = {}
+  const tried = new Set<string>()
+  for (const account of input.accounts) {
+    const strategy = input.strategies.find((s) => s.id === account.strategyId)
     const step = (s: string) => input.onStep(`${account.name}：${s}`)
     try {
-      if (account.market === 'TW') {
-        const quotes = await deps.fetchQuotes(priceSymbols(input.latest(account.id), strategy), input.today, step)
-        input.save(updatePrices(input.latest(account.id), quotes))
+      const symbols = priceSymbols(input.latest(account.id), strategy)
+      const need = symbols.filter((s) => !tried.has(s))
+      Object.assign(fetched, await deps.fetchQuotes(need, input.today, step, (s) => result.missing.push(s)))
+      for (const s of need) tried.add(s)
+      const quotes = Object.fromEntries(symbols.filter((s) => fetched[s]).map((s) => [s, fetched[s]]))
+      for (const s of symbols) if (input.manual?.[s]) quotes[s] = input.manual[s]
+      input.save(updatePrices(input.latest(account.id), quotes))
+      if (strategy && advised.some((x) => x.account.id === account.id) && STRATEGY_TEMPLATES[strategy.template].backtestable) {
+        input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay }, deps))
       }
-      input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay }, deps))
       result.done.push(account.name)
     } catch (error) {
       result.failed.push({ name: account.name, error })

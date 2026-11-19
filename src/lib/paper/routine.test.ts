@@ -29,7 +29,7 @@ const account = (id: string, strategyId: string): PaperAccount => ({
 })
 
 describe('runPaperRoutine', () => {
-  it('updates prices, then suggests, for accounts on paper cards only', async () => {
+  it('updates prices for every account, and suggests for accounts on paper cards only', async () => {
     const strategies = [card('p', 'paper'), card('d', 'dev')]
     const store: Record<string, PaperAccount> = { a: account('a', 'p'), b: account('b', 'd') }
     expect(routineAccounts(Object.values(store), strategies).map((x) => x.account.id)).toEqual(['a'])
@@ -42,8 +42,10 @@ describe('runPaperRoutine', () => {
       { accounts: Object.values(store), strategies, policy: createDefaultInvestmentPolicy(), regime: null, today: last.date, onStep: () => {}, latest: (id) => store[id], save: (a) => (store[a.id] = a) },
       deps,
     )
-    expect(res).toEqual({ done: ['a'], failed: [] })
+    expect(res).toEqual({ done: ['a', 'b'], failed: [], missing: [] })
     expect(store.a.positions[0].lastPrice).toBe(1010)
+    expect(store.b.positions[0].lastPrice).toBe(1010)
+    expect(store.b.quotes?.['TW:1111'].price).toBe(1010)
     expect(store.a.assistant?.items.find((i) => i.symbol === 'TW:1111')?.kind).toBe('enter')
     expect(store.b.assistant).toBeUndefined()
   })

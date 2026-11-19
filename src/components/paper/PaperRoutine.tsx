@@ -4,6 +4,7 @@ import { useJourney } from '../../lib/useJourney'
 import { useRegime } from '../../lib/market/useRegime'
 import { todayIsoDate } from '../../lib/market/twse'
 import { describeAiError } from '../../lib/ai/client'
+import { formatSymbol } from '../../lib/backtest/templates'
 import { routineAccounts, runPaperRoutine, type RoutineResult } from '../../lib/paper/routine'
 import { secondaryButton } from '../ui'
 
@@ -19,7 +20,9 @@ export function PaperRoutine() {
   const { ctx: regime, loading: regimeLoading } = useRegime()
   const [step, setStep] = useState<string | null>(null)
   const [result, setResult] = useState<RoutineResult | null>(null)
-  const count = routineAccounts(accounts, strategies).length
+  // Every account gets the latest closes; paper cards also get suggestions.
+  const count = accounts.length
+  const advised = routineAccounts(accounts, strategies).length
   if (count === 0) return null
 
   async function run() {
@@ -51,10 +54,11 @@ export function PaperRoutine() {
       ) : result ? (
         <span>
           {result.done.length > 0 && `已更新 ${result.done.join('、')}`}
+          {result.missing.length > 0 && `・取不到收盤價：${result.missing.map(formatSymbol).join('、')}`}
           {result.failed.map((f) => `・${f.name} 失敗：${describeAiError(f.error)}`).join('')}
         </span>
       ) : (
-        <span>{regimeLoading ? '讀取局勢中…' : `虛擬帳戶 ${count} 個：更新收盤價並產生建議`}</span>
+        <span>{regimeLoading ? '讀取局勢中…' : `虛擬帳戶 ${count} 個：更新收盤價${advised > 0 ? `，${advised} 個產生建議` : ''}`}</span>
       )}
       <button type="button" className={secondaryButton} disabled={step !== null || regimeLoading} onClick={() => void run()}>
         執行今日例行
