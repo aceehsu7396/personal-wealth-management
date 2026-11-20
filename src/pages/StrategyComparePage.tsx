@@ -540,7 +540,7 @@ export function StrategyComparePage() {
                 整體分析：{symbolLabel(current.symbol)} {current.name}
               </h2>
               <span className="text-xs text-gray-500 dark:text-gray-400">
-                {current.start} ～ {current.end}・{current.round === 0 ? '預設條件' : `調整第 ${current.round} 次`}・這檔累計試過 {current.trials} 個訊號範本
+                {current.start} ～ {current.end}・{current.auto ? `每日自動研究（${current.auto.screen}）` : current.round === 0 ? '預設條件' : `調整第 ${current.round} 次`}・這檔累計試過 {current.trials} 個訊號範本
               </span>
             </div>
             <p className="mt-3 flex items-start gap-2 text-sm text-gray-900 dark:text-gray-100">
@@ -675,13 +675,17 @@ export function StrategyComparePage() {
           <div className={cardClass}>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">權益曲線（起點 100）</h2>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">虛線為基準；數字見上表。</p>
-            <div className="mt-3">
-              <CompareChart
-                series={current.rows.map((r) => ({ key: r.entry.key, label: entryLabel(r.entry), benchmark: r.entry.role === 'benchmark' }))}
-                points={current.equity}
-                oosStart={current.outOfSampleStart}
-              />
-            </div>
+            {current.equity.length === 0 ? (
+              <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">自動回測未保存走勢圖；按上方「全部執行」可以重跑並看到走勢圖，也才能建立策略卡。</p>
+            ) : (
+              <div className="mt-3">
+                <CompareChart
+                  series={current.rows.map((r) => ({ key: r.entry.key, label: entryLabel(r.entry), benchmark: r.entry.role === 'benchmark' }))}
+                  points={current.equity}
+                  oosStart={current.outOfSampleStart}
+                />
+              </div>
+            )}
           </div>
         </>
       )}
@@ -699,7 +703,8 @@ export function StrategyComparePage() {
                   <button type="button" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400" onClick={() => setCodeText(c.symbol.split(',').map((x) => x.replace(/^TW:/, '')).join(', '))}>
                     {symbolLabel(c.symbol)} {c.name}
                   </button>
-                  ：{c.createdAt.slice(0, 10)}・{c.summary.headline}
+                  ：{c.createdAt.slice(0, 10)}
+                  {c.auto && `（每日自動研究・${c.auto.screen}）`}・{c.summary.headline}
                 </li>
               ))}
           </ul>
@@ -712,7 +717,7 @@ export function StrategyComparePage() {
           <ul className="mt-2 space-y-1 text-sm text-gray-700 dark:text-gray-300">
             {[...forSymbol].reverse().map((c) => (
               <li key={c.id}>
-                {c.createdAt.slice(0, 10)}・{c.round === 0 ? '預設' : `調整 ${c.round}`}：{c.summary.headline}
+                {c.createdAt.slice(0, 10)}・{c.auto ? '每日自動研究' : c.round === 0 ? '預設' : `調整 ${c.round}`}：{c.summary.headline}
               </li>
             ))}
           </ul>

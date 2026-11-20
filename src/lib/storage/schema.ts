@@ -261,6 +261,8 @@ export const StockThesisSchema = z.object({
   kind: z.enum(['stock', 'etf']).default('stock'),
   // Snapshot computed from free data; validated where it is produced.
   auto: z.custom<AutoResearch>((v) => typeof v === 'object' && v !== null).optional(),
+  // Created by the daily automatic research (lib/research/dailyResearch.ts).
+  autoOrigin: z.object({ screen: z.string(), date: z.string() }).optional(),
   verdict: z.enum(['invest', 'watch', 'pass']).optional(),
   // Why, and what would change it (e.g. "wait for P/E back to the median").
   verdictNote: z.string().default(''),
@@ -790,6 +792,8 @@ export const StrategyComparisonSchema = z.object({
   summary: z.object({ kind: z.enum(['edge', 'few_trades', 'none']), headline: z.string(), details: z.array(z.string()), ranking: z.array(z.string()) }),
   // NaN does not survive JSON; a missing value is null.
   equity: z.array(z.object({ date: z.string(), values: z.array(z.number().nullable()) })),
+  // From the daily automatic research: saved without its curve.
+  auto: z.object({ screen: z.string(), date: z.string() }).optional(),
   createdAt: z.string(),
 })
 export type StrategyComparison = z.infer<typeof StrategyComparisonSchema>
@@ -1190,6 +1194,8 @@ export const AppDataSchema = z.object({
   strategyLibrary: z.array(LibraryTemplateSchema).optional(),
   // Absent = decide weekly strategies on Friday.
   tradingPrefs: z.object({ weeklyDecisionDay: DecisionDaySchema }).optional(),
+  // The last daily automatic research run imported (its date).
+  dailyResearchImported: z.string().optional(),
   paperAccounts: z.array(PaperAccountSchema).default([]),
   watchlist: z.array(WatchItemSchema).default([]),
   ideaNotes: z.array(IdeaNoteSchema).default([]),

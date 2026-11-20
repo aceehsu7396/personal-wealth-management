@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware'
 import { upsertSnapshot } from '../calculations/netWorth'
 import { purgeCaches, setItemMakingRoom } from './cacheCleanup'
+import { applyDailyRun, type DailyRun } from '../research/dailyResearch'
 import {
   AppDataSchema,
   SCHEMA_VERSION,
@@ -177,6 +178,8 @@ interface AppStore extends AppData {
   setStrategyLibrary: (library: LibraryTemplate[]) => void
   // Monday = 1 … Friday = 5 (lib/backtest/weekly.ts).
   setWeeklyDecisionDay: (day: number) => void
+  // One day of the daily automatic research, saved as cards and comparisons.
+  importDailyResearch: (run: DailyRun) => void
   addPaperAccount: (entry: Omit<PaperAccount, 'id' | 'createdAt'>) => string
   // Paper-account changes are computed by pure functions and saved whole.
   replacePaperAccount: (account: PaperAccount) => void
@@ -242,6 +245,7 @@ function toAppData(state: AppData): AppData {
     compareSet: state.compareSet,
     strategyLibrary: state.strategyLibrary,
     tradingPrefs: state.tradingPrefs,
+    dailyResearchImported: state.dailyResearchImported,
     paperAccounts: state.paperAccounts,
     watchlist: state.watchlist,
     ideaNotes: state.ideaNotes,
@@ -258,6 +262,14 @@ function toAppData(state: AppData): AppData {
 // Keep localStorage bounded: only the most recent backtests are stored.
 export const MAX_BACKTEST_RUNS = 40
 export const MAX_STRATEGY_COMPARISONS = 20
+
+// Your own comparisons are capped here; the automatic ones separately
+// (lib/research/dailyResearch.ts), so they never push yours out.
+function capOwn(list: StrategyComparison[]): StrategyComparison[] {
+  const own = list.filter((c) => !c.auto)
+  const drop = new Set(own.slice(0, Math.max(0, own.length - MAX_STRATEGY_COMPARISONS)).map((c) => c.id))
+  return list.filter((c) => !drop.has(c.id))
+}
 
 export function exportAppData(): AppData {
   return toAppData(useAppStore.getState())
@@ -536,9 +548,7 @@ export const useAppStore = create<AppStore>()(
       addStrategyComparison: (entry) => {
         const id = crypto.randomUUID()
         set((state) => ({
-          strategyComparisons: [...state.strategyComparisons, { ...entry, id, createdAt: new Date().toISOString() }].slice(
-            -MAX_STRATEGY_COMPARISONS,
-          ),
+          strategyComparisons: capOwn([...state.strategyComparisons, { ...entry, id, createdAt: new Date().toISOString() }]),
         }))
         return id
       },
@@ -550,6 +560,11 @@ export const useAppStore = create<AppStore>()(
 
       setStrategyLibrary: (library) => set({ strategyLibrary: library }),
       setWeeklyDecisionDay: (day) => set({ tradingPrefs: { weeklyDecisionDay: day } }),
+      importDailyResearch: (run) =>
+        set((state) => {
+          if (state.dailyResearchImported && run.date <= state.dailyResearchImported) return {}
+          return { ...applyDailyRun(state, run, new Date().toISOString(), () => crypto.randomUUID()), dailyResearchImported: run.date }
+        }),
 
       addPaperAccount: (entry) => {
         const id = crypto.randomUUID()

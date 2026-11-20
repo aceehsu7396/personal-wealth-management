@@ -5,23 +5,32 @@ on:
     branches: [main]
   # Daily at 07:00 Taiwan time (after the US close) and weekdays at 14:30
   # (after the Taiwan close): refresh the index, macro, stock and fund data.
+  # Daily at 06:00: the automatic research (handbook 06 §1.1).
   schedule:
+    - cron: '0 22 * * *'
     - cron: '0 23 * * *'
     - cron: '30 6 * * 1-5'
   workflow_dispatch:
+    inputs:
+      research:
+        description: 執行每日自動研究
+        type: boolean
+        default: false
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
+# The 06:00 research runs about 20 minutes; a push meanwhile waits for it.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -36,7 +45,7 @@ jobs:
       - name: Restore last published data
         run: |
           mkdir -p public/data
-          for f in macro stocks funds indices events valuation; do
+          for f in macro stocks funds indices events valuation daily-research; do
             curl -sf -o "public/data/$f.json" "https://aceehsu7396.github.io/personal-wealth-management/data/$f.json" \
               || rm -f "public/data/$f.json"
           done
@@ -72,6 +81,12 @@ jobs:
       # Latest NAV of every fund sold in Taiwan (Anue fund list, no key).
       - name: Fetch fund NAVs
         run: npx tsx scripts/fund-nav.mts
+        continue-on-error: true
+      # One stock from each of seven screens: health check, then every
+      # library template backtested for those rated 留意 or better.
+      - name: Daily automatic research
+        if: github.event.schedule == '0 22 * * *' || inputs.research
+        run: npx tsx scripts/daily-research.mts
         continue-on-error: true
       - run: npm run build
       - uses: actions/configure-pages@v5

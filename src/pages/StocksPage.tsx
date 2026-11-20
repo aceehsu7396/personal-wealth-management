@@ -26,6 +26,7 @@ import { IndustryAnalysisPanel } from '../components/research/IndustryAnalysisPa
 import type { ThesisStatus } from '../lib/storage/schema'
 import { inputClass } from '../components/forms/FormField'
 import { ListGroup } from '../components/research/ListGroup'
+import { fetchDailyResearch, runSummary, type DailyRun } from '../lib/research/dailyResearch'
 import { actionGroupOf, groupItems, matchesQuery, openByDefault } from '../lib/research/actionGroups'
 
 const cardClass =
@@ -159,10 +160,22 @@ export function StocksPage() {
   const queued = queue.map((code) => theses.find((t) => t.ticker === code)).filter((t) => t !== undefined)
   const undecided = queued.filter((t) => !t.verdict)
 
+  const imported = useAppStore((s) => s.dailyResearchImported)
+  const [dailyRun, setDailyRun] = useState<DailyRun | null>(null)
+  useEffect(() => {
+    if (!imported) return
+    let cancelled = false
+    void fetchDailyResearch().then((file) => {
+      if (!cancelled) setDailyRun(file?.runs.find((r) => r.date === imported) ?? null)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [imported])
   const [query, setQuery] = useState('')
   const [openRows, setOpenRows] = useState<string[]>([])
   const [toggled, setToggled] = useState<Record<string, boolean>>({})
-  const shown = evaluated.filter(({ thesis: t }) => matchesQuery(query, [t.ticker, t.name, t.sector]))
+  const shown = evaluated.filter(({ thesis: t }) => matchesQuery(query, [t.ticker, t.name, t.sector, t.autoOrigin ? `每日自動研究・${t.autoOrigin.screen}` : undefined]))
   const groups = groupItems(shown, ({ thesis: t, signals }) => actionGroupOf(signals?.action ?? null, t.status === 'exited'))
   const toggleRow = (id: string) => setOpenRows((l) => (l.includes(id) ? l.filter((x) => x !== id) : [...l, id]))
   const muted = 'text-xs text-gray-600 dark:text-gray-400'
@@ -204,6 +217,7 @@ export function StocksPage() {
           )}
           <span className={muted}>
             {t.kind === 'etf' ? 'ETF' : `${t.sector}・${LYNCH_LABELS[e.lynchCategory]}`}・{STATUS_LABELS[t.status]}
+            {t.autoOrigin && `・每日自動研究・${t.autoOrigin.screen}（${t.autoOrigin.date.slice(5).replace('-', '/')}）`}
           </span>
           {link && (
             <Link to={link.to} className="ml-auto text-xs font-medium whitespace-nowrap text-indigo-700 hover:underline dark:text-indigo-400">
@@ -306,6 +320,20 @@ export function StocksPage() {
         missing={journey.missingForSatellite}
         intro="研究卡隨時可以建立來觀察；實單買進前，建議先完成這些步驟："
       />
+
+      {dailyRun && (
+        <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">
+          每日自動研究（{dailyRun.date.slice(5).replace('-', '/')} 06:00）：{runSummary(dailyRun)}。
+          {dailyRun.items.some((i) => i.comparison) && (
+            <>
+              {' '}
+              <Link to="/sim/compare" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+                看回測紀錄 →
+              </Link>
+            </>
+          )}
+        </p>
+      )}
 
       <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="研究中標的" value={`${active.length}`} hint="觀察 + 持有" />

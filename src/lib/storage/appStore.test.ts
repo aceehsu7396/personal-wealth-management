@@ -72,4 +72,23 @@ describe('appStore storage', () => {
     s().removeTradePlan(id)
     expect(s().tradePlans).toEqual([])
   })
+
+  it('imports a daily research run once, and caps only your own comparisons', async () => {
+    store.set('pfm:appData', JSON.stringify({ state: blank(), version: SCHEMA_VERSION }))
+    const { useAppStore } = await import('./appStore')
+    await useAppStore.persist.rehydrate()
+    const auto = { kind: 'stock', name: 'X', industry: '', fetchedAt: '2026-11-20T00:00:00Z' }
+    const comparison = { symbol: 'TW:2330', name: '', start: '', end: '', initialCapital: 1, outOfSampleStart: null, round: 0, trials: 1, rows: [], summary: { kind: 'none', headline: '', details: [], ranking: [] }, equity: [] }
+    const run = { date: '2026-11-20', skipped: [], items: [{ screenId: 'value', screenName: '價值', code: '2330', name: 'X', auto, rating: 'strong', comparison }] } as never
+    const s = useAppStore.getState()
+    s.importDailyResearch(run)
+    s.importDailyResearch(run)
+    expect(useAppStore.getState().stockTheses).toHaveLength(1)
+    expect(useAppStore.getState().strategyComparisons).toHaveLength(1)
+    expect(useAppStore.getState().dailyResearchImported).toBe('2026-11-20')
+    for (let i = 0; i < 25; i++) s.addStrategyComparison({ ...comparison, symbol: `TW:${i}` } as never)
+    const list = useAppStore.getState().strategyComparisons
+    expect(list.filter((c) => !c.auto)).toHaveLength(20)
+    expect(list.filter((c) => c.auto)).toHaveLength(1)
+  })
 })

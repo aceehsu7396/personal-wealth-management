@@ -8,6 +8,7 @@ import { HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-d
 import { NavBar } from './components/layout/NavBar'
 import { ScrollToTop } from './components/layout/ScrollToTop'
 import { PortfolioSnapshotRecorder } from './components/PortfolioSnapshotRecorder'
+import { DailyResearchImporter } from './components/research/DailyResearchImporter'
 import { HOME_PATH, LEGACY_REDIRECTS } from './components/layout/navigation'
 import { DashboardPage } from './pages/DashboardPage'
 import { GoalsPage } from './pages/GoalsPage'
@@ -51,6 +52,7 @@ function App() {
             <DemoBanner />
             <StorageWarning />
             <PortfolioSnapshotRecorder />
+            <DailyResearchImporter />
             <PageContext />
             <Routes>
               <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
