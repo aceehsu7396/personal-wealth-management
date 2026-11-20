@@ -29,6 +29,7 @@ export const NAV_GROUPS: NavGroup[] = [
     tabs: [
       { label: '市場', to: '/research/market' },
       { label: '選股', to: '/research/screener' },
+      { label: '主動式 ETF', to: '/research/active-etf' },
       { label: '研究卡', to: '/research/stocks' },
     ],
   },

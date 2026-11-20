@@ -1,0 +1,52 @@
+{
+ "pcf": [
+  {
+   "FundCode": "49YTW",
+   "TranDate": "/Date(1795017600000)/",
+   "PCFCode": "PRE_AMT",
+   "Amount": 11250000
+  },
+  {
+   "FundCode": "49YTW",
+   "TranDate": "/Date(1795017600000)/",
+   "PCFCode": "NAV",
+   "Amount": 232084472007
+  }
+ ],
+ "asset": [
+  {
+   "AssetCode": "GD",
+   "Details": [
+    {
+     "DetailCode": "TX",
+     "DetailName": "台指期貨",
+     "Share": 867,
+     "NavRate": 2.88
+    }
+   ]
+  },
+  {
+   "AssetCode": "ST",
+   "Details": [
+    {
+     "DetailCode": "2330",
+     "DetailName": "台積電",
+     "Share": 19303000,
+     "NavRate": 17.47
+    },
+    {
+     "DetailCode": "2454",
+     "DetailName": "聯發科",
+     "Share": 5861000,
+     "NavRate": 9.39
+    },
+    {
+     "DetailCode": "3017",
+     "DetailName": "奇鋐",
+     "Share": 7078000,
+     "NavRate": 7.46
+    }
+   ]
+  }
+ ]
+}

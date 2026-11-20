@@ -26,6 +26,7 @@ import { SettingsPage } from './pages/SettingsPage'
 import { StrategiesPage } from './pages/StrategiesPage'
 import { PaperPage } from './pages/PaperPage'
 import { ScreenerPage } from './pages/ScreenerPage'
+import { ActiveEtfPage } from './pages/ActiveEtfPage'
 import { StrategyComparePage } from './pages/StrategyComparePage'
 import { IdeaNotesPage } from './pages/IdeaNotesPage'
 
@@ -59,6 +60,7 @@ function App() {
               {/* 研究分析 */}
               <Route path="/research/market" element={<MarketPage />} />
               <Route path="/research/screener" element={<ScreenerPage />} />
+              <Route path="/research/active-etf" element={<ActiveEtfPage />} />
               <Route path="/research/stocks" element={<StocksPage />} />
               {/* 模擬交易 */}
               <Route path="/sim/strategies" element={<StrategiesPage />} />

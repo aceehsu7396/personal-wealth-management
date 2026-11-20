@@ -45,7 +45,7 @@ jobs:
       - name: Restore last published data
         run: |
           mkdir -p public/data
-          for f in macro stocks funds indices events valuation daily-research; do
+          for f in macro stocks funds indices events valuation daily-research active-etf; do
             curl -sf -o "public/data/$f.json" "https://aceehsu7396.github.io/personal-wealth-management/data/$f.json" \
               || rm -f "public/data/$f.json"
           done
@@ -64,6 +64,11 @@ jobs:
       # Listed stocks and ETFs for the screener (TWSE open data, no key).
       - name: Fetch stock data
         run: npx tsx scripts/stocks-data.mts
+        continue-on-error: true
+      # The three largest active ETFs' daily holdings (open-source project
+      # active-etf), checked against 統一 and 復華's own sites (no key).
+      - name: Fetch active ETF holdings
+        run: npx tsx scripts/active-etf.mts
         continue-on-error: true
       # The market-wide part of the daily push notification.
       - name: Build push brief

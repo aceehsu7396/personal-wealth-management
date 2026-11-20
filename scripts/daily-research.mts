@@ -1,5 +1,5 @@
 // Builds public/data/daily-research.json at 06:00 Taiwan time (handbook 06
-// §1.1): one stock from each of seven screens gets the automatic health
+// §1.1): one stock from each of seven screens and the active ETF consensus gets the automatic health
 // check, and those rated 留意 or better a comparison of every library
 // template over 5 years. Free data only (FinMind, 證交所). The site imports
 // the results into the research cards and comparisons when it opens.
@@ -9,7 +9,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import type { StockData } from '../src/lib/screener/stockData.ts'
 import { buildAutoResearch } from '../src/lib/research/autoResearch.ts'
 import { rateAuto, OVERALL_LABELS } from '../src/lib/research/rating.ts'
-import { mergeRuns, pickDaily, qualifies, runSummary, type DailyItem, type DailyResearchFile } from '../src/lib/research/dailyResearch.ts'
+import { ACTIVE_CONSENSUS_SCREEN, mergeRuns, pickDaily, qualifies, runSummary, type DailyItem, type DailyResearchFile, type ExtraScreen } from '../src/lib/research/dailyResearch.ts'
+import { consensus, type ActiveEtfFile } from '../src/lib/research/activeEtf.ts'
 import { createDefaultInvestmentPolicy } from '../src/lib/storage/schema.ts'
 import { builtInLibrary, compareEntriesOf } from '../src/lib/backtest/library.ts'
 import { STRATEGY_TEMPLATES } from '../src/lib/backtest/templates.ts'
@@ -29,7 +30,15 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).sli
 const stocks = (JSON.parse(readFileSync('public/data/stocks.json', 'utf8')) as StockData).stocks
 const prev: DailyResearchFile | null = existsSync(OUT) ? (JSON.parse(readFileSync(OUT, 'utf8')) as DailyResearchFile) : null
 const policy = createDefaultInvestmentPolicy()
-const { picks, skipped } = pickDaily(stocks, prev?.log ?? [], today)
+// The active ETF consensus (scripts/active-etf.mts runs first): listed
+// stocks only, since the backtest needs 證交所 prices.
+const ACTIVE = 'public/data/active-etf.json'
+const listed = new Set(stocks.filter((s) => !s.isEtf).map((s) => s.code))
+const extra: ExtraScreen[] = existsSync(ACTIVE)
+  ? [{ ...ACTIVE_CONSENSUS_SCREEN, candidates: consensus(JSON.parse(readFileSync(ACTIVE, 'utf8')) as ActiveEtfFile).filter((r) => listed.has(r.code)) }]
+  : []
+const { picks, skipped } = pickDaily(stocks, prev?.log ?? [], today, extra)
+if (!existsSync(ACTIVE)) skipped.push({ screenName: ACTIVE_CONSENSUS_SCREEN.screenName, reason: '沒有主動式 ETF 持股資料' })
 log(`${today}：${picks.map((p) => `${p.screenName} ${p.code}`).join('、')}`)
 
 async function compare(code: string, name: string) {

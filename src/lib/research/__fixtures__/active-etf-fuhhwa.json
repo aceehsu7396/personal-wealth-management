@@ -1,0 +1,40 @@
+{
+ "result": [
+  {
+   "fundID": "ETF23",
+   "etf002": "00991A",
+   "dDate": "2026/11/19",
+   "pcf_FundNav": "50,572,956,372",
+   "detail": [
+    {
+     "ftype": "股票",
+     "stockid": "2330",
+     "stockname": "台灣積體",
+     "qshare": "4,230,000",
+     "prate_addaccint": "17.565%"
+    },
+    {
+     "ftype": "股票",
+     "stockid": "2454",
+     "stockname": "聯發科技",
+     "qshare": "1,200,000",
+     "prate_addaccint": "8.827%"
+    },
+    {
+     "ftype": "股票",
+     "stockid": "2383",
+     "stockname": "台光電子",
+     "qshare": "1,375,000",
+     "prate_addaccint": "8.483%"
+    },
+    {
+     "ftype": "其他資產",
+     "stockid": "",
+     "stockname": "扣除應付買入證券款後現金餘額(NTD)",
+     "qshare": "0",
+     "prate_addaccint": "0.610%"
+    }
+   ]
+  }
+ ]
+}

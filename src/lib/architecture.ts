@@ -200,6 +200,7 @@ export const PAGE_NODES: Record<string, string> = {
   '/research/market': 'macro',
   '/research/stocks': 'research',
   '/research/screener': 'screener',
+  '/research/active-etf': 'screener',
   '/sim/strategies': 'strategy',
   '/sim/compare': 'backtest',
   '/sim/paper': 'paper',

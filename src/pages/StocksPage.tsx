@@ -27,6 +27,8 @@ import type { ThesisStatus } from '../lib/storage/schema'
 import { inputClass } from '../components/forms/FormField'
 import { ListGroup } from '../components/research/ListGroup'
 import { fetchDailyResearch, runSummary, type DailyRun } from '../lib/research/dailyResearch'
+import { useActiveEtf } from '../lib/research/useActiveEtf'
+import { CHANGE_LABELS, stockActivity } from '../lib/research/activeEtf'
 import { actionGroupOf, groupItems, matchesQuery, openByDefault } from '../lib/research/actionGroups'
 
 const cardClass =
@@ -160,6 +162,7 @@ export function StocksPage() {
   const queued = queue.map((code) => theses.find((t) => t.ticker === code)).filter((t) => t !== undefined)
   const undecided = queued.filter((t) => !t.verdict)
 
+  const { file: activeEtf } = useActiveEtf()
   const imported = useAppStore((s) => s.dailyResearchImported)
   const [dailyRun, setDailyRun] = useState<DailyRun | null>(null)
   useEffect(() => {
@@ -241,6 +244,21 @@ export function StocksPage() {
               </span>
             </div>
             {t.verdictNote && <p className={muted}>結論備註：{t.verdictNote}</p>}
+            {(() => {
+              const held = activeEtf ? stockActivity(activeEtf, t.ticker) : []
+              if (held.length === 0) return null
+              return (
+                <p className={muted}>
+                  主動式 ETF：
+                  {held
+                    .map((p) => `${p.etf} ${p.weight > 0 ? `權重 ${p.weight.toFixed(1)}%` : '已剔除'}${p.change && p.change.kind !== 'removed' ? `（${p.dataDate.slice(5).replace('-', '/')} ${CHANGE_LABELS[p.change.kind]} ${Math.round(Math.abs(p.change.sharesDelta) / 1000).toLocaleString()} 張）` : ''}`)
+                    .join('、')}{' '}
+                  <Link to="/research/active-etf" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
+                    看持股 →
+                  </Link>
+                </p>
+              )
+            })()}
             {t.market === 'TW' ? (
               <p className={muted}>
                 {t.auto ? `體檢 ${t.auto.fetchedAt.slice(0, 10)}` : '尚未體檢'}

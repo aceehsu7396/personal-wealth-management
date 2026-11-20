@@ -46,6 +46,16 @@ describe('pickDaily', () => {
     expect(picks.map((p) => p.code)).toContain('1102')
   })
 
+  it('adds the active ETF consensus as the last screen', () => {
+    const extra = [{ screenId: 'active-consensus', screenName: '主動 ETF 共識', candidates: [row('1101'), row('2330'), row('2454')] }]
+    const { picks } = pickDaily(stocks, [{ code: '2330', date: '2026-11-19' }], '2026-11-20', extra)
+    const last = picks.at(-1)!
+    expect(last.screenId).toBe('active-consensus')
+    // 1101 went to an earlier screen today, 2330 was researched yesterday.
+    expect(last.code).toBe('2454')
+    expect(pickDaily(stocks, [], '2026-11-20', [{ ...extra[0], candidates: [] }]).skipped.at(-1)).toEqual({ screenName: '主動 ETF 共識', reason: '今天沒有符合的標的' })
+  })
+
   it('says why a screen has nothing to pick', () => {
     const { skipped } = pickDaily([row('1101')], [{ code: '1101', date: '2026-11-19' }], '2026-11-20')
     expect(skipped.length).toBeGreaterThan(0)

@@ -52,19 +52,33 @@ export const qualifies = (rating: OverallRating | undefined) => rating === 'stro
 
 const daysBetween = (a: string, b: string) => (Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000
 
+// A screen whose candidates come from elsewhere, already ranked (the active
+// ETF consensus, lib/research/activeEtf.ts).
+export interface ExtraScreen {
+  screenId: string
+  screenName: string
+  candidates: { code: string; name: string }[]
+}
+
+export const ACTIVE_CONSENSUS_SCREEN = { screenId: 'active-consensus', screenName: '主動 ETF 共識' }
+
 // One stock per screen: the top-ranked one not researched automatically in
 // the last 30 days and not picked by an earlier screen today.
-export function pickDaily(stocks: StockRow[], log: DailyResearchFile['log'], today: string, presets: PresetScreen[] = PRESET_SCREENS) {
+export function pickDaily(stocks: StockRow[], log: DailyResearchFile['log'], today: string, extra: ExtraScreen[] = [], presets: PresetScreen[] = PRESET_SCREENS) {
   const recent = new Set(log.filter((l) => daysBetween(l.date, today) < REPICK_DAYS).map((l) => l.code))
   const picks: { screenId: string; screenName: string; code: string; name: string }[] = []
   const skipped: DailyRun['skipped'] = []
-  for (const id of DAILY_SCREEN_IDS) {
-    const preset = presets.find((p) => p.id === id)
-    if (!preset) continue
-    const ranked = applyScreen(stocks, preset.screen)
-    const pick = ranked.find((s) => !recent.has(s.code) && !picks.some((p) => p.code === s.code))
-    if (pick) picks.push({ screenId: id, screenName: preset.name, code: pick.code, name: pick.name })
-    else skipped.push({ screenName: preset.name, reason: ranked.length === 0 ? '今天沒有符合的標的' : `符合的 ${ranked.length} 檔都在 ${REPICK_DAYS} 天內研究過` })
+  const screens: ExtraScreen[] = [
+    ...DAILY_SCREEN_IDS.flatMap((id) => {
+      const preset = presets.find((p) => p.id === id)
+      return preset ? [{ screenId: id, screenName: preset.name, candidates: applyScreen(stocks, preset.screen) }] : []
+    }),
+    ...extra,
+  ]
+  for (const { screenId, screenName, candidates } of screens) {
+    const pick = candidates.find((s) => !recent.has(s.code) && !picks.some((p) => p.code === s.code))
+    if (pick) picks.push({ screenId, screenName, code: pick.code, name: pick.name })
+    else skipped.push({ screenName, reason: candidates.length === 0 ? '今天沒有符合的標的' : `符合的 ${candidates.length} 檔都在 ${REPICK_DAYS} 天內研究過` })
   }
   return { picks, skipped }
 }
