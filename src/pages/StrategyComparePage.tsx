@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import type { BacktestStats, Cadence, CompareEntry, StrategyComparison, StrategyTemplate } from '../lib/storage/schema'
 import { DeepDive, type RunDraft } from '../components/backtest/DeepDive'
@@ -65,7 +65,15 @@ interface Loaded {
 // reading, re-runs with adjusted conditions on the data already downloaded,
 // and a deep dive into any one template.
 export function StrategyComparePage() {
+  // A new address (a stock picked from 最近的比較, or the browser's back
+  // button) starts the page over from its parameters.
+  const { search } = useLocation()
+  return <ComparePage key={search} />
+}
+
+function ComparePage() {
   const [search] = useSearchParams()
+  const navigate = useNavigate()
   const theses = useAppStore((s) => s.stockTheses)
   const policy = useAppStore((s) => s.investmentPolicy)
   const comparisons = useAppStore((s) => s.strategyComparisons)
@@ -504,6 +512,18 @@ export function StrategyComparePage() {
 
       {current && (
         <>
+          {comparisons.length > 0 && (
+            <button
+              type="button"
+              className="mt-6 text-sm font-medium text-indigo-700 hover:underline dark:text-indigo-400"
+              onClick={() => {
+                setCodeText('')
+                if (search.toString()) navigate('/sim/compare')
+              }}
+            >
+              ← 回到最近的比較
+            </button>
+          )}
           <div className={cardClass}>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
@@ -679,9 +699,9 @@ export function StrategyComparePage() {
               .slice(0, 10)
               .map((c) => (
                 <li key={c.id}>
-                  <button type="button" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400" onClick={() => setCodeText(c.symbol.split(',').map((x) => x.replace(/^TW:/, '')).join(', '))}>
+                  <Link to={`/sim/compare?symbols=${c.symbol}`} className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
                     {symbolLabel(c.symbol)} {c.name}
-                  </button>
+                  </Link>
                   ：{c.createdAt.slice(0, 10)}
                   {c.auto && `（每日自動研究・${c.auto.screen}）`}・{c.summary.headline}
                 </li>
