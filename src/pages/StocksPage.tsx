@@ -341,7 +341,7 @@ export function StocksPage() {
 
       {dailyRun && (
         <p className="mt-4 text-sm text-gray-700 dark:text-gray-300">
-          每日自動研究（{dailyRun.date.slice(5).replace('-', '/')} 06:00）：{runSummary(dailyRun)}。
+          每日自動研究（{dailyRun.date.slice(5).replace('-', '/')}）：{runSummary(dailyRun)}。
           {dailyRun.items.some((i) => i.comparison) && (
             <>
               {' '}

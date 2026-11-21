@@ -89,9 +89,14 @@ jobs:
         continue-on-error: true
       # One stock from each of seven screens: health check, then every
       # library template backtested for those rated 留意 or better.
+      # GitHub often starts schedules hours late and may drop one, so every
+      # scheduled run tries; the first one on a Taiwan date does the day's
+      # research and the rest skip it.
       - name: Daily automatic research
-        if: github.event.schedule == '0 22 * * *' || inputs.research
+        if: github.event_name == 'schedule' || inputs.research
         run: npx tsx scripts/daily-research.mts
+        env:
+          FORCE_RESEARCH: ${{ inputs.research && '1' || '' }}
         continue-on-error: true
       - run: npm run build
       - uses: actions/configure-pages@v5

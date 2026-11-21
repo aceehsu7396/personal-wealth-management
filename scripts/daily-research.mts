@@ -29,6 +29,12 @@ const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).sli
 
 const stocks = (JSON.parse(readFileSync('public/data/stocks.json', 'utf8')) as StockData).stocks
 const prev: DailyResearchFile | null = existsSync(OUT) ? (JSON.parse(readFileSync(OUT, 'utf8')) as DailyResearchFile) : null
+// One run per Taiwan date: later scheduled runs skip it (a manual run
+// with 執行每日自動研究 ticked redoes it).
+if (prev?.runs.some((r) => r.date === today) && !process.env.FORCE_RESEARCH) {
+  log(`${today} 已研究過，略過`)
+  process.exit(0)
+}
 const policy = createDefaultInvestmentPolicy()
 // The active ETF consensus (scripts/active-etf.mts runs first): listed
 // stocks only, since the backtest needs 證交所 prices.
