@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
-import { groupCards } from '../lib/backtest/cardGroups'
+import { groupCards, symbolNames } from '../lib/backtest/cardGroups'
 import {
   cancelOrder,
   paperStats,
@@ -87,33 +87,59 @@ function LatestCloses({ account, symbols, today }: { account: PaperAccount; symb
   )
 }
 
+// The stock first, then only the cards made for it.
 function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: string; onCreate: (a: Omit<PaperAccount, 'id' | 'createdAt'>) => void }) {
   const strategies = useAppStore((s) => s.tradingStrategies)
+  const watchlist = useAppStore((s) => s.watchlist)
+  const stockTheses = useAppStore((s) => s.stockTheses)
+  const paperAccounts = useAppStore((s) => s.paperAccounts)
+  const holdings = useAppStore((s) => s.holdings)
+  const names = useMemo(() => symbolNames({ watchlist, stockTheses, paperAccounts, holdings }), [watchlist, stockTheses, paperAccounts, holdings])
+  const groups = groupCards(
+    strategies.filter((s) => s.status !== 'retired'),
+    'symbol',
+    { runs: [], accounts: [], names },
+  )
+  const groupOf = (id: string) => groups.find((g) => g.cards.some((c) => c.id === id))?.key ?? ''
   const [name, setName] = useState('')
-  const [market, setMarket] = useState<'TW' | 'US'>('TW')
+  const [stock, setStock] = useState(() => groupOf(defaultStrategyId))
+  const cards = groups.find((g) => g.key === stock)?.cards ?? []
+  const marketOf = (key: string) => (key.split(',').every((x) => x.startsWith('US:')) && key ? 'US' : 'TW')
+  const [market, setMarket] = useState<'TW' | 'US'>(() => marketOf(stock))
   const [cash, setCash] = useState(1_000_000)
   const [strategyId, setStrategyId] = useState(defaultStrategyId)
   const strategy = strategies.find((s) => s.id === strategyId)
+
+  function chooseStock(key: string) {
+    setStock(key)
+    const list = groups.find((g) => g.key === key)?.cards ?? []
+    // One card: link it; several: let the user pick.
+    setStrategyId(list.length === 1 ? list[0].id : '')
+    if (key) setMarket(marketOf(key))
+  }
+
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <Field label="帳戶名稱">
         <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder={strategy?.name ?? '例：0050 均線練習'} />
       </Field>
+      <Field label="標的">
+        <select className={inputClass} value={stock} onChange={(e) => chooseStock(e.target.value)}>
+          <option value="">（不指定）</option>
+          {groups.map((g) => (
+            <option key={g.key} value={g.key}>
+              {g.label}（{g.cards.length} 張策略卡）
+            </option>
+          ))}
+        </select>
+      </Field>
       <Field label="連結策略卡">
-        <select className={inputClass} value={strategyId} onChange={(e) => setStrategyId(e.target.value)}>
-          <option value="">（不連結）</option>
-          {groupCards(
-            strategies.filter((s) => s.status !== 'retired'),
-            'symbol',
-            { runs: [], accounts: [], names: {} },
-          ).map((g) => (
-            <optgroup key={g.key} label={g.label}>
-              {g.cards.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </optgroup>
+        <select className={inputClass} value={strategyId} onChange={(e) => setStrategyId(e.target.value)} disabled={!stock}>
+          <option value="">{stock ? '（不連結）' : '先選標的'}</option>
+          {cards.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
           ))}
         </select>
       </Field>
@@ -126,7 +152,7 @@ function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: str
       <Field label="初始資金">
         <input type="number" step="10000" className={inputClass} value={cash} onChange={(e) => setCash(Number(e.target.value))} />
       </Field>
-      <div className="sm:col-span-4">
+      <div className="col-span-full">
         <button
           type="button"
           disabled={!(cash > 0)}
