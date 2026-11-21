@@ -719,6 +719,9 @@ export const BacktestRunSchema = z.object({
   equity: z.array(z.object({ date: z.string(), strategy: z.number(), benchmark: z.number() })),
   cadence: CadenceSchema.optional(),
   decisionDay: DecisionDaySchema.optional(),
+  // From the daily automatic research: kept with its card, apart from the
+  // cap on your own runs.
+  auto: z.boolean().optional(),
   createdAt: z.string(),
 })
 export type BacktestRun = z.infer<typeof BacktestRunSchema>

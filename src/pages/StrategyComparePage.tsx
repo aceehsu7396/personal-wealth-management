@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAppStore } from '../lib/storage/appStore'
 import type { BacktestStats, Cadence, CompareEntry, StrategyComparison, StrategyTemplate } from '../lib/storage/schema'
@@ -17,7 +17,8 @@ import { BACKTEST_SETTING_HELP, STRATEGY_TEMPLATES, defaultParams, formatSymbol,
 import { calmarOf } from '../lib/backtest/passRule'
 import { compareEntriesOf, useLibrary, withCompareSet } from '../lib/backtest/library'
 import { findDuplicate } from '../lib/backtest/cardGroups'
-import { DEFAULT_DECISION_DAY, isWeeklyTemplate, WEEKDAY_LABELS } from '../lib/backtest/weekly'
+import { cardDraftOf, entryLabel, runDraftOf } from '../lib/backtest/comparisonCard'
+import { DEFAULT_DECISION_DAY, WEEKDAY_LABELS } from '../lib/backtest/weekly'
 import { RunRecords } from '../components/backtest/RunRecords'
 import { FewTradesPanel } from '../components/backtest/FewTradesPanel'
 import { thesisForCode } from '../lib/research/strategyLink'
@@ -41,8 +42,6 @@ const YEARS = 5
 const pct = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(1)}%`)
 const num = (v: number | null | undefined) => (v === null || v === undefined || !Number.isFinite(v) ? '—' : v.toFixed(2))
 const signed = (v: number) => `${v >= 0 ? '+' : ''}${(v * 100).toFixed(1)}%`
-// Weekly rows say so in their name.
-const entryLabel = (e: CompareEntry) => (e.cadence === 'weekly' && !isWeeklyTemplate(e.template) ? `${e.label}（週）` : e.label)
 // Calendar days held, in weeks once past two.
 const holdText = (days: number) => (days >= 14 ? `${(days / 7).toFixed(1)} 週` : `${Math.round(days)} 天`)
 const paramText = (e: CompareEntry) => STRATEGY_TEMPLATES[e.template].params.map((p) => `${p.label} ${e.params[p.key] ?? p.default}`).join('、') || '—'
@@ -132,6 +131,12 @@ export function StrategyComparePage() {
   const forSymbol = comparisons.filter((c) => c.symbol === symbol)
   const current = runIds.length > 0 ? comparisons.find((c) => c.id === runIds.at(-1)) : forSymbol.at(-1)
   const previous = current ? forSymbol.filter((c) => c.createdAt < current.createdAt).at(-1) : undefined
+  // Cards made here belong to the comparison on screen.
+  const currentId = current?.id
+  useEffect(() => {
+    setCards({})
+    setReused({})
+  }, [currentId])
   const runnable = (e: CompareEntry) => !STRATEGY_TEMPLATES[e.template].multiSymbol || symbols.length >= 2
   const active = entries.filter((e) => !off.includes(e.key) && runnable(e))
 
@@ -211,60 +216,26 @@ export function StrategyComparePage() {
 
   // A chosen template becomes a strategy card in 開發中, with this run saved
   // as its first backtest so the usual path (paper trading, live gate) follows.
-  function createCard(c: StrategyComparison, row: Row, index: number) {
+  function createCard(c: StrategyComparison, row: Row) {
     if (!row.stats) return
-    const def = STRATEGY_TEMPLATES[row.entry.template]
-    const t = library.find((x) => x.id === row.entry.key)
-    const codes = c.symbol.split(',').map((x) => x.replace(/^TW:/, '')).join('、')
-    const benchIndex = c.rows.findIndex((r) => r.entry.template === 'buy_hold')
-    const benchmark = benchIndex >= 0 ? c.rows[benchIndex].stats : null
-    const weekly = row.entry.cadence === 'weekly'
-    const draft = {
-      name: `${entryLabel(row.entry)}・${codes}`,
-      template: row.entry.template,
-      params: row.entry.params,
-      symbols: c.symbol.split(','),
-      edge: t?.edge ?? '',
-      entryRules: t?.entryRules || def.entry,
-      exitRules: t?.exitRules || def.exit,
-      riskPerTradePercent: policy.riskPerTradePercent,
-      status: 'dev',
-      notes: `由 ${c.createdAt.slice(0, 10)} 的策略比較建立：${row.verdictReason || c.summary.headline}`,
-      ...(weekly ? { cadence: 'weekly' as const, ...(c.decisionDay ? { decisionDay: c.decisionDay } : {}) } : {}),
-    } as const
+    const draft = cardDraftOf(c, row, library, policy.riskPerTradePercent)
     // The same template, parameters and symbols already have a card: the
     // run goes there instead of a second card.
     const same = findDuplicate(strategies, draft)
     const id = same?.id ?? addTradingStrategy(draft)
     if (same) setReused((m) => ({ ...m, [row.entry.key]: same.name }))
-    addBacktestRun({
-      strategyId: id,
-      label: `${entryLabel(row.entry)}・${codes}（策略比較）`,
-      ...(weekly ? { cadence: 'weekly' as const, decisionDay: c.decisionDay ?? DEFAULT_DECISION_DAY } : {}),
-      template: row.entry.template,
-      params: row.entry.params,
-      symbols: c.symbol.split(','),
-      start: c.start,
-      end: c.end,
-      initialCapital: c.initialCapital,
-      outOfSampleStart: c.outOfSampleStart,
-      dividendAdjusted: true,
-      stats: row.stats,
-      benchmark: benchmark ?? row.stats,
-      equity: c.equity
-        .filter((p) => p.values[index] !== null)
-        .map((p) => ({ date: p.date, strategy: p.values[index] ?? 0, benchmark: benchIndex >= 0 ? (p.values[benchIndex] ?? 0) : 0 })),
-    })
+    const run = runDraftOf(c, row, id)
+    if (run) addBacktestRun(run)
     setCards((m) => ({ ...m, [row.entry.key]: id }))
     return id
   }
 
   // The deep dive's own run saved to the row's card: the card this page
   // was opened from, one made here, or a new one.
-  function saveDive(c: StrategyComparison, row: Row, index: number, run: RunDraft) {
+  function saveDive(c: StrategyComparison, row: Row, run: RunDraft) {
     let id = row.entry.key === cardKey && fromCard ? fromCard.id : cards[row.entry.key]
     if (!id) {
-      const made = createCard(c, row, index)
+      const made = createCard(c, row)
       if (!made) return
       id = made
     }
@@ -291,7 +262,6 @@ export function StrategyComparePage() {
   }
 
   const diveRow = current && dive ? current.rows.find((r) => r.entry.key === dive) : undefined
-  const diveIndex = current && diveRow ? current.rows.indexOf(diveRow) : -1
   const diveInput = useMemo<BacktestInput | null>(
     () =>
       current && diveRow && loaded && loaded.symbol === current.symbol && loaded.start === current.start && loaded.end === current.end
@@ -630,16 +600,25 @@ export function StrategyComparePage() {
                                 {dive === r.entry.key ? '收合檢驗' : '深入檢驗'}
                               </button>
                               {r.entry.key !== cardKey &&
-                                runIds.includes(current.id) &&
-                                (cards[r.entry.key] ? (
-                                  <Link to={`/sim/strategies?card=${cards[r.entry.key]}`} className={`${linkClass} whitespace-normal`}>
-                                    {reused[r.entry.key] ? `已有相同策略卡「${reused[r.entry.key]}」，回測已存入` : '已建立策略卡'}
-                                  </Link>
-                                ) : (
-                                  <button type="button" className={linkClass} onClick={() => createCard(current, r, i)}>
-                                    建立策略卡
-                                  </button>
-                                ))}
+                                (() => {
+                                  if (cards[r.entry.key])
+                                    return (
+                                      <Link to={`/sim/strategies?card=${cards[r.entry.key]}`} className={`${linkClass} whitespace-normal`}>
+                                        {reused[r.entry.key] ? `已有相同策略卡「${reused[r.entry.key]}」，回測已存入` : '已建立策略卡'}
+                                      </Link>
+                                    )
+                                  // A card made earlier (by hand or by the daily research).
+                                  const existing = findDuplicate(strategies, cardDraftOf(current, r, library, policy.riskPerTradePercent))
+                                  return existing ? (
+                                    <Link to={`/sim/strategies?card=${existing.id}`} className={`${linkClass} whitespace-normal`}>
+                                      已有策略卡「{existing.name}」
+                                    </Link>
+                                  ) : (
+                                    <button type="button" className={linkClass} onClick={() => createCard(current, r)}>
+                                      建立策略卡
+                                    </button>
+                                  )
+                                })()}
                             </div>
                           )}
                         </td>
@@ -661,7 +640,7 @@ export function StrategyComparePage() {
                   card={diveCard}
                   saved={savedDives.includes(`${current.id}:${diveRow.entry.key}`)}
                   saveLabel={diveRow.entry.key === cardKey ? '存為這張策略卡的回測' : cards[diveRow.entry.key] ? '存入剛建立的策略卡' : '建立策略卡並儲存回測'}
-                  onSave={(draft) => saveDive(current, diveRow, diveIndex, draft)}
+                  onSave={(draft) => saveDive(current, diveRow, draft)}
                   onApplyParam={(key, value) => {
                     setParam(diveRow.entry.key, key, value)
                     setStatus({ kind: 'info', message: `已把「${diveRow.entry.label}」的參數改為 ${value}，按「用目前條件再跑」重算。` })

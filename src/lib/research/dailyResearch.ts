@@ -1,4 +1,6 @@
-import type { StockThesis, StrategyComparison } from '../storage/schema'
+import type { BacktestRun, LibraryTemplate, StockThesis, StrategyComparison, TradingStrategy } from '../storage/schema'
+import { findDuplicate } from '../backtest/cardGroups'
+import { cardDraftOf, reliablePass, runDraftOf } from '../backtest/comparisonCard'
 import type { StockRow } from '../screener/stockData'
 import { applyScreen, PRESET_SCREENS, type PresetScreen } from '../screener/screens'
 import type { AutoResearch } from './autoResearch'
@@ -99,12 +101,15 @@ const autoKey = (c: Pick<StrategyComparison, 'auto' | 'symbol'>) => (c.auto ? c.
 // health check (verdict and notes kept) for existing ones, and the
 // comparisons, an automatic one replacing the older automatic one for the
 // same symbol. Your own comparisons are never touched.
+type DailyData = { stockTheses: StockThesis[]; strategyComparisons: StrategyComparison[]; tradingStrategies: TradingStrategy[]; backtestRuns: BacktestRun[] }
+
 export function applyDailyRun(
-  data: { stockTheses: StockThesis[]; strategyComparisons: StrategyComparison[] },
+  data: DailyData,
   run: DailyRun,
   now: string,
   newId: () => string,
-): { stockTheses: StockThesis[]; strategyComparisons: StrategyComparison[] } {
+  cards: { library: LibraryTemplate[]; riskPercent: number },
+): DailyData {
   let theses = data.stockTheses
   const added: StrategyComparison[] = []
   for (const item of run.items) {
@@ -130,7 +135,23 @@ export function applyDailyRun(
   const autos = [...data.strategyComparisons.filter((c) => c.auto && !replaced.has(autoKey(c) ?? '')), ...added].slice(-MAX_AUTO_COMPARISONS)
   // Keep the saved order: oldest first.
   const comparisons = [...own, ...autos].sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-  return { stockTheses: theses, strategyComparisons: comparisons }
+
+  // A template that passed with enough trades becomes a card (開發中) with
+  // this comparison as its backtest; one already there is left alone.
+  let strategies = data.tradingStrategies
+  let runs = data.backtestRuns
+  for (const c of added) {
+    for (const row of c.rows.filter(reliablePass)) {
+      const note = `每日自動研究（${c.auto?.screen}，${run.date}）建立：樣本外通過、交易 ${row.stats?.full.trades} 筆。${row.verdictReason}`
+      const draft = cardDraftOf(c, row, cards.library, cards.riskPercent, note)
+      if (findDuplicate(strategies, draft)) continue
+      const id = newId()
+      strategies = [...strategies, { ...draft, id, createdAt: now, updatedAt: now }]
+      const r = runDraftOf(c, row, id)
+      if (r) runs = [...runs, { ...r, id: newId(), createdAt: now }]
+    }
+  }
+  return { stockTheses: theses, strategyComparisons: comparisons, tradingStrategies: strategies, backtestRuns: runs }
 }
 
 // Runs not yet imported, oldest first.

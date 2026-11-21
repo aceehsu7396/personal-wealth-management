@@ -96,6 +96,8 @@ describe('applyDailyRun', () => {
     ({ ...comparison(symbol), id, createdAt, ...(isAuto ? { auto: { screen: '價值', date: '' } } : {}) }) as StrategyComparison
   let n = 0
   const newId = () => `id${++n}`
+  const data = (over: Partial<Parameters<typeof applyDailyRun>[0]>) => ({ stockTheses: [], strategyComparisons: [], tradingStrategies: [], backtestRuns: [], ...over })
+  const cards = { library: [], riskPercent: 1 }
 
   it('adds a new card, refreshes an existing one and keeps its verdict', () => {
     const mine = { ...blankThesis(), ticker: '2330', id: 't1', createdAt: '', updatedAt: '', verdict: 'invest', verdictNote: '我的理由' } as StockThesis
@@ -108,7 +110,7 @@ describe('applyDailyRun', () => {
         { screenId: 'growth', screenName: '成長', code: '3008', name: '大立光', error: '額度用完' },
       ],
     }
-    const out = applyDailyRun({ stockTheses: [mine], strategyComparisons: [] }, run, 'now', newId)
+    const out = applyDailyRun(data({ stockTheses: [mine] }), run, 'now', newId, cards)
     expect(out.stockTheses).toHaveLength(2)
     const updated = out.stockTheses.find((t) => t.id === 't1')!
     expect(updated.verdict).toBe('invest')
@@ -125,7 +127,7 @@ describe('applyDailyRun', () => {
   it('replaces only the older automatic comparison of the same symbol', () => {
     const before = [saved('own', 'TW:2330', '2026-11-01'), saved('old', 'TW:2330', '2026-11-02', true), saved('other', 'TW:2317', '2026-11-03', true)]
     const run: DailyRun = { date: '2026-11-20', skipped: [], items: [{ screenId: 'large', screenName: '大型權值', code: '2330', name: '', auto: auto('z'), rating: 'strong', comparison: comparison('TW:2330') }] }
-    const ids = applyDailyRun({ stockTheses: [], strategyComparisons: before }, run, '2026-11-20', newId).strategyComparisons.map((c) => c.id)
+    const ids = applyDailyRun(data({ strategyComparisons: before }), run, '2026-11-20', newId, cards).strategyComparisons.map((c) => c.id)
     expect(ids).toContain('own')
     expect(ids).toContain('other')
     expect(ids).not.toContain('old')
@@ -138,9 +140,35 @@ describe('applyDailyRun', () => {
       ...Array.from({ length: MAX_AUTO_COMPARISONS }, (_, i) => saved(`a${i}`, `TW:${2000 + i}`, `2026-11-01T00:00:${String(i).padStart(2, '0')}`, true)),
     ]
     const run: DailyRun = { date: '2026-11-20', skipped: [], items: [{ screenId: 'value', screenName: '價值', code: '9999', name: '', auto: auto('z'), rating: 'strong', comparison: comparison('TW:9999') }] }
-    const list = applyDailyRun({ stockTheses: [], strategyComparisons: before }, run, '2026-11-20', newId).strategyComparisons
+    const list = applyDailyRun(data({ strategyComparisons: before }), run, '2026-11-20', newId, cards).strategyComparisons
     expect(list.filter((c) => !c.auto)).toHaveLength(20)
     expect(list.filter((c) => c.auto)).toHaveLength(MAX_AUTO_COMPARISONS)
     expect(list.some((c) => c.id === 'a0')).toBe(false)
+  })
+
+  it('makes a card for each template that passed with 20 or more trades', () => {
+    const st = (trades: number) => ({ full: { totalReturn: 0.1, cagr: 0.1, maxDrawdown: -0.1, sharpe: 1, trades, winRate: 0.5, profitFactor: 1.5, exposure: 0.5 }, inSample: null, outOfSample: null })
+    const row = (key: string, passed: boolean | null, trades: number, role: 'signal' | 'benchmark' = 'signal') => ({
+      entry: { key, label: key, template: 'donchian' as const, params: { entryDays: key.length }, role },
+      stats: st(trades),
+      passed,
+      verdictReason: '樣本外勝過',
+      warnings: [],
+      costSensitive: false,
+      deflatedProbability: null,
+      avgR: null,
+    })
+    const c = { ...comparison('TW:2330'), rows: [row('ok', true, 25), row('few', true, 5), row('fail', false, 40), row('buy_hold', null, 1, 'benchmark')] }
+    const run: DailyRun = { date: '2026-11-21', skipped: [], items: [{ screenId: 'large', screenName: '大型權值', code: '2330', name: '台積電', auto: auto('z'), rating: 'strong', comparison: c }] }
+    const out = applyDailyRun(data({}), run, 'now', newId, cards)
+    expect(out.tradingStrategies.map((s) => s.name)).toEqual(['ok・2330'])
+    expect(out.tradingStrategies[0]).toMatchObject({ status: 'dev', symbols: ['TW:2330'] })
+    expect(out.tradingStrategies[0].notes).toContain('每日自動研究（大型權值，2026-11-21）')
+    expect(out.backtestRuns).toHaveLength(1)
+    expect(out.backtestRuns[0]).toMatchObject({ strategyId: out.tradingStrategies[0].id, auto: true, equity: [] })
+    // The same card is not made twice.
+    const again = applyDailyRun({ ...out, strategyComparisons: [] }, { ...run, date: '2026-11-22' }, 'now', newId, cards)
+    expect(again.tradingStrategies).toHaveLength(1)
+    expect(again.backtestRuns).toHaveLength(1)
   })
 })

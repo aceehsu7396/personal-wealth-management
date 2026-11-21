@@ -3,6 +3,7 @@ import { persist, createJSONStorage, type StateStorage } from 'zustand/middlewar
 import { upsertSnapshot } from '../calculations/netWorth'
 import { purgeCaches, setItemMakingRoom } from './cacheCleanup'
 import { applyDailyRun, type DailyRun } from '../research/dailyResearch'
+import { defaultLibrary } from '../backtest/library'
 import {
   AppDataSchema,
   SCHEMA_VERSION,
@@ -262,6 +263,13 @@ function toAppData(state: AppData): AppData {
 // Keep localStorage bounded: only the most recent backtests are stored.
 export const MAX_BACKTEST_RUNS = 40
 export const MAX_STRATEGY_COMPARISONS = 20
+
+// Your own runs are capped; the daily research's runs stay with their cards.
+function capOwnRuns(list: BacktestRun[]): BacktestRun[] {
+  const own = list.filter((r) => !r.auto)
+  const drop = new Set(own.slice(0, Math.max(0, own.length - MAX_BACKTEST_RUNS)).map((r) => r.id))
+  return list.filter((r) => !drop.has(r.id))
+}
 
 // Your own comparisons are capped here; the automatic ones separately
 // (lib/research/dailyResearch.ts), so they never push yours out.
@@ -530,14 +538,16 @@ export const useAppStore = create<AppStore>()(
         })),
 
       removeTradingStrategy: (id) =>
-        set((state) => ({ tradingStrategies: state.tradingStrategies.filter((t) => t.id !== id) })),
+        set((state) => ({
+          tradingStrategies: state.tradingStrategies.filter((t) => t.id !== id),
+          // An automatic card's run goes with it.
+          backtestRuns: state.backtestRuns.filter((r) => !(r.auto && r.strategyId === id)),
+        })),
 
       addBacktestRun: (entry) => {
         const id = crypto.randomUUID()
         set((state) => ({
-          backtestRuns: [...state.backtestRuns, { ...entry, id, createdAt: new Date().toISOString() }].slice(
-            -MAX_BACKTEST_RUNS,
-          ),
+          backtestRuns: capOwnRuns([...state.backtestRuns, { ...entry, id, createdAt: new Date().toISOString() }]),
         }))
         return id
       },
@@ -563,7 +573,8 @@ export const useAppStore = create<AppStore>()(
       importDailyResearch: (run) =>
         set((state) => {
           if (state.dailyResearchImported && run.date <= state.dailyResearchImported) return {}
-          return { ...applyDailyRun(state, run, new Date().toISOString(), () => crypto.randomUUID()), dailyResearchImported: run.date }
+          const cards = { library: state.strategyLibrary ?? defaultLibrary(state.compareSet), riskPercent: state.investmentPolicy.riskPerTradePercent }
+          return { ...applyDailyRun(state, run, new Date().toISOString(), () => crypto.randomUUID(), cards), dailyResearchImported: run.date }
         }),
 
       addPaperAccount: (entry) => {

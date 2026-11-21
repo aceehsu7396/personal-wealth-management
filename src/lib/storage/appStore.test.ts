@@ -91,4 +91,19 @@ describe('appStore storage', () => {
     expect(list.filter((c) => !c.auto)).toHaveLength(20)
     expect(list.filter((c) => c.auto)).toHaveLength(1)
   })
+
+  it("keeps the daily research's runs apart from the cap on yours, and drops them with their card", async () => {
+    store.set('pfm:appData', JSON.stringify({ state: blank(), version: SCHEMA_VERSION }))
+    const { useAppStore } = await import('./appStore')
+    await useAppStore.persist.rehydrate()
+    const st = { totalReturn: 0, cagr: 0, maxDrawdown: 0, sharpe: null, trades: 0, winRate: null, profitFactor: null, exposure: 0 }
+    const run = (auto: boolean, strategyId = 'x') => ({ strategyId, label: '', template: 'donchian', params: {}, symbols: [], start: '', end: '', initialCapital: 1, outOfSampleStart: null, dividendAdjusted: true, stats: { full: st, inSample: null, outOfSample: null }, benchmark: { full: st, inSample: null, outOfSample: null }, equity: [], ...(auto ? { auto: true } : {}) }) as never
+    const s = useAppStore.getState()
+    s.addBacktestRun(run(true, 'card1'))
+    for (let i = 0; i < 45; i++) s.addBacktestRun(run(false))
+    expect(useAppStore.getState().backtestRuns.filter((r) => !r.auto)).toHaveLength(40)
+    expect(useAppStore.getState().backtestRuns.filter((r) => r.auto)).toHaveLength(1)
+    s.removeTradingStrategy('card1')
+    expect(useAppStore.getState().backtestRuns.filter((r) => r.auto)).toHaveLength(0)
+  })
 })
