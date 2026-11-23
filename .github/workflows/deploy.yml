@@ -13,7 +13,11 @@ on:
   workflow_dispatch:
     inputs:
       research:
-        description: 執行每日自動研究
+        description: 執行每日自動研究（當天已研究過也重做）
+        type: boolean
+        default: false
+      auto:
+        description: 看門狗補跑（每日研究照常判斷是否該做）
         type: boolean
         default: false
 
@@ -45,7 +49,7 @@ jobs:
       - name: Restore last published data
         run: |
           mkdir -p public/data
-          for f in macro stocks funds indices events valuation daily-research active-etf; do
+          for f in macro stocks funds indices events valuation daily-research active-etf health; do
             curl -sf -o "public/data/$f.json" "https://aceehsu7396.github.io/personal-wealth-management/data/$f.json" \
               || rm -f "public/data/$f.json"
           done
@@ -93,10 +97,16 @@ jobs:
       # scheduled run tries; the first one on a Taiwan date does the day's
       # research and the rest skip it.
       - name: Daily automatic research
-        if: github.event_name == 'schedule' || inputs.research
+        if: github.event_name == 'schedule' || inputs.research || inputs.auto
         run: npx tsx scripts/daily-research.mts
         env:
           FORCE_RESEARCH: ${{ inputs.research && '1' || '' }}
+        continue-on-error: true
+      # Is every file as new as it should be? Anything late has its script
+      # run once more here; the watchdog workflow keeps retrying and only
+      # then notifies (handbook 附錄 C §7).
+      - name: Check data freshness
+        run: npx tsx scripts/data-health.mts
         continue-on-error: true
       - run: npm run build
       - uses: actions/configure-pages@v5

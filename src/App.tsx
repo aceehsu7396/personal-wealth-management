@@ -9,6 +9,7 @@ import { NavBar } from './components/layout/NavBar'
 import { ScrollToTop } from './components/layout/ScrollToTop'
 import { PortfolioSnapshotRecorder } from './components/PortfolioSnapshotRecorder'
 import { DailyResearchImporter } from './components/research/DailyResearchImporter'
+import { DataHealthNotice } from './components/DataHealthNotice'
 import { AutoPaperRoutine } from './components/paper/AutoPaperRoutine'
 import { HOME_PATH, LEGACY_REDIRECTS } from './components/layout/navigation'
 import { DashboardPage } from './pages/DashboardPage'
@@ -53,6 +54,7 @@ function App() {
             <NavBar />
             <DemoBanner />
             <StorageWarning />
+            <DataHealthNotice />
             <PortfolioSnapshotRecorder />
             <DailyResearchImporter />
             <AutoPaperRoutine />

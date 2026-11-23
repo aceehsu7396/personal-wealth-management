@@ -5,6 +5,7 @@
 //   npx tsx scripts/stocks-data.mts
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { isEtfCode, priceReturn, type StockData, type StockRow } from '../src/lib/screener/stockData.ts'
+import { closeDue } from '../src/lib/paper/autoRoutine.ts'
 
 const OUT = 'public/data/stocks.json'
 const OPENAPI = 'https://openapi.twse.com.tw/v1'
@@ -103,6 +104,20 @@ async function closesOn(date: string): Promise<Map<string, number>> {
   throw new Error(`找不到 ${date} 前後的收盤資料`)
 }
 
+// The whole market's closes and turnover of one trading day, shaped like
+// STOCK_DAY_ALL rows; empty when that day has no data (yet).
+async function dayFromMiIndex(date: string): Promise<{ Date: string; Code: string; Name: string; TradeValue: string; ClosingPrice: string }[]> {
+  const ymd = date.replace(/-/g, '')
+  const json = await getJson<{ stat: string; tables?: { fields?: string[]; data?: string[][] }[] }>(
+    `https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=${ymd}&type=ALLBUT0999&response=json`,
+  )
+  const table = json.tables?.find((t) => t.fields?.includes('證券代號') && t.fields.includes('收盤價'))
+  if (json.stat !== 'OK' || !table?.data?.length) return []
+  const f = table.fields!
+  const at = (name: string) => f.indexOf(name)
+  return table.data.map((r) => ({ Date: ymd, Code: r[at('證券代號')], Name: r[at('證券名稱')], TradeValue: r[at('成交金額')], ClosingPrice: r[at('收盤價')] }))
+}
+
 function monthsAgo(date: string, months: number): string {
   const d = new Date(`${date}T00:00:00Z`)
   d.setUTCMonth(d.getUTCMonth() - months)
@@ -112,8 +127,24 @@ function monthsAgo(date: string, months: number): string {
 async function main() {
   const errors: string[] = []
   type Daily = { Date: string; Code: string; Name: string; TradeValue: string; ClosingPrice: string }
-  const daily = (await getJson<Record<string, string>[]>(`${OPENAPI}/exchangeReport/STOCK_DAY_ALL`)).map(dayAllRow) as Daily[]
-  const date = rocDate(daily[0].Date)
+  let daily = (await getJson<Record<string, string>[]>(`${OPENAPI}/exchangeReport/STOCK_DAY_ALL`)).map(dayAllRow) as Daily[]
+  let date = rocDate(daily[0].Date)
+  // The open API often serves the day before until the next morning; the
+  // day's closes are already in MI_INDEX after 14:30 (handbook 附錄 C §7).
+  let source = '證交所開放資料 STOCK_DAY_ALL'
+  const due = closeDue(new Date())
+  if (date < due) {
+    try {
+      const fresh = await dayFromMiIndex(due)
+      if (fresh.length > 0) {
+        daily = fresh
+        date = due
+        source = '證交所每日收盤行情 MI_INDEX（開放資料尚未更新）'
+      }
+    } catch (e) {
+      console.warn(`[stocks-data] MI_INDEX ${due} 失敗：${(e as Error).message}`)
+    }
+  }
 
   const attempt = async <T,>(label: string, task: () => Promise<T>): Promise<T | null> => {
     try {
@@ -175,10 +206,10 @@ async function main() {
     })
     .filter((s) => s.close !== null)
 
-  const data: StockData = { generatedAt: new Date().toISOString(), date, errors, stocks }
+  const data: StockData = { generatedAt: new Date().toISOString(), date, source, errors, stocks }
   mkdirSync('public/data', { recursive: true })
   writeFileSync(OUT, JSON.stringify(data))
-  console.log(`[stocks-data] ${OUT}：${stocks.length} 檔（${date}）、${errors.length} 個錯誤`)
+  console.log(`[stocks-data] ${OUT}：${stocks.length} 檔（${date}，${source}）、${errors.length} 個錯誤`)
 }
 
 await main()

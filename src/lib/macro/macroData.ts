@@ -65,6 +65,9 @@ export interface MacroData {
   // Month-end closes of the tracked indices (last month may be in
   // progress), to check Fubon's forecasts when a report gives no actual.
   indexCloses?: MarketCloses
+  // The newest outlook listed on Fubon's site, parsed or not: shown as a
+  // link when the PDF could not be read yet, and checked for freshness.
+  fubonLatestListed?: { date: string; title: string; pdfUrl: string }
 }
 
 // Free sources (no API key) for the month-end closes.

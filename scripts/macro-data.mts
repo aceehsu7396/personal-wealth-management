@@ -116,12 +116,13 @@ async function marginOn(date: string): Promise<Point | null> {
 // --- Fubon monthly outlooks -----------------------------------------------
 
 // The newest issue listed on the site, to tell when parsing falls behind.
-let newestListed: string | null = null
+let newestListed: MacroData['fubonLatestListed'] | null = null
 
 async function fubon(): Promise<FubonReportData[]> {
   const html = await (await get(`${FUBON}/financial-news/research`)).text()
   const listed = parseResearchList(html).slice(0, FUBON_REPORTS)
-  newestListed = listed[0]?.listedDate ?? null
+  const top = listed[0]
+  newestListed = top ? { date: top.listedDate, title: top.title || '富邦市場展望', pdfUrl: `${FUBON}${top.path.split('/').map((p) => encodeURIComponent(decodeURIComponent(p))).join('/')}` } : null
   // Keyed by the date printed in the PDF; a later upload of the same issue wins.
   const byDate = new Map<string, FubonReportData>()
   for (const f of [...listed].reverse()) {
@@ -227,8 +228,8 @@ async function main() {
   // An issue listed weeks after the newest one parsed: the site or the PDF
   // layout changed, and the page would quietly show an old outlook.
   const newestParsed = reports.at(-1)?.reportDate
-  if (newestListed && newestParsed && Date.parse(newestListed) - Date.parse(newestParsed) > 20 * 86400000) {
-    errors.push(`富邦市場展望：網站已有 ${newestListed} 上架的新一期，但只解析到 ${newestParsed}，請檢查解析程式`)
+  if (newestListed && newestParsed && Date.parse(newestListed.date) - Date.parse(newestParsed) > 20 * 86400000) {
+    errors.push(`富邦市場展望：網站已有 ${newestListed.date} 上架的新一期，但只解析到 ${newestParsed}，請檢查解析程式`)
   }
 
   const data: MacroData = {
@@ -238,6 +239,7 @@ async function main() {
     margin: now && earlier ? { now, before: earlier } : null,
     fubon: reports,
     indexCloses: closes,
+    ...(newestListed ? { fubonLatestListed: newestListed } : {}),
   }
   mkdirSync('public/data', { recursive: true })
   writeFileSync(OUT, JSON.stringify(data))

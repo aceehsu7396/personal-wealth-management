@@ -5,12 +5,13 @@ import { DemoControl } from '../components/DemoBanner'
 import { AiKeySettings } from '../components/AiKeySettings'
 import { SyncCard } from '../components/settings/SyncCard'
 import { TradingPrefsCard } from '../components/settings/TradingPrefsCard'
+import { DataHealthCard } from '../components/settings/DataHealthCard'
 import { PageHeader } from '../components/ui'
 
 export function SettingsPage() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
-      <PageHeader title="設定" summary="個人資料、建議規則參數、週頻交易判斷日、同步與推播，以及資料管理。" />
+      <PageHeader title="設定" summary="個人資料、建議規則參數、週頻交易判斷日、資料狀態、同步與推播，以及資料管理。" />
 
       <div className="mt-8">
         <SyncCard />
@@ -36,6 +37,8 @@ export function SettingsPage() {
       </div>
 
       <TradingPrefsCard />
+
+      <DataHealthCard />
 
       <div className="mt-8 rounded-lg border border-gray-200 bg-white p-6 dark:border-gray-700 dark:bg-gray-800">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">

@@ -41,6 +41,7 @@ npm run ui-check   # 畫面檢查，規範見 docs/ui-guidelines.md
 | `events-data.mts` | 事件日曆：除權息與法說會 |
 | `fund-nav.mts` | 基金淨值 |
 | `active-etf.mts` | 規模前三大主動式 ETF 的每日持股（開源專案 active-etf，統一與復華再和官網比對；手冊 06 §1.2） |
+| `data-health.mts` | 每次更新最後檢查各份資料是否夠新，過期就重跑一次，結果寫成 `health.json`；看門狗（`.github/workflows/watchdog.yml`）每小時檢查線上資料、必要時觸發更新，修復失敗 12 小時才寄信（附錄 C §7） |
 | `daily-research.mts` | 每天 06:00 的自動研究：7 個篩選組合與主動 ETF 共識各選 1 檔體檢，評等留意以上的再回測全部範本（手冊 06 §1.1） |
 
 手動執行：

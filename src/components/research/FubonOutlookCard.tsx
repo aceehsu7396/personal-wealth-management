@@ -140,6 +140,18 @@ export function FubonOutlookCard({ data }: { data: MacroData | null }) {
         每天由 GitHub 自動讀取富邦金控「富邦總經觀點－市場展望」，依固定格式擷取配置觀點、預測區間與各段重點（免 API 金鑰），並逐月追蹤預測命中。
       </p>
 
+      {/* A newer issue is listed but its PDF could not be read yet: link it
+          rather than show an old outlook as the latest (附錄 C §7). */}
+      {data?.fubonLatestListed && (!latest || Date.parse(data.fubonLatestListed.date) - Date.parse(latest.reportDate) > 20 * 86400000) && (
+        <p className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+          最新一期已於 {data.fubonLatestListed.date} 上架，內容待解析（自動修復中）：
+          <a href={data.fubonLatestListed.pdfUrl} target="_blank" rel="noreferrer" className={linkClass}>
+            {data.fubonLatestListed.title}
+          </a>
+          。下方仍是上一期 {latest?.reportDate ?? ''}。
+        </p>
+      )}
+
       {!latest ? (
         <p className="mt-4 text-sm text-gray-600 dark:text-gray-300">
           目前沒有可用的富邦報告資料。可以直接到{' '}

@@ -1,0 +1,64 @@
+name: Data watchdog
+
+# Every hour (every half hour on weekday afternoons and evenings, Taiwan
+# time): is the live data as new as it should be? If not, run the data jobs
+# again; only when repairs have failed for hours does this run fail, and
+# GitHub emails the owner (handbook 附錄 C §7). Odd minutes, since GitHub
+# often drops schedules on the hour.
+on:
+  schedule:
+    - cron: '17 * * * *'
+    - cron: '47 5-15 * * 1-5'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check the live data
+        id: health
+        run: npx tsx scripts/data-health.mts --live
+      # A data run already under way, or started in the last 90 minutes,
+      # is left to finish.
+      - name: Run the data jobs again
+        if: steps.health.outputs.dispatch == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          recent=$(gh run list --workflow deploy.yml --limit 5 --json status,createdAt \
+            --jq "[.[] | select(.status != \"completed\" or (now - (.createdAt | fromdateiso8601)) < 5400)] | length")
+          if [ "$recent" -gt 0 ]; then
+            echo "資料更新正在進行或剛跑過，這次不重跑"
+          else
+            gh workflow run deploy.yml -f auto=true
+            echo "已觸發資料更新"
+          fi
+      - name: Notify when repairs have failed
+        if: steps.health.outputs.notify == 'true'
+        env:
+          REPORT: ${{ steps.health.outputs.report }}
+        run: |
+          {
+            echo "## 資料自動修復失敗，需要處理"
+            echo
+            echo "$REPORT"
+            echo
+            echo "網站：設定 → 資料狀態。修好後會自動恢復，不需要做其他事。"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$REPORT"
+          exit 1

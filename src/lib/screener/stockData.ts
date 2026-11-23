@@ -31,6 +31,8 @@ export interface StockData {
   generatedAt: string
   // Latest trading day of the prices.
   date: string
+  // Where the day's closes came from (MI_INDEX when the open API lags).
+  source?: string
   errors: string[]
   stocks: StockRow[]
 }
