@@ -33,11 +33,14 @@ export async function fetchQuotes(
   today: string,
   onStep: (s: string) => void,
   onMiss: (symbol: string) => void = () => {},
+  // Each symbol as it starts (undefined) and finishes (the quote or null).
+  onQuote: (symbol: string, quote: Quote | null | undefined) => void = () => {},
 ): Promise<Record<string, Quote>> {
   const out: Record<string, Quote> = {}
   let twse = 0
   for (const symbol of symbols) {
     onStep(`取得 ${formatSymbol(symbol)} 最新收盤價…`)
+    onQuote(symbol, undefined)
     let quote: Quote | null = null
     if (symbol.startsWith('TW:')) {
       if (twse++ > 0) await sleep(TWSE_REQUEST_GAP_MS)
@@ -57,6 +60,7 @@ export async function fetchQuotes(
     }
     if (quote) out[symbol] = quote
     else onMiss(symbol)
+    onQuote(symbol, quote)
   }
   return out
 }
@@ -115,6 +119,27 @@ export function routineAccounts(accounts: PaperAccount[], strategies: TradingStr
   })
 }
 
+// What the routine is doing, for the progress panel.
+export interface SymbolProgress {
+  symbol: string
+  status: 'pending' | 'fetching' | 'done' | 'missing' | 'manual'
+  price?: number
+  date?: string
+}
+
+export interface AccountProgress {
+  id: string
+  name: string
+  status: 'pending' | 'prices' | 'advising' | 'done' | 'failed'
+  note?: string
+}
+
+export interface RoutineProgress {
+  phase: 'prices' | 'advice' | 'finished'
+  symbols: SymbolProgress[]
+  accounts: AccountProgress[]
+}
+
 export interface RoutineInput {
   accounts: PaperAccount[]
   strategies: TradingStrategy[]
@@ -129,6 +154,7 @@ export interface RoutineInput {
   // on what the previous one saved.
   latest: (id: string) => PaperAccount
   save: (account: PaperAccount) => void
+  onProgress?: (progress: RoutineProgress) => void
 }
 
 export interface RoutineResult {
@@ -147,24 +173,63 @@ export async function runPaperRoutine(input: RoutineInput, deps: RoutineDeps = d
   const advised = routineAccounts(input.accounts, input.strategies)
   const fetched: Record<string, Quote> = {}
   const tried = new Set<string>()
+  const strategyOf = (account: PaperAccount) => input.strategies.find((s) => s.id === account.strategyId)
+  // Every symbol up front, so the panel shows the whole list from the start.
+  const progress: RoutineProgress = {
+    phase: 'prices',
+    symbols: [...new Set(input.accounts.flatMap((a) => priceSymbols(input.latest(a.id), strategyOf(a))))].map((symbol) => ({ symbol, status: 'pending' })),
+    accounts: input.accounts.map((a) => ({ id: a.id, name: a.name, status: 'pending' })),
+  }
+  const report = () => input.onProgress?.({ phase: progress.phase, symbols: progress.symbols.map((x) => ({ ...x })), accounts: progress.accounts.map((x) => ({ ...x })) })
+  const setSymbol = (symbol: string, patch: Omit<SymbolProgress, 'symbol'>) => {
+    const i = progress.symbols.findIndex((x) => x.symbol === symbol)
+    if (i >= 0) progress.symbols[i] = { symbol, ...patch }
+    else progress.symbols.push({ symbol, ...patch })
+    report()
+  }
+  const setAccount = (id: string, patch: Partial<AccountProgress>) => {
+    progress.accounts = progress.accounts.map((a) => (a.id === id ? { ...a, ...patch } : a))
+    report()
+  }
+  report()
   for (const account of input.accounts) {
-    const strategy = input.strategies.find((s) => s.id === account.strategyId)
+    const strategy = strategyOf(account)
     const step = (s: string) => input.onStep(`${account.name}：${s}`)
+    setAccount(account.id, { status: 'prices' })
     try {
       const symbols = priceSymbols(input.latest(account.id), strategy)
       const need = symbols.filter((s) => !tried.has(s))
-      Object.assign(fetched, await deps.fetchQuotes(need, input.today, step, (s) => result.missing.push(s)))
+      Object.assign(
+        fetched,
+        await deps.fetchQuotes(need, input.today, step, (s) => result.missing.push(s), (s, q) =>
+          setSymbol(s, q === undefined ? { status: 'fetching' } : q ? { status: 'done', price: q.price, date: q.date } : { status: 'missing' }),
+        ),
+      )
       for (const s of need) tried.add(s)
       const quotes = Object.fromEntries(symbols.filter((s) => fetched[s]).map((s) => [s, fetched[s]]))
-      for (const s of symbols) if (input.manual?.[s]) quotes[s] = input.manual[s]
+      for (const s of symbols) {
+        const typed = input.manual?.[s]
+        if (!typed) continue
+        quotes[s] = typed
+        setSymbol(s, { status: 'manual', price: typed.price, date: typed.date })
+      }
       input.save(updatePrices(input.latest(account.id), quotes))
       if (strategy && advised.some((x) => x.account.id === account.id) && STRATEGY_TEMPLATES[strategy.template].backtestable) {
+        progress.phase = 'advice'
+        setAccount(account.id, { status: 'advising' })
         input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay }, deps))
+        progress.phase = 'prices'
       }
       result.done.push(account.name)
+      setAccount(account.id, { status: 'done' })
     } catch (error) {
       result.failed.push({ name: account.name, error })
+      // Symbols this account left half done.
+      for (const x of progress.symbols) if (x.status === 'fetching') setSymbol(x.symbol, { status: 'missing' })
+      setAccount(account.id, { status: 'failed', note: error instanceof Error ? error.message : String(error) })
     }
   }
+  progress.phase = 'finished'
+  report()
   return result
 }

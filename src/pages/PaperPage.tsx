@@ -14,7 +14,8 @@ import { STRATEGY_TEMPLATES, formatSymbol, parseSymbolList } from '../lib/backte
 import { liveGate, paperRulesFor } from '../lib/calculations/strategyProgress'
 import { cadenceOf, DEFAULT_DECISION_DAY, WEEKDAY_LABELS } from '../lib/backtest/weekly'
 import { orderChecks, resolveItem } from '../lib/paper/assistant'
-import { adviseAccount, fetchQuotes, priceSymbols, routineAccounts, runPaperRoutine } from '../lib/paper/routine'
+import { adviseAccount, fetchQuotes, priceSymbols, routineAccounts, runPaperRoutine, type RoutineProgress } from '../lib/paper/routine'
+import { RoutineProgressPanel } from '../components/paper/RoutineProgressPanel'
 import { useJourney } from '../lib/useJourney'
 import { useRegime } from '../lib/market/useRegime'
 import { OrderCheckList, PaperAssistant } from '../components/paper/PaperAssistant'
@@ -193,6 +194,8 @@ export function PaperPage() {
   const [selectedId, setSelectedId] = useState<string | null>(preset?.id ?? accounts[0]?.id ?? null)
   const [creating, setCreating] = useState(accounts.length === 0 || (presetStrategy !== '' && !preset))
   const [busy, setBusy] = useState<string | null>(null)
+  // The last 更新收盤價並產生建議: progress while it runs, then its summary.
+  const [progress, setProgress] = useState<RoutineProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
   // Symbols the last update could not get a close for.
   const [missing, setMissing] = useState<string[]>([])
@@ -245,6 +248,7 @@ export function PaperPage() {
   // card, and for this one whenever its card has rules.
   async function updateAndAdvise() {
     if (!account) return
+    setProgress(null)
     await guarded('更新收盤價…', async () => {
       const res = await runPaperRoutine({
         accounts,
@@ -257,12 +261,23 @@ export function PaperPage() {
         manual: manualQuotes(priceSymbols(account, strategy)),
         latest: (id) => useAppStore.getState().paperAccounts.find((a) => a.id === id)!,
         save: replacePaperAccount,
+        onProgress: setProgress,
       })
       setMissing(res.missing)
       if (res.failed.length > 0) throw new Error(res.failed.map((f) => `${f.name}：${describeAiError(f.error)}`).join('；'))
       if (canSignal && strategy && !routineAccounts([current()], strategies).length) {
+        // This account's card is not in paper trading: its suggestions too.
+        const mark = (status: 'advising' | 'done' | 'failed', phase: RoutineProgress['phase'], note?: string) =>
+          setProgress((p) => p && { ...p, phase, accounts: p.accounts.map((a) => (a.id === account.id ? { ...a, status, ...(note ? { note } : {}) } : a)) })
+        mark('advising', 'advice')
         setBusy(weekly ? '計算本週建議…' : '計算今日建議…')
-        save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay }))
+        try {
+          save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay }))
+          mark('done', 'finished')
+        } catch (e) {
+          mark('failed', 'finished', describeAiError(e))
+          throw e
+        }
       }
     })
   }
@@ -436,7 +451,8 @@ export function PaperPage() {
           {missing.length} 檔取不到收盤價：{missing.map(formatSymbol).join('、')}。證交所與 FinMind 都沒有資料，可能是代號有誤、停牌或剛上市；FinMind 免費額度用完時，約 10 分鐘後再試。
         </p>
       )}
-      {busy && <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">{busy}</p>}
+      {progress && <RoutineProgressPanel progress={progress} detail={busy} />}
+      {busy && (!progress || progress.phase === 'finished') && <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">{busy}</p>}
 
       {showAccount && account && stats && (
         <>
