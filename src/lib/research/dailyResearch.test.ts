@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { StockRow } from '../screener/stockData'
 import type { StockThesis, StrategyComparison } from '../storage/schema'
 import type { AutoResearch } from './autoResearch'
-import { applyDailyRun, MAX_AUTO_COMPARISONS, mergeRuns, pickDaily, qualifies, runsToImport, type DailyComparison, type DailyRun } from './dailyResearch'
+import { applyDailyRun, researchDue, MAX_AUTO_COMPARISONS, mergeRuns, pickDaily, qualifies, runsToImport, type DailyComparison, type DailyRun } from './dailyResearch'
 import { blankThesis } from './batchResearch'
 
 const row = (code: string, over: Partial<StockRow> = {}): StockRow => ({
@@ -76,6 +76,29 @@ describe('mergeRuns', () => {
     expect(file.runs.filter((r) => r.date === '2026-11-10')).toHaveLength(1)
     expect(file.log.filter((l) => l.date === '2026-11-10')).toHaveLength(1)
     expect(runsToImport(file, '2026-11-08').map((r) => r.date)).toEqual(['2026-11-09', '2026-11-10'])
+  })
+})
+
+describe('researchDue', () => {
+  const run = (date: string, marketDate?: string): DailyRun => ({ date, marketDate, items: [], skipped: [] })
+
+  it('skips weekends', () => {
+    expect(researchDue('2026-11-21', '2026-11-20', []).due).toBe(false)
+    expect(researchDue('2026-11-22', '2026-11-20', []).due).toBe(false)
+  })
+
+  it('runs once on the first weekday after a break', () => {
+    const runs = [run('2026-11-20', '2026-11-19')]
+    // Monday morning: Friday's close is new.
+    expect(researchDue('2026-11-23', '2026-11-20', runs).due).toBe(true)
+    // A second scheduled run the same day.
+    expect(researchDue('2026-11-23', '2026-11-20', [...runs, run('2026-11-23', '2026-11-20')]).due).toBe(false)
+  })
+
+  it('skips a weekday holiday, whose data stays on the last trading day', () => {
+    const runs = [run('2026-12-24', '2026-12-23')]
+    expect(researchDue('2026-12-25', '2026-12-23', runs)).toMatchObject({ due: false })
+    expect(researchDue('2026-12-25', '2026-12-23', runs).reason).toContain('已研究過')
   })
 })
 

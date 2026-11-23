@@ -9,7 +9,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import type { StockData } from '../src/lib/screener/stockData.ts'
 import { buildAutoResearch } from '../src/lib/research/autoResearch.ts'
 import { rateAuto, OVERALL_LABELS } from '../src/lib/research/rating.ts'
-import { ACTIVE_CONSENSUS_SCREEN, mergeRuns, pickDaily, qualifies, runSummary, type DailyItem, type DailyResearchFile, type ExtraScreen } from '../src/lib/research/dailyResearch.ts'
+import { ACTIVE_CONSENSUS_SCREEN, mergeRuns, pickDaily, qualifies, researchDue, runSummary, type DailyItem, type DailyResearchFile, type ExtraScreen } from '../src/lib/research/dailyResearch.ts'
 import { consensus, type ActiveEtfFile } from '../src/lib/research/activeEtf.ts'
 import { createDefaultInvestmentPolicy } from '../src/lib/storage/schema.ts'
 import { builtInLibrary, compareEntriesOf } from '../src/lib/backtest/library.ts'
@@ -27,12 +27,13 @@ const today = new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10)
 const log = (msg: string) => console.log(`[daily-research] ${msg}`)
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e)).slice(0, 120)
 
-const stocks = (JSON.parse(readFileSync('public/data/stocks.json', 'utf8')) as StockData).stocks
+const stockData = JSON.parse(readFileSync('public/data/stocks.json', 'utf8')) as StockData
+const stocks = stockData.stocks
 const prev: DailyResearchFile | null = existsSync(OUT) ? (JSON.parse(readFileSync(OUT, 'utf8')) as DailyResearchFile) : null
-// One run per Taiwan date: later scheduled runs skip it (a manual run
-// with 執行每日自動研究 ticked redoes it).
-if (prev?.runs.some((r) => r.date === today) && !process.env.FORCE_RESEARCH) {
-  log(`${today} 已研究過，略過`)
+// Once per trading day; a manual run with 執行每日自動研究 ticked redoes it.
+const due = researchDue(today, stockData.date, prev?.runs ?? [])
+if (!due.due && !process.env.FORCE_RESEARCH) {
+  log(`${due.reason}，略過`)
   process.exit(0)
 }
 const policy = createDefaultInvestmentPolicy()
@@ -92,6 +93,6 @@ for (const pick of picks) {
   items.push(item)
 }
 
-const run = { date: today, items, skipped }
+const run = { date: today, marketDate: stockData.date, items, skipped }
 writeFileSync(OUT, JSON.stringify(mergeRuns(prev, run, new Date().toISOString())))
 log(`${OUT}：${runSummary(run)}${skipped.length > 0 ? `；略過 ${skipped.map((s) => `${s.screenName}（${s.reason}）`).join('、')}` : ''}`)

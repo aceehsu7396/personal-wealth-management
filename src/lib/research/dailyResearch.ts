@@ -39,6 +39,8 @@ export interface DailyItem {
 
 export interface DailyRun {
   date: string
+  // The trading day of the screener data it picked from (stocks.json).
+  marketDate?: string
   items: DailyItem[]
   // Screens with nothing left to pick.
   skipped: { screenName: string; reason: string }[]
@@ -83,6 +85,18 @@ export function pickDaily(stocks: StockRow[], log: DailyResearchFile['log'], tod
     else skipped.push({ screenName, reason: candidates.length === 0 ? '今天沒有符合的標的' : `符合的 ${candidates.length} 檔都在 ${REPICK_DAYS} 天內研究過` })
   }
   return { picks, skipped }
+}
+
+// Research once per trading day: on a Taiwan weekday, with screener data
+// from a trading day not researched yet. Weekends and holidays (the data
+// stays on the last trading day) are skipped, so after a break each screen
+// still gets one stock, not one per day off.
+export function researchDue(today: string, marketDate: string, runs: DailyRun[]): { due: boolean; reason: string } {
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay()
+  if (weekday === 0 || weekday === 6) return { due: false, reason: `${today} 是週末，不研究` }
+  if (runs.some((r) => r.date === today)) return { due: false, reason: `${today} 已研究過` }
+  if (runs.some((r) => r.marketDate === marketDate)) return { due: false, reason: `${marketDate} 的收盤資料已研究過（假日或資料尚未更新）` }
+  return { due: true, reason: '' }
 }
 
 // The newest run replaces one of the same date; older runs and the log age out.
