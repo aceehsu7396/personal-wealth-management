@@ -82,6 +82,18 @@ describe('research list and newer layouts', () => {
     ])
   })
 
+  it("reads links with a hidden 「另開新視窗」 span and the page's embedded list", () => {
+    const html =
+      '<tr class="x"><td>2026/11/09</td><td><a href="/api/publish/report/4c29720d.pdf" target="_blank" class="b">富邦市場展望-11月市場展望 <span class="sr-only">（另開新視窗）</span></a></td></tr>' +
+      '{"date":62},"2026\\u002F11\\u002F09","富邦市場展望-11月市場展望","\\u002Fapi\\u002Fpublish\\u002Freport\\u002F4c29720d.pdf",' +
+      '"2026\\u002F10\\u002F21","富邦總經分析-越南.泰國經濟展望","\\u002Fapi\\u002Fpublish\\u002Freport\\u002F6439.pdf",' +
+      '"2026\\u002F10\\u002F08","富邦總經觀點-9月市場展望","\\u002Fapi\\u002Fpublish\\u002Freport\\u002F9441.pdf"'
+    expect(parseResearchList(html)).toEqual([
+      { path: '/api/publish/report/4c29720d.pdf', title: '富邦市場展望-11月市場展望', listedDate: '2026-11-09' },
+      { path: '/api/publish/report/9441.pdf', title: '富邦總經觀點-9月市場展望', listedDate: '2026-10-08' },
+    ])
+  })
+
   it('reads a table of contents numbered with Roman numerals', () => {
     expect(parseContents(['I.月度配置觀點P2IV.債券市場P10-12', 'II.總經觀點P3-5V.成熟/新興市場P13-16', 'III.外匯市場P6-9VI.財經大事曆P17', '1'])).toEqual([
       { title: '月度配置觀點', from: 2, to: 2 },

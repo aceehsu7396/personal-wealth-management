@@ -286,19 +286,27 @@ export interface ListedReport {
 // the PDF itself later.
 export function parseResearchList(html: string): ListedReport[] {
   const out: ListedReport[] = []
+  const isOutlook = (title: string, path: string) => title.includes('市場展望') || /富邦市場展望\d{6}\.pdf$/.test(path)
+  const add = (path: string, title: string, listedDate: string) => {
+    if (isOutlook(title, path) && !out.some((o) => o.path === path)) out.push({ path, title, listedDate })
+  }
   for (const row of html.split(/<tr\b/).slice(1)) {
     const date = /(20\d{2})\/(\d{2})\/(\d{2})/.exec(row)
-    const link = /<a href="(\/api\/publish\/report\/[^"]+\.pdf)"[^>]*>([^<]*)<\/a>/.exec(row)
+    // The link text may carry a hidden 「（另開新視窗）」 span.
+    const link = /<a href="(\/api\/publish\/report\/[^"]+\.pdf)"[^>]*>([\s\S]*?)<\/a>/.exec(row)
     if (!date || !link) continue
-    const [, path, title] = link
-    if (!title.includes('市場展望') && !/富邦市場展望\d{6}\.pdf$/.test(path)) continue
-    out.push({ path, title: title.trim(), listedDate: `${date[1]}-${date[2]}-${date[3]}` })
+    const title = link[2].replace(/<span class="sr-only">[\s\S]*?<\/span>/g, '').replace(/<[^>]+>/g, '').trim()
+    add(link[1], title, `${date[1]}-${date[2]}-${date[3]}`)
   }
-  // Older issues appear only in the page's embedded data, by file name.
+  // The page's embedded data: "2026\u002F11\u002F09","富邦市場展望-11月市場展望","\u002Fapi…pdf".
+  // Newer issues are stored under random file names, so the title tells.
+  const slash = String.raw`(?:\/|\\u002F)`
+  const entry = new RegExp(String.raw`"(20\d{2})${slash}(\d{2})${slash}(\d{2})","([^"]*)","(${slash}api${slash}publish${slash}report${slash}[^"]+\.pdf)"`, 'g')
+  for (const m of html.matchAll(entry)) add(m[5].replace(/\\u002F/g, '/'), m[4], `${m[1]}-${m[2]}-${m[3]}`)
+  // Older issues appear only by file name.
   for (const m of html.matchAll(/(?:\/|\\u002F)api(?:\/|\\u002F)publish(?:\/|\\u002F)report(?:\/|\\u002F)(富邦市場展望\d{6}\.pdf)/g)) {
-    const path = `/api/publish/report/${m[1]}`
     const listedDate = dateFromFileName(m[1])
-    if (listedDate && !out.some((o) => o.path === path)) out.push({ path, title: '', listedDate })
+    if (listedDate) add(`/api/publish/report/${m[1]}`, '', listedDate)
   }
   return out.sort((a, b) => b.listedDate.localeCompare(a.listedDate))
 }
