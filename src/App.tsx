@@ -9,6 +9,7 @@ import { NavBar } from './components/layout/NavBar'
 import { ScrollToTop } from './components/layout/ScrollToTop'
 import { PortfolioSnapshotRecorder } from './components/PortfolioSnapshotRecorder'
 import { DailyResearchImporter } from './components/research/DailyResearchImporter'
+import { AutoPaperRoutine } from './components/paper/AutoPaperRoutine'
 import { HOME_PATH, LEGACY_REDIRECTS } from './components/layout/navigation'
 import { DashboardPage } from './pages/DashboardPage'
 import { GoalsPage } from './pages/GoalsPage'
@@ -54,6 +55,7 @@ function App() {
             <StorageWarning />
             <PortfolioSnapshotRecorder />
             <DailyResearchImporter />
+            <AutoPaperRoutine />
             <PageContext />
             <Routes>
               <Route path="/" element={<Navigate to={HOME_PATH} replace />} />

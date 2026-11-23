@@ -196,7 +196,7 @@ export function PaperAssistant(ctx: Ctx) {
       {!backtestPassed && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">「{strategy.name}」還沒有通過回測：可以照練，但這個帳戶的結果不能用來解鎖實單。</p>}
 
       {!snap ? (
-        <p className={`mt-3 ${mutedClass}`}>收盤後按頁首「更新收盤價並產生建議」（或在「今日」頁按「執行今日例行」）：助手會依策略卡規則逐檔判斷，並以每筆風險計算股數、設好停損。</p>
+        <p className={`mt-3 ${mutedClass}`}>交易日收盤後打開網站會自動執行「更新收盤價並產生建議」（也可以按頁首的按鈕，或「今日」頁的「執行今日例行」）：助手會依策略卡規則逐檔判斷，並以每筆風險計算股數、設好停損。</p>
       ) : (
         <>
           {/* The day's conclusion first. */}

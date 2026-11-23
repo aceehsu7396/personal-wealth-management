@@ -181,6 +181,7 @@ interface AppStore extends AppData {
   setWeeklyDecisionDay: (day: number) => void
   // One day of the daily automatic research, saved as cards and comparisons.
   importDailyResearch: (run: DailyRun) => void
+  setPaperRoutineRanAt: (at: string) => void
   addPaperAccount: (entry: Omit<PaperAccount, 'id' | 'createdAt'>) => string
   // Paper-account changes are computed by pure functions and saved whole.
   replacePaperAccount: (account: PaperAccount) => void
@@ -247,6 +248,7 @@ function toAppData(state: AppData): AppData {
     strategyLibrary: state.strategyLibrary,
     tradingPrefs: state.tradingPrefs,
     dailyResearchImported: state.dailyResearchImported,
+    paperRoutineRanAt: state.paperRoutineRanAt,
     paperAccounts: state.paperAccounts,
     watchlist: state.watchlist,
     ideaNotes: state.ideaNotes,
@@ -570,6 +572,7 @@ export const useAppStore = create<AppStore>()(
 
       setStrategyLibrary: (library) => set({ strategyLibrary: library }),
       setWeeklyDecisionDay: (day) => set({ tradingPrefs: { weeklyDecisionDay: day } }),
+      setPaperRoutineRanAt: (at) => set({ paperRoutineRanAt: at }),
       importDailyResearch: (run) =>
         set((state) => {
           if (state.dailyResearchImported && run.date <= state.dailyResearchImported) return {}

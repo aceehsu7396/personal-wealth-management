@@ -16,6 +16,8 @@ import { cadenceOf, DEFAULT_DECISION_DAY, WEEKDAY_LABELS } from '../lib/backtest
 import { orderChecks, resolveItem } from '../lib/paper/assistant'
 import { adviseAccount, fetchQuotes, priceSymbols, routineAccounts, runPaperRoutine, type RoutineProgress } from '../lib/paper/routine'
 import { RoutineProgressPanel } from '../components/paper/RoutineProgressPanel'
+import { AutoRanNote } from '../components/paper/AutoPaperRoutine'
+import { claimRoutine, releaseRoutine } from '../lib/paper/autoRoutine'
 import { useJourney } from '../lib/useJourney'
 import { useRegime } from '../lib/market/useRegime'
 import { OrderCheckList, PaperAssistant } from '../components/paper/PaperAssistant'
@@ -188,6 +190,7 @@ export function PaperPage() {
   const replacePaperAccount = useAppStore((s) => s.replacePaperAccount)
   const removePaperAccount = useAppStore((s) => s.removePaperAccount)
   const updateTradingStrategy = useAppStore((s) => s.updateTradingStrategy)
+  const setPaperRoutineRanAt = useAppStore((s) => s.setPaperRoutineRanAt)
 
   const presetStrategy = search.get('strategy') ?? ''
   const preset = accounts.find((a) => a.id === search.get('account')) ?? accounts.find((a) => a.strategyId === presetStrategy)
@@ -248,6 +251,8 @@ export function PaperPage() {
   // card, and for this one whenever its card has rules.
   async function updateAndAdvise() {
     if (!account) return
+    // The automatic run after the close may be under way.
+    if (!claimRoutine()) return setError('收盤後的自動更新正在進行中，完成後就會看到結果。')
     setProgress(null)
     await guarded('更新收盤價…', async () => {
       const res = await runPaperRoutine({
@@ -279,7 +284,9 @@ export function PaperPage() {
           throw e
         }
       }
+      setPaperRoutineRanAt(new Date().toISOString())
     })
+    releaseRoutine()
   }
 
   // Places an order on the latest saved account; the caller saves it.
@@ -398,9 +405,15 @@ export function PaperPage() {
         }
         action={
           showAccount ? (
-            <button type="button" disabled={busy !== null || (canSignal && regimeLoading)} onClick={() => void updateAndAdvise()} className={primaryButton}>
-              {canSignal ? '更新收盤價並產生建議' : '更新收盤價'}
-            </button>
+            <div className="flex flex-col items-end gap-1">
+              <button type="button" disabled={busy !== null || (canSignal && regimeLoading)} onClick={() => void updateAndAdvise()} className={primaryButton}>
+                {canSignal ? '更新收盤價並產生建議' : '更新收盤價'}
+              </button>
+              <span className="text-xs text-gray-600 dark:text-gray-400">
+                收盤後自動執行
+                <AutoRanNote />
+              </span>
+            </div>
           ) : undefined
         }
       />
@@ -481,10 +494,10 @@ export function PaperPage() {
             </div>
             <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
               {canSignal && weekly
-                ? `每天收盤後按頁首「更新收盤價並產生建議」：一次完成最新收盤價、停損與掛單觸發，以及助手建議。週頻卡只在每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤判斷進出場，其他日子只檢查停損；下單在下個交易日開盤成交。`
+                ? `交易日 14:30 收盤資料公布後，打開網站就會自動執行「更新收盤價並產生建議」（也可以按頁首的按鈕重跑）：一次完成最新收盤價、停損與掛單觸發，以及助手建議。週頻卡只在每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤判斷進出場，其他日子只檢查停損；下單在下個交易日開盤成交。`
                 : canSignal
-                  ? '每天收盤後按頁首「更新收盤價並產生建議」：一次完成最新收盤價、停損與掛單觸發，以及助手建議。'
-                  : `每天收盤後按頁首「更新收盤價」：取得持倉、掛單${strategy ? '與策略卡標的' : ''}的最新收盤價，並觸發停損與限價單。${strategy ? '這張策略卡是文字規則，助手無法自動判斷，請對照下方收盤價自行檢查。' : ''}`}
+                  ? '交易日 14:30 收盤資料公布後，打開網站就會自動執行「更新收盤價並產生建議」（也可以按頁首的按鈕重跑）：一次完成最新收盤價、停損與掛單觸發，以及助手建議。'
+                  : `交易日 14:30 後打開網站會自動更新收盤價（也可以按頁首的「更新收盤價」重跑）：取得持倉、掛單${strategy ? '與策略卡標的' : ''}的最新收盤價，並觸發停損與限價單。${strategy ? '這張策略卡是文字規則，助手無法自動判斷，請對照下方收盤價自行檢查。' : ''}`}
             </p>
 
             {account.market === 'US' && (

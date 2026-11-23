@@ -1199,6 +1199,8 @@ export const AppDataSchema = z.object({
   tradingPrefs: z.object({ weeklyDecisionDay: DecisionDaySchema }).optional(),
   // The last daily automatic research run imported (its date).
   dailyResearchImported: z.string().optional(),
+  // When 更新收盤價並產生建議 last ran (by hand or automatically), ISO time.
+  paperRoutineRanAt: z.string().optional(),
   paperAccounts: z.array(PaperAccountSchema).default([]),
   watchlist: z.array(WatchItemSchema).default([]),
   ideaNotes: z.array(IdeaNoteSchema).default([]),
