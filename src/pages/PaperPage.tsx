@@ -16,6 +16,7 @@ import { cadenceOf, DEFAULT_DECISION_DAY, WEEKDAY_LABELS } from '../lib/backtest
 import { orderChecks, resolveItem } from '../lib/paper/assistant'
 import { adviseAccount, fetchQuotes, priceSymbols, routineAccounts, runPaperRoutine, type RoutineProgress } from '../lib/paper/routine'
 import { RoutineProgressPanel } from '../components/paper/RoutineProgressPanel'
+import { PaperOverview } from '../components/paper/PaperOverview'
 import { AutoRanNote } from '../components/paper/AutoPaperRoutine'
 import { claimRoutine, releaseRoutine } from '../lib/paper/autoRoutine'
 import { useJourney } from '../lib/useJourney'
@@ -205,6 +206,9 @@ export function PaperPage() {
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({})
   const [order, setOrder] = useState({ symbol: '', side: 'buy' as 'buy' | 'sell', type: 'market' as PaperOrder['type'], shares: '', price: '', stopLoss: '', reason: '', emotion: 3 })
   const [pendingDelete, setPendingDelete] = useState(false)
+  // 總覽 of every account: the default with two or more, unless the link
+  // names an account or a card.
+  const [overview, setOverview] = useState(accounts.length >= 2 && !search.get('account') && presetStrategy === '')
 
   const { policy } = useJourney()
   const { ctx: regime, loading: regimeLoading } = useRegime()
@@ -388,7 +392,8 @@ export function PaperPage() {
           regime,
         })
       : null
-  const showAccount = !!account && !!stats && !creating
+  const showOverview = overview && !creating && accounts.length > 0
+  const showAccount = !!account && !!stats && !creating && !showOverview
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
@@ -404,7 +409,7 @@ export function PaperPage() {
           </>
         }
         action={
-          showAccount ? (
+          showAccount || (showOverview && account) ? (
             <div className="flex flex-col items-end gap-1">
               <button type="button" disabled={busy !== null || (canSignal && regimeLoading)} onClick={() => void updateAndAdvise()} className={primaryButton}>
                 {canSignal ? '更新收盤價並產生建議' : '更新收盤價'}
@@ -419,6 +424,19 @@ export function PaperPage() {
       />
 
       <div className="mt-6 flex flex-wrap items-center gap-2">
+        {accounts.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setOverview(true)
+              setCreating(false)
+            }}
+            aria-pressed={showOverview}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium ${showOverview ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700'}`}
+          >
+            總覽
+          </button>
+        )}
         {accounts.map((a) => (
           <button
             key={a.id}
@@ -426,9 +444,10 @@ export function PaperPage() {
             onClick={() => {
               setSelectedId(a.id)
               setCreating(false)
+              setOverview(false)
             }}
-            aria-pressed={a.id === selectedId && !creating}
-            className={`rounded-md px-3 py-1.5 text-sm ${a.id === selectedId && !creating ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700'}`}
+            aria-pressed={a.id === selectedId && showAccount}
+            className={`rounded-md px-3 py-1.5 text-sm ${a.id === selectedId && showAccount ? 'bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900' : 'bg-white text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-200 dark:ring-gray-700 dark:hover:bg-gray-700'}`}
           >
             {a.name}
           </button>
@@ -448,6 +467,7 @@ export function PaperPage() {
                 const id = addPaperAccount(a)
                 setSelectedId(id)
                 setCreating(false)
+                setOverview(false)
                 if (a.strategyId) {
                   const s = strategies.find((x) => x.id === a.strategyId)
                   if (s?.status === 'dev') updateTradingStrategy(s.id, { status: 'paper' })
@@ -466,6 +486,17 @@ export function PaperPage() {
       )}
       {progress && <RoutineProgressPanel progress={progress} detail={busy} />}
       {busy && (!progress || progress.phase === 'finished') && <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">{busy}</p>}
+
+      {showOverview && (
+        <PaperOverview
+          accounts={accounts}
+          onSelect={(id) => {
+            setSelectedId(id)
+            setOverview(false)
+            window.scrollTo({ top: 0 })
+          }}
+        />
+      )}
 
       {showAccount && account && stats && (
         <>
