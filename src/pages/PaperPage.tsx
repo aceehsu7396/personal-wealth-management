@@ -281,7 +281,7 @@ export function PaperPage() {
         mark('advising', 'advice')
         setBusy(weekly ? '計算本週建議…' : '計算今日建議…')
         try {
-          save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay }))
+          save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay, accounts: useAppStore.getState().paperAccounts }))
           mark('done', 'finished')
         } catch (e) {
           mark('failed', 'finished', describeAiError(e))
@@ -390,6 +390,7 @@ export function PaperPage() {
           strategy,
           backtestPassed,
           regime,
+          accounts,
         })
       : null
   const showOverview = overview && !creating && accounts.length > 0
@@ -553,6 +554,7 @@ export function PaperPage() {
             {canSignal && strategy && (
               <PaperAssistant
                 account={account}
+                accounts={accounts}
                 strategy={strategy}
                 backtestPassed={backtestPassed}
                 regime={regime}

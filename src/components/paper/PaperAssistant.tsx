@@ -44,6 +44,8 @@ export function OrderCheckList({ checks }: { checks: OrderCheck[] }) {
 
 interface Ctx {
   account: PaperAccount
+  // Every paper account: the trading capital (handbook 10 §7).
+  accounts?: PaperAccount[]
   strategy: TradingStrategy
   backtestPassed: boolean
   regime: RegimeContext | null
@@ -89,10 +91,11 @@ function ActionRow({ item, ctx }: { item: AssistantItem; ctx: Ctx }) {
         strategy: ctx.strategy,
         backtestPassed: ctx.backtestPassed,
         regime: ctx.regime,
+        accounts: ctx.accounts,
       })
     : []
   const canAct = item.kind === 'enter' || item.kind === 'exit' || item.kind === 'raise_stop'
-  const ex = explainItem(item, ctx.account)
+  const ex = explainItem(item, ctx.account, ctx.accounts)
   const lv = priceLevels(item, ctx.account)
 
   return (
@@ -227,7 +230,7 @@ export function PaperAssistant(ctx: Ctx) {
             <ol className="list-decimal space-y-1 pl-5 text-xs text-gray-600 dark:text-gray-400">
               <li>逐檔套用策略卡的進出場規則：持股看出場訊號與停損，未持有的看進場訊號。</li>
               <li>停損 = 收盤 − k × ATR(14)：k 用策略卡的倍數，局勢表有設時改用局勢的；策略卡沒有停損規則時給 2.5 倍的保護停損。</li>
-              <li>股數 = 帳戶權益 × 每筆風險 ÷（價格 − 停損），再乘局勢的部位倍數，並受現金、單一部位上限與持有檔數限制。</li>
+              <li>股數 = 總資金（全部虛擬帳戶合計）× 每筆風險 ÷（價格 − 停損），再乘局勢的部位倍數；所有帳戶的未平倉停損風險合計不超過總資金 6%，並受這個帳戶的現金、單一部位上限與持有檔數限制。</li>
               <li>進場價、出場價：下一次判斷時（日頻是下個交易日收盤，週頻是判斷日收盤）收盤要到多少才觸發，由策略卡的規則反推，另附離今天收盤多遠；外資買賣超、動能排名、持有天數這類不是價格的條件直接寫出來。出場價同時列出停損。</li>
               <li>持股的吊燈停損（進場後最高價 − k × ATR）高於目前停損時，建議上調；收盤離停損不到 {Math.round(NEAR_STOP * 100)}% 時提醒。</li>
               <li>下單前檢查：價格是否最新、有沒有停損、風險是否超過上限、現金夠不夠；必須項沒過就不能下單。</li>
@@ -259,7 +262,7 @@ export function PaperAssistant(ctx: Ctx) {
                   </thead>
                   <tbody>
                     {[...holds, ...waits].map((i) => {
-                      const e = explainItem(i, account)
+                      const e = explainItem(i, account, ctx.accounts)
                       const lv = priceLevels(i, account)
                       return (
                         <tr key={`${i.kind}${i.symbol}`} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">

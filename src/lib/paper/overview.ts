@@ -4,6 +4,7 @@
 // converted.
 import type { PaperAccount } from '../storage/schema'
 import { equityOf } from './paperAccount'
+import { sleeveOf } from './assistant'
 
 export type Market = PaperAccount['market']
 
@@ -67,6 +68,11 @@ export interface MarketTotal {
   cashShare: number
   pendingBuys: number
   available: number
+  // Every position's stop risk together (handbook 10 §7), its share of the
+  // equity, and positions without a stop (not counted).
+  openRisk: number
+  openRiskShare: number
+  unstopped: number
 }
 
 export interface PaperOverview {
@@ -160,6 +166,7 @@ export function paperOverview(accounts: PaperAccount[]): PaperOverview {
     const initialCash = sum((r) => r.initialCash)
     const cash = sum((r) => r.cash)
     const pendingBuys = sum((r) => r.pendingBuys)
+    const sleeve = sleeveOf(accounts, market)
     return [
       {
         market,
@@ -175,6 +182,9 @@ export function paperOverview(accounts: PaperAccount[]): PaperOverview {
         cashShare: ratio(cash, equity),
         pendingBuys,
         available: cash - pendingBuys,
+        openRisk: sleeve.openRisk,
+        openRiskShare: ratio(sleeve.openRisk, equity),
+        unstopped: sleeve.unstopped,
       },
     ]
   })

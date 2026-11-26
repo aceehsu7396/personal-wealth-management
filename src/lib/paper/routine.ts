@@ -92,10 +92,12 @@ export interface AdviceInput {
   onStep: (s: string) => void
   // The site-wide weekly decision day, for weekly cards without their own.
   weeklyDecisionDay?: number
+  // Every paper account, for the trading capital (handbook 10 §7).
+  accounts?: PaperAccount[]
 }
 
 // Today's suggestions for an account (handbook 10 §7), saved on it.
-export async function adviseAccount({ account, strategy, policy, regime, today, onStep, weeklyDecisionDay }: AdviceInput, deps: RoutineDeps = defaultDeps): Promise<PaperAccount> {
+export async function adviseAccount({ account, strategy, policy, regime, today, onStep, weeklyDecisionDay, accounts }: AdviceInput, deps: RoutineDeps = defaultDeps): Promise<PaperAccount> {
   const symbols = [...new Set([...strategy.symbols, ...account.positions.map((p) => p.symbol)])]
   const data = await deps.loadPriceData(symbols, isoDaysAgo(today, 1), today, (p) => onStep(`下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}`))
   const held = Object.fromEntries(account.positions.map((p) => [p.symbol, { shares: p.shares, openedAt: p.openedAt }]))
@@ -107,7 +109,7 @@ export async function adviseAccount({ account, strategy, policy, regime, today, 
     decisionDay: strategy.decisionDay ?? weeklyDecisionDay,
     today,
   })
-  return withSnapshot(account, assistantItems({ strategy, account, statuses, data, policy, regime }), new Date().toISOString())
+  return withSnapshot(account, assistantItems({ strategy, account, statuses, data, policy, regime, accounts }), new Date().toISOString())
 }
 
 // Accounts the daily routine gives suggestions: linked to a card in paper
@@ -217,7 +219,7 @@ export async function runPaperRoutine(input: RoutineInput, deps: RoutineDeps = d
       if (strategy && advised.some((x) => x.account.id === account.id) && STRATEGY_TEMPLATES[strategy.template].backtestable) {
         progress.phase = 'advice'
         setAccount(account.id, { status: 'advising' })
-        input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay }, deps))
+        input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay, accounts: input.accounts.map((a) => input.latest(a.id)) }, deps))
         progress.phase = 'prices'
       }
       result.done.push(account.name)

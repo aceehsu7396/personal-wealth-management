@@ -26,6 +26,33 @@ export const STALE_DAYS = 5
 // Suggestions that ask for an order or a stop change.
 export const ACTIONABLE: AssistantKind[] = ['enter', 'exit', 'raise_stop']
 const MAX_LOG = 300
+// All open positions' stop risk together, as % of the trading capital:
+// past it no new entry (handbook 10 §7; Elder's 6% rule).
+export const OPEN_RISK_LIMIT_PERCENT = 6
+
+// The trading capital (handbook 10 §7): every paper account of the market
+// together, each account being the money given to its card. Risk per trade
+// and the open-risk limit are shares of it. TW and US are never mixed.
+export interface Sleeve {
+  capital: number
+  // Shares × (price − stop) over every position with a stop below price.
+  openRisk: number
+  // Positions without a stop, left out of openRisk.
+  unstopped: number
+}
+
+export function sleeveOf(accounts: PaperAccount[], market: PaperAccount['market']): Sleeve {
+  const mine = accounts.filter((a) => a.market === market)
+  let openRisk = 0
+  let unstopped = 0
+  for (const a of mine) {
+    for (const p of a.positions) {
+      if (p.stopLoss === undefined) unstopped += 1
+      else openRisk += p.shares * Math.max(p.lastPrice - p.stopLoss, 0)
+    }
+  }
+  return { capital: mine.reduce((sum, a) => sum + equityOf(a), 0), openRisk, unstopped }
+}
 
 export const ASSISTANT_KIND_LABELS: Record<AssistantKind, string> = {
   enter: '進場',
@@ -58,22 +85,31 @@ export function stopWidth(strategy: Pick<TradingStrategy, 'template' | 'params'>
 export interface PaperSizeInput {
   price: number
   stop: number
+  // The trading capital (all accounts of the market; one account alone
+  // when there is only one).
   equity: number
+  // This account's cash: the money its card has left.
   cash: number
+  // Stop risk already open across the accounts.
+  openRisk?: number
   policy: InvestmentPolicy
   strategy?: Pick<TradingStrategy, 'riskPerTradePercent'>
   multiplier?: number
 }
 
-// The paper account is the trading sleeve, so the per-trade risk is a
-// share of its equity; then the regime multiplier, then the caps: cash,
+// The paper accounts together are the trading sleeve, so the per-trade
+// risk is a share of their total, no more than what the open-risk limit
+// leaves; then the regime multiplier, then the caps: this account's cash,
 // the single-position limit (rescaled from the whole portfolio to the
 // sleeve) and an equal slot for each allowed open position.
 export function paperShares(input: PaperSizeInput): { shares: number; basis: string[] } {
   const { price, stop, equity, cash, policy } = input
   if (!(price > stop) || equity <= 0) return { shares: 0, basis: ['停損須低於價格，無法計算股數'] }
   const limit = riskLimitOf(input.strategy, policy)
-  const budget = (equity * limit.percent) / 100
+  const perTrade = (equity * limit.percent) / 100
+  const openRisk = input.openRisk ?? 0
+  const room = Math.max((equity * OPEN_RISK_LIMIT_PERCENT) / 100 - openRisk, 0)
+  const budget = Math.min(perTrade, room)
   const byRisk = Math.floor(budget / (price - stop))
   const multiplier = input.multiplier ?? 1
   const sized = Math.floor(byRisk * multiplier)
@@ -86,7 +122,10 @@ export function paperShares(input: PaperSizeInput): { shares: number; basis: str
   const tightest = caps.reduce((a, b) => (b.shares < a.shares ? b : a))
   const shares = Math.max(0, Math.min(sized, tightest.shares))
   const basis = [
-    `風險預算 = 權益 ${money(equity)} × ${limit.percent}%（${limit.source}）= ${money(budget)}`,
+    `風險預算 = 總資金 ${money(equity)} × ${limit.percent}%（${limit.source}）= ${money(perTrade)}`,
+    ...(openRisk > 0 || room < perTrade
+      ? [`未平倉停損風險 ${money(openRisk)}（${((openRisk / equity) * 100).toFixed(1)}%），上限 ${OPEN_RISK_LIMIT_PERCENT}% 還剩 ${money(room)}${room < perTrade ? `，風險預算改為 ${money(budget)}` : ''}`]
+      : []),
     `每股風險 = ${price} − 停損 ${stop} = ${round2(price - stop)}，可買 ${byRisk.toLocaleString()} 股`,
   ]
   if (multiplier !== 1) basis.push(`局勢部位倍數 × ${multiplier} = ${sized.toLocaleString()} 股`)
@@ -101,14 +140,18 @@ export interface AssistantInput {
   data: Record<string, Bar[]>
   policy: InvestmentPolicy
   regime?: RegimeContext | null
+  // Every paper account, for the trading capital; this one alone if absent.
+  accounts?: PaperAccount[]
 }
 
 // One suggestion per symbol, the most urgent kind first: an exit signal,
 // a broken stop, a stop to raise (or set), a stop close by, then hold.
-export function assistantItems({ strategy, account, statuses, data, policy, regime }: AssistantInput): AssistantItem[] {
+export function assistantItems({ strategy, account, statuses, data, policy, regime, accounts }: AssistantInput): AssistantItem[] {
   const { k, protective } = stopWidth(strategy, regime)
-  const equity = equityOf(account)
+  const sleeve = sleeveOf([account, ...(accounts ?? []).filter((a) => a.id !== account.id)], account.market)
+  const equity = sleeve.capital
   let cash = account.cash
+  let openRisk = sleeve.openRisk
   const out: AssistantItem[] = []
   for (const st of statuses) {
     const p = account.positions.find((x) => x.symbol === st.symbol)
@@ -160,8 +203,9 @@ export function assistantItems({ strategy, account, statuses, data, policy, regi
       continue
     }
     const stopLoss = round2(st.close - k * st.atr)
-    const size = paperShares({ price: st.close, stop: stopLoss, equity, cash, policy, strategy, multiplier: regime?.multiplier })
+    const size = paperShares({ price: st.close, stop: stopLoss, equity, cash, openRisk, policy, strategy, multiplier: regime?.multiplier })
     cash -= size.shares * st.close
+    openRisk += size.shares * (st.close - stopLoss)
     const stopNote = protective
       ? `保護停損 = 收盤 − ${k} × ATR = ${stopLoss}（策略卡沒有停損規則，這是每筆必設停損的要求，不會移動）`
       : `停損 = 收盤 − ${k} × ATR = ${stopLoss}${regime && regime.row.stopAtr !== resolveParams(strategy.template, strategy.params).atrStop ? `（局勢「${regime.label}」的停損寬度）` : ''}`
@@ -189,6 +233,8 @@ export interface OrderCheckInput {
   strategy?: TradingStrategy
   backtestPassed: boolean
   regime?: RegimeContext | null
+  // Every paper account, for the trading capital; this one alone if absent.
+  accounts?: PaperAccount[]
 }
 
 // Before a paper order: required checks block it, the rest only advise.
@@ -202,10 +248,18 @@ export function orderChecks(input: OrderCheckInput): OrderCheck[] {
   out.push({ level: 'required', text: hasStop ? `已設停損 ${stopLoss}` : '買進必須設停損，且低於買進價', passed: hasStop })
   if (hasStop) {
     const limit = riskLimitOf(strategy, policy)
+    const sleeve = sleeveOf([account, ...(input.accounts ?? []).filter((a) => a.id !== account.id)], account.market)
+    const capital = sleeve.capital
     const risk = shares * (price - stopLoss!)
-    const share = equityOf(account) > 0 ? (risk / equityOf(account)) * 100 : Infinity
+    const share = capital > 0 ? (risk / capital) * 100 : Infinity
     const ok = share <= limit.percent + 0.005
-    out.push({ level: 'required', text: `停損風險 ${money(risk)}，占權益 ${share.toFixed(2)}%（上限 ${limit.percent}%，${limit.source}）`, passed: ok })
+    out.push({ level: 'required', text: `停損風險 ${money(risk)}，占總資金 ${share.toFixed(2)}%（上限 ${limit.percent}%，${limit.source}）`, passed: ok })
+    const open = capital > 0 ? ((sleeve.openRisk + risk) / capital) * 100 : Infinity
+    out.push({
+      level: 'required',
+      text: `下單後全部帳戶的未平倉停損風險 ${open.toFixed(1)}%（上限 ${OPEN_RISK_LIMIT_PERCENT}%${sleeve.unstopped > 0 ? `；${sleeve.unstopped} 檔沒設停損，未計入` : ''}）`,
+      passed: open <= OPEN_RISK_LIMIT_PERCENT + 0.005,
+    })
   }
   const cost = shares * price * 1.002
   out.push({ level: 'required', text: cost <= account.cash ? `現金足夠（需約 ${money(cost)}）` : `現金不足：需約 ${money(cost)}，可用 ${money(account.cash)}`, passed: cost <= account.cash && shares > 0 })
@@ -358,9 +412,10 @@ const signedMoney = (v: number) => `${v >= 0 ? '+' : '−'}${money(Math.abs(v))}
 
 // One suggestion in plain words (docs/ui-guidelines.md §3): the action,
 // its money and risk, and the next step.
-export function explainItem(item: AssistantItem, account: PaperAccount): ItemExplanation {
+export function explainItem(item: AssistantItem, account: PaperAccount, accounts?: PaperAccount[]): ItemExplanation {
   const sym = formatSymbol(item.symbol)
   const equity = equityOf(account)
+  const capital = sleeveOf([account, ...(accounts ?? []).filter((a) => a.id !== account.id)], account.market).capital
   const p = account.positions.find((x) => x.symbol === item.symbol)
   const share = (v: number) => (equity > 0 ? `帳戶 ${pct(v / equity)}` : '')
   const pnl = p ? (item.close - p.avgCost) * p.shares : 0
@@ -374,7 +429,7 @@ export function explainItem(item: AssistantItem, account: PaperAccount): ItemExp
         action: `買進 ${sym} ${item.shares.toLocaleString()} 股，約 ${money(cost)} 元`,
         numbers: [
           { label: '停損', value: `${item.stopLoss}（−${pct((item.close - item.stopLoss) / item.close)}）` },
-          { label: '停損時虧損', value: `${money(risk)} 元（${share(risk)}）` },
+          { label: '停損時虧損', value: `${money(risk)} 元（${capital > equity ? `總資金 ${pct(risk / capital)}` : share(risk)}）` },
           { label: '部位', value: share(cost) },
         ],
         todo: '確認股數與停損後按「依建議下單」；不買就按「略過」並寫一句理由。',

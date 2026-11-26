@@ -4,6 +4,7 @@ import { paperOverview, type AccountRow, type HoldingRow, type Market, type Mark
 import { formatSymbol } from '../../lib/backtest/templates'
 import { Badge, Card, DataTable, StatTile, type Column } from '../ui'
 import type { PaperAccount } from '../../lib/storage/schema'
+import { OPEN_RISK_LIMIT_PERCENT } from '../../lib/paper/assistant'
 
 const UNIT: Record<Market, string> = { TW: '元', US: '美元' }
 const MARKET: Record<Market, string> = { TW: '台股', US: '美股' }
@@ -158,6 +159,15 @@ export function PaperOverview({ accounts, onSelect }: { accounts: PaperAccount[]
         {o.totals.map((t) => (
           <p key={t.market} className="mt-1 text-sm text-gray-800 dark:text-gray-200">
             {conclusion(t, multi)}
+          </p>
+        ))}
+        {o.totals.map((t) => (
+          <p key={`risk${t.market}`} className="mt-2 flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+            <Badge tone={t.openRiskShare * 100 >= OPEN_RISK_LIMIT_PERCENT ? 'bad' : t.openRiskShare * 100 > OPEN_RISK_LIMIT_PERCENT - 1 ? 'warn' : 'info'}>
+              {multi ? `${MARKET[t.market]}・` : ''}未平倉停損風險 {pct(t.openRiskShare)}
+            </Badge>
+            所有持股同時觸及停損時，約虧 {money(t.openRisk)} {UNIT[t.market]}；上限是總資金的 {OPEN_RISK_LIMIT_PERCENT}%，到了就不再開新部位。
+            {t.unstopped > 0 && <span className="text-amber-700 dark:text-amber-400">{t.unstopped} 檔沒設停損，未計入。</span>}
           </p>
         ))}
         {o.totals.map((t) => (

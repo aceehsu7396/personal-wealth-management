@@ -3,7 +3,7 @@ import type { Bar } from '../market/priceHistory'
 import type { PaperAccount, TradingStrategy } from '../storage/schema'
 import { createDefaultInvestmentPolicy } from '../storage/schema'
 import { symbolStatus } from '../backtest/engine'
-import { adviceSummary, assistantItems, blocked, executionOf, explainItem, orderChecks, paperScanItems, paperShares, priceLevels, resolveItem, stopWidth, weeklyReview, withSnapshot } from './assistant'
+import { adviceSummary, assistantItems, blocked, executionOf, explainItem, orderChecks, paperScanItems, paperShares, priceLevels, resolveItem, sleeveOf, stopWidth, weeklyReview, withSnapshot } from './assistant'
 
 function weekdays(n: number, from = '2024-01-01'): string[] {
   const out: string[] = []
@@ -246,5 +246,42 @@ describe('priceLevels', () => {
     const lv = priceLevels({ ...base, kind: 'hold', levels: { exit: { above: 1100, note: '或持有滿 10 個交易日（還有 3 天）' } } }, held)
     expect(lv.entry).toBe('已持有')
     expect(lv.exit).toBe('收盤 > 1100（+10.0%），或持有滿 10 個交易日（還有 3 天）・停損 930（−7.0%）')
+  })
+})
+
+describe('the trading capital (all paper accounts)', () => {
+  const pos = (shares: number, price: number, stop?: number) => ({ symbol: `TW:${shares}`, name: '', shares, avgCost: price, lastPrice: price, lastPriceDate: '2026-11-25', stopLoss: stop, openedAt: '2026-11-01' })
+  const other = (id: string, cash: number, positions: PaperAccount['positions'] = [], market: PaperAccount['market'] = 'TW'): PaperAccount => ({ ...account(positions, cash), id, market })
+
+  it('adds up every account of the market, and their open stop risk', () => {
+    const s = sleeveOf([account(), other('b', 500_000, [pos(1000, 100, 90)]), other('u', 9_999, [], 'US'), other('c', 0, [pos(10, 50)])], 'TW')
+    expect(s.capital).toBe(1_000_000 + 500_000 + 100_000 + 500)
+    expect(s.openRisk).toBe(10_000)
+    expect(s.unstopped).toBe(1)
+  })
+
+  it('sizes on the total, within this account’s cash, and stops at 6% open risk', () => {
+    // 1% of 3,000,000 = 30,000; 5 per share → 6,000 shares, but the cash is 200,000.
+    const total = paperShares({ price: 100, stop: 95, equity: 3_000_000, cash: 200_000, policy })
+    expect(total.shares).toBe(Math.floor(200_000 / 100.2))
+    const roomy = paperShares({ price: 100, stop: 80, equity: 3_000_000, cash: 3_000_000, policy, strategy: { riskPerTradePercent: 1 } })
+    expect(roomy.shares).toBe(1500)
+    // 5.5% open: only 0.5% = 15,000 left → 750 shares.
+    const near = paperShares({ price: 100, stop: 80, equity: 3_000_000, cash: 3_000_000, openRisk: 165_000, policy })
+    expect(near.shares).toBe(750)
+    expect(near.basis.join('')).toContain('上限 6%')
+    expect(paperShares({ price: 100, stop: 80, equity: 3_000_000, cash: 3_000_000, openRisk: 180_000, policy }).shares).toBe(0)
+  })
+
+  it('checks a manual order against the total and the open-risk limit', () => {
+    const base = { side: 'buy' as const, price: 100, date: '2026-11-25', today: '2026-11-25', policy, backtestPassed: false, stopLoss: 90 }
+    const small = account([], 1_000_000)
+    // 2,000 shares × 10 = 20,000: 2% of one account, 1% of two.
+    expect(blocked(orderChecks({ ...base, shares: 2000, account: small }))).toBe(true)
+    expect(orderChecks({ ...base, shares: 2000, account: small, accounts: [small, other('b', 1_000_000)] }).filter((c) => c.level === 'required' && !c.passed).map((c) => c.text)).toEqual([])
+    // The other account risks 120,000 of 2,200,000 (5.5%); 15,000 more passes 6%.
+    const risky = other('b', 0, [pos(12_000, 100, 90)])
+    const checks = orderChecks({ ...base, shares: 1500, account: small, accounts: [small, risky] })
+    expect(checks.find((c) => c.text.includes('未平倉'))?.passed).toBe(false)
   })
 })
