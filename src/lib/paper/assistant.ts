@@ -111,8 +111,18 @@ export function assistantItems({ strategy, account, statuses, data, policy, regi
   let cash = account.cash
   const out: AssistantItem[] = []
   for (const st of statuses) {
-    const base = { symbol: st.symbol, date: st.date, close: st.close, reading: st.reading, basis: [] as string[], outcome: 'pending' as const, ...(st.decidesOn ? { decidesOn: st.decidesOn } : {}) }
     const p = account.positions.find((x) => x.symbol === st.symbol)
+    const base = {
+      symbol: st.symbol,
+      date: st.date,
+      close: st.close,
+      reading: st.reading,
+      basis: [] as string[],
+      outcome: 'pending' as const,
+      ...(st.decidesOn ? { decidesOn: st.decidesOn } : {}),
+      ...(st.levels ? { levels: st.levels } : {}),
+      ...(!p && st.atr ? { stopEstimate: round2(st.close - k * st.atr) } : {}),
+    }
     if (p) {
       const stop = p.stopLoss
       if (st.state === 'exit') {
@@ -416,4 +426,63 @@ export function adviceSummary(items: AssistantItem[]): { headline: string; detai
     detail: [weekly, rest ? `其餘：${rest}。照規則什麼都不做，也是一種紀律。` : ''].filter(Boolean).join(''),
     actionable,
   }
+}
+
+// The entry and exit prices of one symbol under the card's rules
+// (handbook 10 §7): what the next deciding close must reach, each with its
+// distance from the latest close, plus the stop. Weekly cards decide at the
+// decision day's close.
+export interface PriceLevelText {
+  entry: string
+  exit: string
+}
+
+export function priceLevels(item: AssistantItem, account: PaperAccount): PriceLevelText {
+  const c = item.close
+  const dist = (v: number) => `${v >= c ? '+' : '−'}${pct(Math.abs(v / c - 1))}`
+  const away = (v: number) => `（${dist(v)}）`
+  const when = item.decidesOn ? `${item.decidesOn.slice(5).replace('-', '/')} 收盤` : '收盤'
+  const side = (s: { above?: number; below?: number; note?: string } | undefined): string[] => {
+    if (!s) return []
+    const price =
+      s.above !== undefined && s.below !== undefined
+        ? `${when}介於 ${s.above}～${s.below}（${dist(s.above)}～${dist(s.below)}）`
+        : s.above !== undefined
+          ? `${when} > ${s.above}${away(s.above)}`
+          : s.below !== undefined
+            ? `${when} < ${s.below}${away(s.below)}`
+            : ''
+    return [price, s.note ?? ''].filter(Boolean)
+  }
+  // Not held yet: the card's exit line only matters once bought, and is
+  // left out when it is the entry price itself (crossing back).
+  const entryLv = item.levels?.entry
+  const exitLv = item.levels?.exit
+  const sameLine = !!exitLv && !!entryLv && exitLv.below !== undefined && exitLv.below === entryLv.above
+  const p = account.positions.find((x) => x.symbol === item.symbol)
+  const stop = p?.stopLoss ?? item.stopLoss
+  const stopText = p
+    ? stop !== undefined
+      ? `停損 ${stop}${away(stop)}`
+      : '還沒設停損'
+    : item.stopLoss !== undefined
+      ? `停損 ${item.stopLoss}${away(item.stopLoss)}`
+      : item.stopEstimate !== undefined
+        ? `買進後停損約 ${item.stopEstimate}${away(item.stopEstimate)}`
+        : ''
+
+  const entry =
+    item.kind === 'enter'
+      ? `今天收盤 ${c} 已觸發，${item.decidesOn ? '下個交易日開盤' : '依收盤價'}買進`
+      : p
+        ? '已持有'
+        : side(item.levels?.entry).join('；') || '—'
+  const strategyExit = side(exitLv).join('，')
+  const exit =
+    item.kind === 'exit'
+      ? '出場條件已成立，全部賣出'
+      : p || item.kind === 'enter'
+        ? [strategyExit, stopText].filter(Boolean).join('・') || '—'
+        : [stopText, !sameLine && strategyExit ? `持有後：${strategyExit}` : ''].filter(Boolean).join('・') || '—'
+  return { entry, exit }
 }

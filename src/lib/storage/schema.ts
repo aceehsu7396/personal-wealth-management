@@ -869,6 +869,10 @@ export type AssistantKind = z.infer<typeof AssistantKindSchema>
 export const SignalOutcomeSchema = z.enum(['pending', 'followed', 'modified', 'skipped', 'missed'])
 export type SignalOutcome = z.infer<typeof SignalOutcomeSchema>
 
+// The close the next decision needs (handbook 10 §7): above/below a
+// price, and the conditions that are not a price.
+const LevelSideSchema = z.object({ above: z.number().optional(), below: z.number().optional(), note: z.string().optional() })
+
 export const AssistantItemSchema = z.object({
   symbol: z.string(),
   kind: AssistantKindSchema,
@@ -886,6 +890,9 @@ export const AssistantItemSchema = z.object({
   note: z.string().optional(),
   // Weekly card, before the decision day: the date that decides.
   decidesOn: z.string().optional(),
+  levels: z.object({ entry: LevelSideSchema.optional(), exit: LevelSideSchema.optional() }).optional(),
+  // Not held: the stop an entry now would get (close − k × ATR).
+  stopEstimate: z.number().optional(),
 })
 export type AssistantItem = z.infer<typeof AssistantItemSchema>
 

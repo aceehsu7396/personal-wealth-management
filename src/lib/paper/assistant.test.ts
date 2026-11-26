@@ -3,7 +3,7 @@ import type { Bar } from '../market/priceHistory'
 import type { PaperAccount, TradingStrategy } from '../storage/schema'
 import { createDefaultInvestmentPolicy } from '../storage/schema'
 import { symbolStatus } from '../backtest/engine'
-import { adviceSummary, assistantItems, blocked, executionOf, explainItem, orderChecks, paperScanItems, paperShares, resolveItem, stopWidth, weeklyReview, withSnapshot } from './assistant'
+import { adviceSummary, assistantItems, blocked, executionOf, explainItem, orderChecks, paperScanItems, paperShares, priceLevels, resolveItem, stopWidth, weeklyReview, withSnapshot } from './assistant'
 
 function weekdays(n: number, from = '2024-01-01'): string[] {
   const out: string[] = []
@@ -226,5 +226,25 @@ describe('weekly paper cards', () => {
   it('says when the week decides', () => {
     const s = adviceSummary([{ symbol: 'TW:1', kind: 'wait', date: '2026-11-18', close: 1, reading: '', basis: [], outcome: 'pending', decidesOn: '2026-11-20' }])
     expect(s.detail).toContain('11/20 收盤判斷')
+  })
+})
+
+describe('priceLevels', () => {
+  const base = { symbol: 'TW:2330', date: '2026-11-25', close: 1000, reading: '', basis: [], outcome: 'pending' as const }
+  it('shows the entry price and the stop an entry would get while waiting', () => {
+    const lv = priceLevels({ ...base, kind: 'wait', levels: { entry: { above: 1050 }, exit: { below: 940 } }, stopEstimate: 920 }, account())
+    expect(lv.entry).toBe('收盤 > 1050（+5.0%）')
+    expect(lv.exit).toBe('買進後停損約 920（−8.0%）・持有後：收盤 < 940（−6.0%）')
+    // The exit line equal to the entry price (a cross back) is not repeated.
+    const cross = priceLevels({ ...base, kind: 'wait', levels: { entry: { above: 1050 }, exit: { below: 1050 } }, stopEstimate: 920 }, account())
+    expect(cross.exit).toBe('買進後停損約 920（−8.0%）')
+  })
+  it('shows a zone, notes, the weekly decision day and the position’s stop', () => {
+    const zone = priceLevels({ ...base, kind: 'wait', decidesOn: '2026-11-28', levels: { entry: { above: 950, below: 980 } } }, account())
+    expect(zone.entry).toBe('11/28 收盤介於 950～980（−5.0%～−2.0%）')
+    const held = account([{ symbol: 'TW:2330', name: '', shares: 10, avgCost: 900, lastPrice: 1000, lastPriceDate: '2026-11-25', stopLoss: 930, openedAt: '2026-10-01' }])
+    const lv = priceLevels({ ...base, kind: 'hold', levels: { exit: { above: 1100, note: '或持有滿 10 個交易日（還有 3 天）' } } }, held)
+    expect(lv.entry).toBe('已持有')
+    expect(lv.exit).toBe('收盤 > 1100（+10.0%），或持有滿 10 個交易日（還有 3 天）・停損 930（−7.0%）')
   })
 })

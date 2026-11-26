@@ -14,6 +14,38 @@ export function sma(values: number[], period: number): number[] {
   return out
 }
 
+// Wilder's average gain and loss after the last close, or null before
+// period + 1 closes: the state the next close's RSI is computed from.
+export function rsiState(closes: number[], period: number): { gain: number; loss: number } | null {
+  if (closes.length <= period) return null
+  let gain = 0
+  let loss = 0
+  for (let i = 1; i <= period; i++) {
+    const d = closes[i] - closes[i - 1]
+    if (d > 0) gain += d
+    else loss -= d
+  }
+  gain /= period
+  loss /= period
+  for (let i = period + 1; i < closes.length; i++) {
+    const d = closes[i] - closes[i - 1]
+    gain = (gain * (period - 1) + Math.max(d, 0)) / period
+    loss = (loss * (period - 1) + Math.max(-d, 0)) / period
+  }
+  return { gain, loss }
+}
+
+// The next close at which Wilder's RSI equals `target` (0 < target < 100).
+// RSI rises with the close, so a close above it gives a higher RSI.
+export function rsiPrice(state: { gain: number; loss: number }, last: number, period: number, target: number): number {
+  const q = target / (100 - target)
+  const g = state.gain * (period - 1)
+  const l = state.loss * (period - 1)
+  const down = g / q - l
+  if (down >= 0) return last - down
+  return last + Math.max(q * l - g, 0)
+}
+
 // Wilder's RSI.
 export function rsi(closes: number[], period: number): number[] {
   const out = new Array<number>(closes.length).fill(NaN)

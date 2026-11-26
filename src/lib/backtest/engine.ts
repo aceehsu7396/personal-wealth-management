@@ -1,6 +1,6 @@
 import type { Bar } from '../market/priceHistory'
 import type { BacktestStats, Cadence, StrategyTemplate } from '../storage/schema'
-import { atr, priorHigh, priorLow, rsi, sma } from './indicators'
+import { atr, priorHigh, priorLow, rsi, rsiPrice, rsiState, sma } from './indicators'
 import { parseSymbol, resolveParams, STRATEGY_TEMPLATES } from './templates'
 import { cadenceOf, DEFAULT_DECISION_DAY, decisionDateOf, isWeeklyTemplate, WEEKDAY_LABELS, weeklyBars, type WeeklySeries } from './weekly'
 
@@ -790,6 +790,37 @@ export interface SymbolStatus {
   // Weekly cadence, before this week's decision day: the day that decides.
   // Entries and exits wait for it; the reading is how things stand now.
   decidesOn?: string
+  // The close the next decision needs to enter or exit (handbook 10 §7).
+  levels?: PriceLevels
+}
+
+// A price condition on the next close that decides: the next trading day,
+// or the weekly card's decision day. `note` holds the conditions that are
+// not a price (foreign flow, ranking, days held).
+export interface LevelSide {
+  above?: number
+  below?: number
+  note?: string
+}
+export interface PriceLevels {
+  entry?: LevelSide
+  exit?: LevelSide
+}
+
+const lastSum = (values: number[], count: number) => (count <= 0 ? 0 : values.slice(-count).reduce((a, v) => a + v, 0))
+const round2 = (v: number) => Math.round(v * 100) / 100
+
+// The next close at which an f-period average meets an s-period one, from
+// the closes before it: fast > slow above it, fast < slow below it.
+export function crossPrice(history: number[], fast: number, slow: number): number | null {
+  if (fast >= slow || history.length < slow - 1) return null
+  const x = (lastSum(history, slow - 1) / slow - lastSum(history, fast - 1) / fast) / (1 / fast - 1 / slow)
+  return x > 0 ? x : null
+}
+
+// The next close above which it stays over its n-period average.
+function aboveAverage(history: number[], n: number): number | null {
+  return n > 1 && history.length >= n - 1 ? lastSum(history, n - 1) / (n - 1) : null
 }
 
 const num = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(2))
@@ -815,7 +846,9 @@ export function symbolStatus(
   // Weekly, before the decision day: say where things stand, but entries
   // and exits wait for the decision day's close.
   return symbols.map((s): SymbolStatus => {
-    const st = readStatus(s)
+    const read = readStatus(s)
+    const levels = read.state === 'no_data' ? undefined : levelsFor(s)
+    const st = levels ? { ...read, levels } : read
     const wk = prepared[s]?.wk
     if (!wk || wk.decision[wk.decision.length - 1]) return st
     const decidesOn = decisionDateOf(st.date, day)
@@ -824,6 +857,80 @@ export function symbolStatus(
     if (st.state === 'exit') return { ...st, state: 'hold', decidesOn, reading: `${st.reading.replace(/，(出場|賣出)$/, '')}；週頻：${when}仍成立才出場，停損照常` }
     return { ...st, decidesOn }
   })
+
+  // What the next deciding close must do (handbook 10 §7). Weekly
+  // templates: this week's close while the week is open, else next week's.
+  function levelsFor(s: string): PriceLevels | undefined {
+    const d = prepared[s]
+    if (!d || d.bars.length === 0) return undefined
+    const i = d.bars.length - 1
+    const h = held[s]
+    const p = params
+    const r = (v: number | null) => (v === null || !Number.isFinite(v) ? undefined : round2(v))
+    const wk = d.wk
+    const weekOpen = !!wk && !wk.decision[i]
+    const j = wk ? wk.weekOf[i] : -1
+    const wCloses = wk ? wk.bars.map((b) => b.close) : []
+    const wHistory = wk ? wCloses.slice(0, weekOpen ? j : j + 1) : []
+    const wBars = wk ? wk.bars.slice(0, weekOpen ? j : j + 1) : []
+
+    if (template === 'buy_hold') return { entry: { note: '買進持有：沒有價格條件，尚未持有就買進' }, exit: { note: '不賣出' } }
+    if (template === 'dca') return { entry: { note: '每月定期定額，不看價格' }, exit: { note: '不賣出' } }
+    if (template === 'discretionary') return { entry: { note: '文字規則：請依策略卡自行判斷' }, exit: { note: '文字規則：請依策略卡自行判斷' } }
+    if (rotation) return { entry: { note: `動能排名進入前 ${p.topK} 名，沒有價格門檻` }, exit: { note: `跌出前 ${p.topK} 名` } }
+
+    if (template === 'donchian' || template === 'weekly_breakout') {
+      const src = template === 'donchian' ? d.bars : wBars
+      const [n, m] = template === 'donchian' ? [p.entryDays, p.exitDays] : [p.entryWeeks, p.exitWeeks]
+      if (src.length < Math.max(n, m)) return undefined
+      return {
+        entry: { above: r(Math.max(...src.slice(-n).map((b) => b.high))) },
+        exit: { below: r(Math.min(...src.slice(-m).map((b) => b.low))) },
+      }
+    }
+    if (template === 'ma_cross' || template === 'weekly_ma') {
+      const [history, f, sl] = template === 'ma_cross' ? [d.closes, p.fast, p.slow] : [wHistory, p.fastWeeks, p.slowWeeks]
+      const x = r(crossPrice(history, f, sl))
+      if (x === undefined) return undefined
+      const k = template === 'ma_cross' ? i : j - (weekOpen ? 1 : 0)
+      const above = !h && k >= 0 && d.ind.fast[k] > d.ind.slow[k]
+      return {
+        entry: { above: x, ...(above ? { note: '快線已在慢線之上：要先跌回這個價以下，再站上才進場' } : {}) },
+        exit: { below: x },
+      }
+    }
+    if (template === 'rsi_reversion' || template === 'weekly_pullback') {
+      const daily = template === 'rsi_reversion'
+      const [history, rp, tn] = daily ? [d.closes, p.rsiDays, p.trendDays] : [wHistory, p.rsiWeeks, p.trendWeeks]
+      const state = rsiState(history, rp)
+      const trend = aboveAverage(history, tn)
+      if (!state || trend === null) return undefined
+      const last = history[history.length - 1]
+      let floor = trend
+      // Weekly: the trend line must also rise from last week's.
+      if (!daily && history.length >= tn) floor = Math.max(floor, tn * (lastSum(history, tn) / tn) - lastSum(history, tn - 1))
+      const ceiling = rsiPrice(state, last, rp, p.entryBelow)
+      const exitAbove = rsiPrice(state, last, rp, p.exitAbove)
+      let holdNote: string | undefined
+      if (h) {
+        const entryBar = Math.max(d.bars.findIndex((b) => b.date >= h.openedAt), 0)
+        const left = daily ? p.maxHoldDays - (i - entryBar) : p.maxHoldWeeks - (wk ? wk.weekOf[i] - wk.weekOf[entryBar] + 1 : 0)
+        holdNote = `或持有滿 ${daily ? `${p.maxHoldDays} 個交易日` : `${p.maxHoldWeeks} 週`}（${left > 0 ? `還有 ${left} ${daily ? '天' : '週'}` : '已滿'}）`
+      }
+      return {
+        entry: floor < ceiling ? { above: r(floor), below: r(ceiling) } : { note: `趨勢線門檻 ${round2(floor)} 高於 RSI 門檻 ${round2(ceiling)}：下一次判斷不會進場` },
+        exit: { above: r(exitAbove), ...(holdNote ? { note: holdNote } : {}) },
+      }
+    }
+    if (template === 'chip_flow') {
+      const trend = p.trendDays > 0 ? r(aboveAverage(d.closes, p.trendDays)) : undefined
+      return {
+        entry: { ...(trend !== undefined ? { above: trend } : {}), note: `${trend !== undefined ? '且' : ''}外資 ${p.flowDays} 日買超` },
+        exit: { ...(trend !== undefined ? { below: trend } : {}), note: `${trend !== undefined ? '或' : ''}外資 ${p.flowDays} 日轉賣超` },
+      }
+    }
+    return undefined
+  }
 
   function readStatus(s: string): SymbolStatus {
     const d = prepared[s]

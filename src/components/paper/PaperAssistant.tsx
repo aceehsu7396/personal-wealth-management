@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { AssistantItem, InvestmentPolicy, PaperAccount, TradingStrategy } from '../../lib/storage/schema'
 import type { RegimeContext } from '../../lib/market/regime'
-import { ASSISTANT_KIND_LABELS, NEAR_STOP, OUTCOME_LABELS, adviceSummary, blocked, executionOf, explainItem, orderChecks, weeklyReview, type OrderCheck } from '../../lib/paper/assistant'
+import { ASSISTANT_KIND_LABELS, NEAR_STOP, OUTCOME_LABELS, adviceSummary, blocked, executionOf, explainItem, orderChecks, priceLevels, weeklyReview, type OrderCheck } from '../../lib/paper/assistant'
 import { coachPrompt } from '../../lib/ai/prompts/agents'
 import { PromptPanel } from '../ai/PromptPanel'
 import { formatSymbol } from '../../lib/backtest/templates'
@@ -55,6 +55,20 @@ interface Ctx {
   onSkip: (item: AssistantItem, note: string) => void
 }
 
+// The card's entry and exit prices for one symbol (handbook 10 §7).
+function LevelLines({ levels }: { levels: { entry: string; exit: string } }) {
+  return (
+    <dl className="mt-1 space-y-0.5 text-sm">
+      {(['entry', 'exit'] as const).map((k) => (
+        <div key={k} className="flex gap-2">
+          <dt className={`shrink-0 ${mutedClass}`}>{k === 'entry' ? '進場價' : '出場價'}</dt>
+          <dd className="text-gray-900 tabular-nums dark:text-gray-100">{levels[k]}</dd>
+        </div>
+      ))}
+    </dl>
+  )
+}
+
 function ActionRow({ item, ctx }: { item: AssistantItem; ctx: Ctx }) {
   const [shares, setShares] = useState(String(item.shares ?? ''))
   const [stop, setStop] = useState(String(item.stopLoss ?? ''))
@@ -79,6 +93,7 @@ function ActionRow({ item, ctx }: { item: AssistantItem; ctx: Ctx }) {
     : []
   const canAct = item.kind === 'enter' || item.kind === 'exit' || item.kind === 'raise_stop'
   const ex = explainItem(item, ctx.account)
+  const lv = priceLevels(item, ctx.account)
 
   return (
     <li className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
@@ -101,6 +116,7 @@ function ActionRow({ item, ctx }: { item: AssistantItem; ctx: Ctx }) {
           （{item.date} 收盤 {item.close}）
         </span>
       </p>
+      <LevelLines levels={lv} />
       {ex.numbers.length > 0 && (
         <dl className="mt-2 flex flex-wrap gap-x-6 gap-y-1">
           {ex.numbers.map((n) => (
@@ -212,6 +228,7 @@ export function PaperAssistant(ctx: Ctx) {
               <li>逐檔套用策略卡的進出場規則：持股看出場訊號與停損，未持有的看進場訊號。</li>
               <li>停損 = 收盤 − k × ATR(14)：k 用策略卡的倍數，局勢表有設時改用局勢的；策略卡沒有停損規則時給 2.5 倍的保護停損。</li>
               <li>股數 = 帳戶權益 × 每筆風險 ÷（價格 − 停損），再乘局勢的部位倍數，並受現金、單一部位上限與持有檔數限制。</li>
+              <li>進場價、出場價：下一次判斷時（日頻是下個交易日收盤，週頻是判斷日收盤）收盤要到多少才觸發，由策略卡的規則反推，另附離今天收盤多遠；外資買賣超、動能排名、持有天數這類不是價格的條件直接寫出來。出場價同時列出停損。</li>
               <li>持股的吊燈停損（進場後最高價 − k × ATR）高於目前停損時，建議上調；收盤離停損不到 {Math.round(NEAR_STOP * 100)}% 時提醒。</li>
               <li>下單前檢查：價格是否最新、有沒有停損、風險是否超過上限、現金夠不夠；必須項沒過就不能下單。</li>
             </ol>
@@ -233,7 +250,7 @@ export function PaperAssistant(ctx: Ctx) {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-gray-200 dark:border-gray-700">
-                      {['標的', '狀態', '規則讀數', '停損與損益'].map((h) => (
+                      {['標的', '狀態', '進場價／出場價', '規則讀數', '停損與損益'].map((h) => (
                         <th key={h} className="py-1.5 pr-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
                           {h}
                         </th>
@@ -243,11 +260,22 @@ export function PaperAssistant(ctx: Ctx) {
                   <tbody>
                     {[...holds, ...waits].map((i) => {
                       const e = explainItem(i, account)
+                      const lv = priceLevels(i, account)
                       return (
                         <tr key={`${i.kind}${i.symbol}`} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
                           <td className="py-1.5 pr-3 whitespace-nowrap text-gray-900 dark:text-gray-100">{formatSymbol(i.symbol)}</td>
                           <td className="py-1.5 pr-3 whitespace-nowrap">
                             <Badge tone="info">{ASSISTANT_KIND_LABELS[i.kind]}</Badge>
+                          </td>
+                          <td className="min-w-[17rem] py-1.5 pr-3 text-xs text-gray-900 tabular-nums dark:text-gray-100">
+                            <span className="block">
+                              <span className={mutedClass}>進場 </span>
+                              {lv.entry}
+                            </span>
+                            <span className="block">
+                              <span className={mutedClass}>出場 </span>
+                              {lv.exit}
+                            </span>
                           </td>
                           <td className="py-1.5 pr-3 text-gray-700 dark:text-gray-300">{i.reading}</td>
                           <td className="py-1.5 pr-3 text-xs text-gray-600 dark:text-gray-400">{[...i.basis, ...e.numbers.map((n) => `${n.label} ${n.value}`)].join('；') || '—'}</td>
