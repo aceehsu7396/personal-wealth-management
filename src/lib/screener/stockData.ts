@@ -25,6 +25,12 @@ export interface StockRow {
   ret3m: number | null
   ret6m: number | null
   ret12m: number | null
+  // From the last year of daily closes (public/data/stock-closes.json),
+  // unadjusted: annualized volatility of daily returns, and the close's
+  // distance below the highest close (0 = at the high, -0.2 = 20% below).
+  // Missing until a year of closes has built up.
+  vol1y?: number | null
+  fromHigh52?: number | null
 }
 
 export interface StockData {

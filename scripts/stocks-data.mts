@@ -3,11 +3,18 @@
 // (no CORS), so the site reads this same-origin snapshot.
 //
 //   npx tsx scripts/stocks-data.mts
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { isEtfCode, priceReturn, type StockData, type StockRow } from '../src/lib/screener/stockData.ts'
+import { addDay, emptyHistory, missingDays, yearStats, type CloseHistory } from '../src/lib/screener/closeHistory.ts'
 import { closeDue } from '../src/lib/paper/autoRoutine.ts'
 
 const OUT = 'public/data/stocks.json'
+// The last year of daily closes, restored from the live site before this
+// runs (deploy.yml) and extended here.
+const HISTORY = 'public/data/stock-closes.json'
+// Missing days downloaded per run (2 s apart): a year builds up in about
+// three runs, a single missed day is filled the next time.
+const MAX_BACKFILL = 100
 const OPENAPI = 'https://openapi.twse.com.tw/v1'
 const UA = 'Mozilla/5.0 (personal-wealth-management data job)'
 // TWSE blocks clients that send more than ~3 requests per 5 seconds.
@@ -112,6 +119,9 @@ async function dayFromMiIndex(date: string): Promise<{ Date: string; Code: strin
     `https://www.twse.com.tw/rwd/zh/afterTrading/MI_INDEX?date=${ymd}&type=ALLBUT0999&response=json`,
   )
   const table = json.tables?.find((t) => t.fields?.includes('證券代號') && t.fields.includes('收盤價'))
+  // "沒有符合條件的資料" is a day without trading; anything else (throttling,
+  // maintenance) is an error, so the day is not taken for a holiday.
+  if (json.stat !== 'OK' && !json.stat?.includes('沒有符合條件')) throw new Error(`MI_INDEX ${ymd}：${json.stat}`)
   if (json.stat !== 'OK' || !table?.data?.length) return []
   const f = table.fields!
   const at = (name: string) => f.indexOf(name)
@@ -175,6 +185,9 @@ async function main() {
     past[key] = (await attempt(`${months} 個月前收盤`, () => closesOn(monthsAgo(date, months)))) ?? new Map()
   }
 
+  const history = await attempt('一年收盤歷史', () => updateHistory(date, daily))
+  const year = (code: string) => (history?.closes[code] ? yearStats(history.closes[code]) : { vol1y: null, fromHigh52: null })
+
   const stocks: StockRow[] = daily
     .map((d) => {
       const code = d.Code.trim()
@@ -202,6 +215,8 @@ async function main() {
         ret3m: round(priceReturn(close, past['3m'].get(code)), 4),
         ret6m: round(priceReturn(close, past['6m'].get(code)), 4),
         ret12m: round(priceReturn(close, past['12m'].get(code)), 4),
+        vol1y: round(year(code).vol1y, 4),
+        fromHigh52: round(year(code).fromHigh52, 4),
       }
     })
     .filter((s) => s.close !== null)
@@ -210,6 +225,37 @@ async function main() {
   mkdirSync('public/data', { recursive: true })
   writeFileSync(OUT, JSON.stringify(data))
   console.log(`[stocks-data] ${OUT}：${stocks.length} 檔（${date}，${source}）、${errors.length} 個錯誤`)
+}
+
+// Adds the day's closes and back-fills missing days, newest first.
+async function updateHistory(date: string, daily: { Code: string; ClosingPrice: string }[]): Promise<CloseHistory> {
+  const closesOf = (rows: { Code: string; ClosingPrice: string }[]) =>
+    new Map(rows.map((r) => [r.Code.trim(), num(r.ClosingPrice)] as const).filter((e): e is [string, number] => e[1] !== null && e[1] > 0))
+  let h: CloseHistory = existsSync(HISTORY) ? (JSON.parse(readFileSync(HISTORY, 'utf8')) as CloseHistory) : emptyHistory()
+  h = addDay(h, date, closesOf(daily))
+  let filled = 0
+  let failures = 0
+  for (const day of missingDays(h, date).slice(0, MAX_BACKFILL)) {
+    await sleep(GAP_MS)
+    let rows: Awaited<ReturnType<typeof dayFromMiIndex>>
+    try {
+      rows = await dayFromMiIndex(day)
+    } catch (e) {
+      // TWSE cuts connections after a burst: pause, then go on; after three
+      // failures the rest waits for the next run.
+      console.warn(`[stocks-data] 收盤歷史 ${day} 失敗：${(e as Error).message}`)
+      if (++failures >= 3) break
+      await sleep(30_000)
+      continue
+    }
+    if (rows.length === 0) h = { ...h, closed: [...h.closed, day] }
+    else h = addDay(h, day, closesOf(rows))
+    filled++
+  }
+  mkdirSync('public/data', { recursive: true })
+  writeFileSync(HISTORY, JSON.stringify(h))
+  console.log(`[stocks-data] ${HISTORY}：${h.dates.length} 個交易日（本次補 ${filled} 天，還缺 ${missingDays(h, date).length} 天）`)
+  return h
 }
 
 await main()

@@ -14,6 +14,8 @@ export type NumericField =
   | 'ret3m'
   | 'ret6m'
   | 'ret12m'
+  | 'vol1y'
+  | 'fromHigh52'
   | 'marketCap'
   | 'tradeValue'
 
@@ -35,6 +37,8 @@ export const FIELDS: Record<NumericField, FieldDef> = {
   ret3m: { label: '3 個月報酬', unit: '%', fraction: true, glossary: '動能' },
   ret6m: { label: '6 個月報酬', unit: '%', fraction: true, glossary: '動能' },
   ret12m: { label: '12 個月報酬', unit: '%', fraction: true, glossary: '動能' },
+  vol1y: { label: '1 年波動度', unit: '%', fraction: true, glossary: '波動度' },
+  fromHigh52: { label: '距 52 週高點', unit: '%', fraction: true, glossary: '52 週高點' },
   marketCap: { label: '市值', unit: '億' },
   tradeValue: { label: '成交金額', unit: '億' },
 }
@@ -155,7 +159,7 @@ export const PRESET_SCREENS: PresetScreen[] = [
 
 export function fieldValue(row: StockRow, field: NumericField): number | null {
   const v = row[field]
-  if (v === null) return null
+  if (v === null || v === undefined) return null
   return FIELDS[field].fraction ? v * 100 : v
 }
 

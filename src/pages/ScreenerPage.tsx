@@ -42,6 +42,12 @@ type WatchKey = 'code' | 'added' | 'change' | 'advice' | 'pe' | 'ret6m'
 const WATCH_SORT_LABELS: Record<WatchKey, string> = { code: '代號', added: '加入日期', change: '加入以來', advice: '研究卡建議', pe: '本益比', ret6m: '6 個月' }
 
 const COLUMNS: NumericField[] = ['pe', 'dividendYield', 'pb', 'revenueYoy', 'ret6m', 'ret12m', 'marketCap', 'tradeValue']
+// A field the screen sorts or filters on is shown even when not a default
+// column, first so it is in view without scrolling the table sideways.
+const columnsFor = (screen: Screen): NumericField[] => [
+  ...[screen.sortBy, ...screen.filters.filter((f) => f.min !== undefined || f.max !== undefined).map((f) => f.field)].filter((f, i, a) => !COLUMNS.includes(f) && a.indexOf(f) === i),
+  ...COLUMNS,
+]
 
 function Header({ field }: { field: NumericField }) {
   const def = FIELDS[field]
@@ -94,6 +100,7 @@ export function ScreenerPage() {
   const [data, setData] = useState<StockData | null | undefined>(undefined)
   const [presetId, setPresetId] = useState<string>(PRESET_SCREENS[0].id)
   const [screen, setScreen] = useState<Screen>(PRESET_SCREENS[0].screen)
+  const columns = columnsFor(screen)
   const [customOpen, setCustomOpen] = useState(false)
 
   useEffect(() => {
@@ -433,7 +440,7 @@ export function ScreenerPage() {
                       </SortableTh>
                       <SortableTh sortKey="industry" label="產業" sort={resultSort} onSort={sortResults} className={thClass} />
                       <SortableTh sortKey="close" label="收盤" sort={resultSort} onSort={sortResults} className={thClass} />
-                      {COLUMNS.map((c) => (
+                      {columns.map((c) => (
                         <SortableTh key={c} sortKey={c} label={FIELDS[c].label} sort={resultSort} onSort={sortResults} className={thClass}>
                           <Header field={c} />
                         </SortableTh>
@@ -463,7 +470,7 @@ export function ScreenerPage() {
                         </td>
                         <td className={`${tdClass} text-xs`}>{r.industry}</td>
                         <td className={tdClass}>{r.close}</td>
-                        {COLUMNS.map((c) => (
+                        {columns.map((c) => (
                           <td key={c} className={tdClass}>
                             {formatField(r, c)}
                           </td>

@@ -49,7 +49,7 @@ jobs:
       - name: Restore last published data
         run: |
           mkdir -p public/data
-          for f in macro stocks funds indices events valuation daily-research active-etf health; do
+          for f in macro stocks stock-closes funds indices events valuation daily-research active-etf health; do
             curl -sf -o "public/data/$f.json" "https://aceehsu7396.github.io/personal-wealth-management/data/$f.json" \
               || rm -f "public/data/$f.json"
           done
