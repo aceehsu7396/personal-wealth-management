@@ -25,7 +25,10 @@ describe('vault crypto', () => {
     expect(await open(k.aesKey, sealed)).toBe('{"trades":[1,2,3]}')
     const wrong = await deriveKeys('wrong horse battery!', FAST)
     await expect(open(wrong.aesKey, sealed)).rejects.toThrow()
-    const tampered = { ...sealed, data: sealed.data.slice(0, -2) + (sealed.data.endsWith('A') ? 'BB' : 'AA') }
+    // A character in the middle always changes real bytes; the last ones
+    // can be base64 padding, which decodes the same whatever it says.
+    const mid = Math.floor(sealed.data.length / 2)
+    const tampered = { ...sealed, data: sealed.data.slice(0, mid) + (sealed.data[mid] === 'A' ? 'B' : 'A') + sealed.data.slice(mid + 1) }
     await expect(open(k.aesKey, tampered)).rejects.toThrow()
   })
 })
