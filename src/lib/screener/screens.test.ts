@@ -62,6 +62,14 @@ describe('applyScreen', () => {
     const universe = Array.from({ length: 80 }, (_, i) => row(`s${i}`, { marketCap: i }))
     expect(applyScreen(universe, preset('large'))).toHaveLength(50)
   })
+
+  it('keeps the 10 least volatile large caps, none before a year of data', () => {
+    const universe = Array.from({ length: 30 }, (_, i) => row(`s${i}`, { marketCap: i < 25 ? 2000 : 500, vol1y: 0.4 - i / 100 }))
+    const picked = applyScreen(universe, preset('low-vol')).map((r) => r.code)
+    // s25–s29 are the calmest but too small.
+    expect(picked).toEqual(Array.from({ length: 10 }, (_, k) => `s${24 - k}`))
+    expect(applyScreen([row('a'), row('b')], preset('low-vol'))).toEqual([])
+  })
 })
 
 describe('priceReturn', () => {

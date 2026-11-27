@@ -149,6 +149,13 @@ export const PRESET_SCREENS: PresetScreen[] = [
     screen: { filters: [LIQUIDITY_FLOOR], kind: 'stock', industry: null, sortBy: 'marketCap', sortDesc: true, topCount: 50 },
   },
   {
+    id: 'low-vol',
+    name: '低波動',
+    summary: '市值 1,000 億以上、近一年波動度最低的 10 檔：報酬可能低於大盤，但跌勢時跌得少（低波動異常，手冊 10 §1.4）。每月換一次。',
+    handbook: '10',
+    screen: { filters: [{ field: 'marketCap', min: 1000 }, LIQUIDITY_FLOOR], kind: 'stock', industry: null, sortBy: 'vol1y', sortDesc: false, topCount: 10 },
+  },
+  {
     id: 'etf-momentum',
     name: 'ETF 動能',
     summary: '只看 ETF，依 6 個月報酬排序：動能輪動策略的候選清單。',
