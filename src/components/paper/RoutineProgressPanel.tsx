@@ -40,8 +40,8 @@ export function RoutineProgressPanel({ progress, detail, compact = false }: { pr
   const percent = finished ? 100 : steps === 0 ? 0 : Math.round(((settled + accountsDone) / steps) * 100)
 
   const headline = finished
-    ? `完成：${total - missing} 檔已更新${missing > 0 ? `、${missing} 檔取不到` : ''}・${progress.accounts.length - failed} 個帳戶完成${failed > 0 ? `、${failed} 個失敗` : ''}`
-    : `${working?.status === 'advising' ? `產生建議中（${working.name}）` : '更新收盤價'} ${settled}／${total} 檔・帳戶 ${accountsDone}／${progress.accounts.length}`
+    ? `完成：${total - missing} 檔已更新${missing > 0 ? `、${missing} 檔取不到` : ''}・${progress.accounts.length - failed} 個策略完成${failed > 0 ? `、${failed} 個失敗` : ''}`
+    : `${working?.status === 'advising' ? `產生建議中（${working.name}）` : '更新收盤價'} ${settled}／${total} 檔・策略 ${accountsDone}／${progress.accounts.length}`
 
   return (
     <div className="mt-4 rounded-md border border-gray-200 bg-white p-3 text-sm dark:border-gray-700 dark:bg-gray-800" aria-live="polite">

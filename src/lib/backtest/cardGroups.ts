@@ -118,7 +118,7 @@ export function cleanupSuggestions(strategies: TradingStrategy[], runs: Backtest
     const last = lastActivity(card, runs, accounts).slice(0, 10)
     const days = Math.floor((Date.parse(today) - Date.parse(last)) / 86400000)
     if (days <= CLEANUP_DAYS) continue
-    out.push({ card, reason: `最近一次回測（${latest.createdAt.slice(0, 10)}）未通過，${days} 天沒有動作，也沒有虛擬帳戶` })
+    out.push({ card, reason: `最近一次回測（${latest.createdAt.slice(0, 10)}）未通過，${days} 天沒有動作，也還沒加入虛擬交易` })
   }
   return out
 }

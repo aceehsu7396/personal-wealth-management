@@ -22,10 +22,9 @@ import { claimRoutine, releaseRoutine } from '../lib/paper/autoRoutine'
 import { useJourney } from '../lib/useJourney'
 import { useRegime } from '../lib/market/useRegime'
 import { OrderCheckList, PaperAssistant } from '../components/paper/PaperAssistant'
-import { loadSeries, seriesForBacktest } from '../lib/market/priceHistory'
+import { poolOf } from '../lib/paper/fund'
 import { todayIsoDate } from '../lib/market/twse'
 import { describeAiError } from '../lib/ai/client'
-import { EquityChart } from '../components/charts/BacktestCharts'
 import { StatCard } from '../components/StatCard'
 import { SimGuide } from '../components/SimGuide'
 import { PaperHowTo } from '../components/PaperHowTo'
@@ -92,7 +91,9 @@ function LatestCloses({ account, symbols, today }: { account: PaperAccount; symb
 }
 
 // The stock first, then only the cards made for it.
-function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: string; onCreate: (a: Omit<PaperAccount, 'id' | 'createdAt'>) => void }) {
+// A strategy joins the cash pool of its market; only the first one of a
+// market asks how much money the pool starts with.
+function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: string; onCreate: (a: Omit<PaperAccount, 'id' | 'createdAt'>, capital?: number) => void }) {
   const strategies = useAppStore((s) => s.tradingStrategies)
   const watchlist = useAppStore((s) => s.watchlist)
   const stockTheses = useAppStore((s) => s.stockTheses)
@@ -110,9 +111,11 @@ function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: str
   const cards = groups.find((g) => g.key === stock)?.cards ?? []
   const marketOf = (key: string) => (key.split(',').every((x) => x.startsWith('US:')) && key ? 'US' : 'TW')
   const [market, setMarket] = useState<'TW' | 'US'>(() => marketOf(stock))
-  const [cash, setCash] = useState(1_000_000)
+  const funds = useAppStore((s) => s.paperFunds)
+  const [capital, setCapital] = useState(1_000_000)
   const [strategyId, setStrategyId] = useState(defaultStrategyId)
   const strategy = strategies.find((s) => s.id === strategyId)
+  const needsFund = funds[market] === undefined && !paperAccounts.some((a) => a.market === market)
 
   function chooseStock(key: string) {
     setStock(key)
@@ -124,7 +127,7 @@ function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: str
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      <Field label="帳戶名稱">
+      <Field label="名稱">
         <input className={inputClass} value={name} onChange={(e) => setName(e.target.value)} placeholder={strategy?.name ?? '例：0050 均線練習'} />
       </Field>
       <Field label="標的">
@@ -153,29 +156,35 @@ function CreateAccount({ defaultStrategyId, onCreate }: { defaultStrategyId: str
           <option value="US">美股（美元，手動輸入價格）</option>
         </select>
       </Field>
-      <Field label="初始資金">
-        <input type="number" step="10000" className={inputClass} value={cash} onChange={(e) => setCash(Number(e.target.value))} />
-      </Field>
+      {needsFund && (
+        <Field label={`${market === 'TW' ? '台股' : '美股'}現金池的投入資金`}>
+          <input type="number" step="10000" className={inputClass} value={capital} onChange={(e) => setCapital(Number(e.target.value))} />
+          <span className="mt-1 block text-xs text-gray-500 dark:text-gray-400">第一次用這個市場時設定，之後所有策略共用，可在總覽調整。</span>
+        </Field>
+      )}
       <div className="col-span-full">
         <button
           type="button"
-          disabled={!(cash > 0)}
+          disabled={needsFund && !(capital > 0)}
           onClick={() =>
-            onCreate({
-              name: name.trim() || (strategy ? `${strategy.name}・虛擬` : '虛擬帳戶'),
-              strategyId: strategyId || undefined,
-              market,
-              initialCash: cash,
-              cash,
-              positions: [],
-              orders: [],
-              equityHistory: [],
-              signalLog: [],
-            })
+            onCreate(
+              {
+                name: name.trim() || (strategy ? strategy.name : '自由練習'),
+                strategyId: strategyId || undefined,
+                market,
+                initialCash: 0,
+                cash: 0,
+                positions: [],
+                orders: [],
+                equityHistory: [],
+                signalLog: [],
+              },
+              needsFund ? capital : undefined,
+            )
           }
           className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
         >
-          建立虛擬帳戶
+          加入虛擬交易
         </button>
       </div>
     </div>
@@ -190,6 +199,8 @@ export function PaperPage() {
   const addPaperAccount = useAppStore((s) => s.addPaperAccount)
   const replacePaperAccount = useAppStore((s) => s.replacePaperAccount)
   const removePaperAccount = useAppStore((s) => s.removePaperAccount)
+  const funds = useAppStore((s) => s.paperFunds)
+  const setPaperCapital = useAppStore((s) => s.setPaperCapital)
   const updateTradingStrategy = useAppStore((s) => s.updateTradingStrategy)
   const setPaperRoutineRanAt = useAppStore((s) => s.setPaperRoutineRanAt)
 
@@ -206,9 +217,9 @@ export function PaperPage() {
   const [manualPrices, setManualPrices] = useState<Record<string, string>>({})
   const [order, setOrder] = useState({ symbol: '', side: 'buy' as 'buy' | 'sell', type: 'market' as PaperOrder['type'], shares: '', price: '', stopLoss: '', reason: '', emotion: 3 })
   const [pendingDelete, setPendingDelete] = useState(false)
-  // 總覽 of every account: the default with two or more, unless the link
-  // names an account or a card.
-  const [overview, setOverview] = useState(accounts.length >= 2 && !search.get('account') && presetStrategy === '')
+  // 總覽 (the cash pool and every holding): the default, unless the link
+  // names a strategy or a card.
+  const [overview, setOverview] = useState(accounts.length >= 1 && !search.get('account') && presetStrategy === '')
 
   const { policy } = useJourney()
   const { ctx: regime, loading: regimeLoading } = useRegime()
@@ -268,6 +279,7 @@ export function PaperPage() {
         onStep: setBusy,
         weeklyDecisionDay,
         manual: manualQuotes(priceSymbols(account, strategy)),
+        funds: useAppStore.getState().paperFunds,
         latest: (id) => useAppStore.getState().paperAccounts.find((a) => a.id === id)!,
         save: replacePaperAccount,
         onProgress: setProgress,
@@ -281,7 +293,7 @@ export function PaperPage() {
         mark('advising', 'advice')
         setBusy(weekly ? '計算本週建議…' : '計算今日建議…')
         try {
-          save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay, accounts: useAppStore.getState().paperAccounts }))
+          save(await adviseAccount({ account: current(), strategy, policy, regime, today, onStep: setBusy, weeklyDecisionDay, accounts: useAppStore.getState().paperAccounts, funds: useAppStore.getState().paperFunds }))
           mark('done', 'finished')
         } catch (e) {
           mark('failed', 'finished', describeAiError(e))
@@ -295,7 +307,7 @@ export function PaperPage() {
 
   // Places an order on the latest saved account; the caller saves it.
   async function execOrder(input: NewOrder): Promise<PaperAccount> {
-    if (!account) throw new Error('沒有選取帳戶')
+    if (!account) throw new Error('沒有選取策略')
     {
       let quote: Quote | undefined
       if (input.type === 'market' && input.fillAt !== 'open') {
@@ -306,7 +318,8 @@ export function PaperPage() {
         else quote = (await fetchQuotes([input.symbol], today, setBusy))[input.symbol]
         if (!quote) throw new Error('取不到最新收盤價：請確認代號，美股可在上方手動填價')
       }
-      return placeOrder(current(), input, quote)
+      const state = useAppStore.getState()
+      return placeOrder(current(), input, quote, undefined, poolOf(state.paperAccounts, account.market, state.paperFunds).cash)
     }
   }
 
@@ -350,20 +363,6 @@ export function PaperPage() {
   }
 
 
-  // Equity vs 0050 (when its prices are cached), both starting at 100.
-  function equityPoints() {
-    if (!account || account.equityHistory.length === 0) return []
-    const tw50 = loadSeries('TW:0050')
-    const bars = tw50 ? seriesForBacktest(tw50).bars : []
-    const at = (date: string) => [...bars].reverse().find((b) => b.date <= date)?.close
-    const base = at(account.equityHistory[0].date)
-    return account.equityHistory.map((p) => ({
-      date: p.date,
-      strategy: (p.equity / account.initialCash) * 100,
-      benchmark: base ? ((at(p.date) ?? base) / base) * 100 : 100,
-    }))
-  }
-
   const stats = account ? paperStats(account, today) : null
   const ownRun = account?.strategyId ? [...runs].reverse().find((r) => r.strategyId === account.strategyId) : undefined
   const openOrders = account?.orders.filter((o) => o.status === 'open') ?? []
@@ -391,8 +390,10 @@ export function PaperPage() {
           backtestPassed,
           regime,
           accounts,
+          funds,
         })
       : null
+  const pool = account ? poolOf(accounts, account.market, funds) : null
   const showOverview = overview && !creating && accounts.length > 0
   const showAccount = !!account && !!stats && !creating && !showOverview
 
@@ -402,7 +403,7 @@ export function PaperPage() {
         title="虛擬帳戶"
         summary={
           <>
-            用虛擬資金照策略卡下單，成本與回測相同。連結策略卡的帳戶操作滿 {rules.months} 個月、{rules.fills} 筆成交{weekly ? `（週頻卡，每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤判斷、下個交易日開盤成交）` : ''}，就完成行動路線 4.3。說明見手冊{' '}
+            所有策略共用一個虛擬現金池，照策略卡下單，成本與回測相同。連結策略卡的策略操作滿 {rules.months} 個月、{rules.fills} 筆成交{weekly ? `（週頻卡，每週${WEEKDAY_LABELS[decisionDay].slice(1)}收盤判斷、下個交易日開盤成交）` : ''}，就完成行動路線 4.3。說明見手冊{' '}
             <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
               10 §7
             </Link>
@@ -454,17 +455,18 @@ export function PaperPage() {
           </button>
         ))}
         <button type="button" onClick={() => setCreating(true)} className={linkClass}>
-          ＋ 新增帳戶
+          ＋ 加入策略
         </button>
       </div>
 
       {creating && (
         <div className={cardClass}>
-          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">新增虛擬帳戶</h2>
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">加入策略</h2>
           <div className="mt-4">
             <CreateAccount
               defaultStrategyId={presetStrategy}
-              onCreate={(a) => {
+              onCreate={(a, capital) => {
+                if (capital !== undefined) setPaperCapital(a.market, capital)
                 const id = addPaperAccount(a)
                 setSelectedId(id)
                 setCreating(false)
@@ -491,6 +493,8 @@ export function PaperPage() {
       {showOverview && (
         <PaperOverview
           accounts={accounts}
+          funds={funds}
+          today={today}
           onSelect={(id) => {
             setSelectedId(id)
             setOverview(false)
@@ -502,8 +506,8 @@ export function PaperPage() {
       {showAccount && account && stats && (
         <>
           <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <StatCard label="帳戶權益" value={money(stats.equity)} hint={`現金 ${money(account.cash)}（${account.market === 'TW' ? '新台幣' : '美元'}）`} />
-            <StatCard label="累計報酬" value={pct(stats.totalReturn)} hint={`最大回撤 ${pct(stats.maxDrawdown)}`} />
+            <StatCard label="策略損益" value={`${stats.pnl >= 0 ? '+' : '−'}${money(Math.abs(stats.pnl))}`} hint={`已實現 ${stats.realized >= 0 ? '+' : '−'}${money(Math.abs(stats.realized))}・未實現 ${stats.unrealized >= 0 ? '+' : '−'}${money(Math.abs(stats.unrealized))}${account.market === 'US' ? '（美元）' : ''}`} />
+            <StatCard label="持股市值" value={money(stats.holdings)} hint={pool && pool.equity > 0 ? `占總資金 ${pct(stats.holdings / pool.equity)}・現金池可用 ${money(pool.available)}` : undefined} />
             <StatCard
               label="平倉交易"
               value={`${stats.closed} 筆`}
@@ -555,6 +559,7 @@ export function PaperPage() {
               <PaperAssistant
                 account={account}
                 accounts={accounts}
+                funds={funds}
                 strategy={strategy}
                 backtestPassed={backtestPassed}
                 regime={regime}
@@ -696,13 +701,6 @@ export function PaperPage() {
             )}
           </div>
 
-          {account.equityHistory.length > 1 && (
-            <div className={cardClass}>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">權益曲線（起始 = 100，對照 0050）</h2>
-              <EquityChart data={equityPoints()} oosStart={null} labels={['帳戶', '0050（含息）']} />
-            </div>
-          )}
-
           <div className={cardClass}>
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">成交紀錄</h2>
             {filled.length === 0 ? (
@@ -751,7 +749,7 @@ export function PaperPage() {
                       setPendingDelete(false)
                     }}
                   >
-                    確定刪除這個帳戶
+                    確定移除這個策略（持股與紀錄一併刪除，總權益扣掉它的累計損益）
                   </button>
                   <button type="button" className="text-xs text-gray-600 hover:underline dark:text-gray-400" onClick={() => setPendingDelete(false)}>
                     取消
@@ -759,7 +757,7 @@ export function PaperPage() {
                 </>
               ) : (
                 <button type="button" className="text-xs text-gray-600 hover:underline dark:text-gray-400" onClick={() => setPendingDelete(true)}>
-                  刪除帳戶
+                  移除策略
                 </button>
               )}
             </div>

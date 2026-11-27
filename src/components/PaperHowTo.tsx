@@ -14,10 +14,10 @@ function readOpen(): boolean {
 
 const STEPS: { title: string; body: React.ReactNode }[] = [
   {
-    title: '建立帳戶',
+    title: '加入策略',
     body: (
       <>
-        按「＋ 新增帳戶」，填名稱，先選<strong>標的</strong>，再從這檔建過的策略卡中<strong>連結一張</strong>（只有一張時會自動帶入；沒連結不計入行動路線 4.3），最後選市場與初始資金。初始資金建議用你打算真的投入這個策略的金額。連結「開發中」的策略卡時，它會自動改為「虛擬交易」狀態。
+        按「＋ 加入策略」，填名稱，先選<strong>標的</strong>，再從這檔建過的策略卡中<strong>連結一張</strong>（只有一張時會自動帶入；沒連結不計入行動路線 4.3），最後選市場。所有策略共用一個<strong>現金池</strong>（台股、美股各一個），第一次用某個市場時才要填投入資金，建議用你打算真的投入交易部位的金額。連結「開發中」的策略卡時，它會自動改為「虛擬交易」狀態。
       </>
     ),
   },
@@ -29,7 +29,7 @@ const STEPS: { title: string; body: React.ReactNode }[] = [
         <br />
         照做按「依建議下單」；不照做按「略過」並寫一句理由，每週檢討時看。沒有訊號就什麼都不做，這也是紀律。
         <br />
-        文字規則的卡只更新收盤價。收盤價一次更新所有帳戶；「今日」頁的「執行今日例行」也一樣。
+        文字規則的卡只更新收盤價。收盤價一次更新所有策略；「今日」頁的「執行今日例行」也一樣。
       </>
     ),
   },
@@ -37,7 +37,7 @@ const STEPS: { title: string; body: React.ReactNode }[] = [
     title: '更新時看進度',
     body: (
       <>
-        按鈕下方會顯示進度：每檔標的是待更新、更新中、已更新（附收盤價與日期）或取不到，每個帳戶做到哪一步。
+        按鈕下方會顯示進度：每檔標的是待更新、更新中、已更新（附收盤價與日期）或取不到，每個策略做到哪一步。
         <br />
         跑完後留著當作結果摘要，直到下次更新。
       </>
@@ -69,7 +69,7 @@ const STEPS: { title: string; body: React.ReactNode }[] = [
     title: '怎麼看結果',
     body: (
       <>
-        上方四格：帳戶權益、累計報酬與最大回撤、平倉筆數與平均 R（每筆賺賠是停損風險的幾倍），以及 4.3 進度。權益曲線會和 0050 比較；也可以拿來對照策略卡的回測結果，差距大多來自執行。
+        總覽：現金池的總權益、累計損益、持股與可用現金，總權益曲線和 0050 比較；下面是每檔持股屬於哪個策略，以及各策略的損益與 4.3 進度。點進單一策略：策略損益（已實現、未實現）、持股市值、平倉筆數與平均 R（每筆賺賠是停損風險的幾倍），以及 4.3 進度。
       </>
     ),
   },
@@ -77,7 +77,7 @@ const STEPS: { title: string; body: React.ReactNode }[] = [
     title: '什麼時候算完成',
     body: (
       <>
-        連結策略卡的帳戶從第一筆成交起滿 <strong>{PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆成交</strong>，就完成行動路線 4.3。回測也通過（4.2）後，策略卡才能改為「實單」。
+        連結策略卡的策略從第一筆成交起滿 <strong>{PAPER_RULES.months} 個月、{PAPER_RULES.fills} 筆成交</strong>，就完成行動路線 4.3。回測也通過（4.2）後，策略卡才能改為「實單」。
       </>
     ),
   },
@@ -117,7 +117,7 @@ export function PaperHowTo({ market }: { market?: 'TW' | 'US' }) {
             ))}
           </ol>
           <p className="mt-3 text-xs text-gray-600 dark:text-gray-400">
-            {market === 'US' ? '美股帳戶的收盤價自動取自 FinMind；在「最新價」欄位手動填價時以手填為準。' : '台股帳戶的價格自動取自證交所，上櫃股票取自 FinMind。'}
+            {market === 'US' ? '美股的收盤價自動取自 FinMind；在「最新價」欄位手動填價時以手填為準。' : '台股的價格自動取自證交所，上櫃股票取自 FinMind。'}
             {' '}原則：照策略卡執行，不臨時改規則；想改規則，回到回測重新驗證。更多說明見手冊{' '}
             <Link to="/handbook/10" className="font-medium text-indigo-700 hover:underline dark:text-indigo-400">
               10 §7

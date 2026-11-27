@@ -120,7 +120,7 @@ export function interpretBacktest(input: InterpretInput): Finding[] {
     out.push({
       level: 'ok',
       title: '沒有發現明顯問題',
-      detail: '樣本外勝過買進持有（報酬或風險調整後），交易數足夠，回撤在上限內。下一步：建立虛擬帳戶照規則操作 3 個月，確認自己做得到。',
+      detail: '樣本外勝過買進持有（報酬或風險調整後），交易數足夠，回撤在上限內。下一步：加入虛擬交易照規則操作 3 個月，確認自己做得到。',
     })
   } else if (!out.some((f) => f.level === 'warning')) {
     out.push({

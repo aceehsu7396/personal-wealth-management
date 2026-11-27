@@ -76,3 +76,20 @@ describe('AppDataSchema', () => {
     expect(StockThesisSchema.parse(card).fScore).toBe(0)
   })
 })
+
+describe('paper cash pool', () => {
+  it('moves each account’s own money into its market’s fund, once', () => {
+    const account = (id: string, market: 'TW' | 'US', initialCash: number, cash: number) => ({
+      id, name: id, market, initialCash, cash, positions: [], orders: [], signalLog: [], createdAt: '',
+      equityHistory: [{ date: '2026-10-01', equity: initialCash }, { date: '2026-10-02', equity: initialCash + 500 }],
+    })
+    const data = { ...createDefaultAppData(), paperAccounts: [account('a', 'TW', 1_000_000, 400_000), account('b', 'TW', 500_000, 500_000), account('c', 'US', 20_000, 5_000)] }
+    const once = AppDataSchema.parse(data)
+    expect(once.paperFunds).toEqual({ TW: { capital: 1_500_000 }, US: { capital: 20_000 } })
+    expect(once.paperAccounts.map((a) => [a.initialCash, a.cash])).toEqual([[0, -600_000], [0, 0], [0, -15_000]])
+    expect(once.paperAccounts[0].equityHistory.map((p) => p.equity)).toEqual([0, 500])
+    // Pool cash is what the accounts had together.
+    expect(once.paperFunds.TW!.capital + once.paperAccounts[0].cash + once.paperAccounts[1].cash).toBe(900_000)
+    expect(AppDataSchema.parse(once)).toEqual(once)
+  })
+})

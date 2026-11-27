@@ -1,30 +1,25 @@
-// 虛擬帳戶總覽 (handbook 10 §7): every account's money, holdings and
-// profit on one screen, with cash set apart. Prices are the ones the last
-// close update saved; TW and US accounts are summed separately, never
-// converted.
-import type { PaperAccount } from '../storage/schema'
-import { equityOf } from './paperAccount'
-import { sleeveOf } from './assistant'
+// 虛擬帳戶總覽 (handbook 10 §7): one cash pool per market, every holding
+// with the strategy it belongs to, and each strategy's profit. Prices are
+// the ones the last close update saved; TW and US are summed separately,
+// never converted.
+import type { PaperAccount, PaperFunds } from '../storage/schema'
+import { holdingsOf, marketsOf, pendingBuyValue, poolOf, strategyPnl, type Market, type Pool } from './fund'
 
-export type Market = PaperAccount['market']
+export type { Market } from './fund'
 
-export interface AccountRow {
+export interface StrategyRow {
   id: string
   name: string
   market: Market
   strategyId?: string
-  initialCash: number
-  cash: number
+  positions: number
   holdings: number
-  equity: number
   unrealized: number
   realized: number
   pnl: number
-  totalReturn: number
-  cashShare: number
-  // Open buy orders: cash they will use when filled (not yet deducted).
+  // Profit as a share of the pool's capital.
+  pnlShare: number
   pendingBuys: number
-  available: number
 }
 
 export interface HoldingRow {
@@ -40,7 +35,8 @@ export interface HoldingRow {
   value: number
   unrealized: number
   gain: number
-  // Share of that account's equity.
+  stopLoss?: number
+  // Share of the pool's equity.
   weight: number
 }
 
@@ -54,77 +50,60 @@ export interface SymbolTotal {
   unrealized: number
 }
 
-export interface MarketTotal {
-  market: Market
-  accounts: number
-  initialCash: number
-  cash: number
-  holdings: number
-  equity: number
+export interface MarketTotal extends Pool {
+  strategies: number
   unrealized: number
   realized: number
-  pnl: number
   totalReturn: number
   cashShare: number
-  pendingBuys: number
-  available: number
-  // Every position's stop risk together (handbook 10 §7), its share of the
-  // equity, and positions without a stop (not counted).
-  openRisk: number
   openRiskShare: number
-  unstopped: number
 }
 
 export interface PaperOverview {
-  accounts: AccountRow[]
+  strategies: StrategyRow[]
   holdings: HoldingRow[]
-  // Only symbols held by more than one account.
+  // Only symbols held by more than one strategy.
   shared: SymbolTotal[]
   totals: MarketTotal[]
 }
 
 const ratio = (a: number, b: number) => (b > 0 ? a / b : 0)
 
-// Cash an open buy order will take: its limit price, or the latest known
-// price of a market order waiting for the next open.
-function pendingBuyValue(account: PaperAccount): number {
-  return account.orders
-    .filter((o) => o.status === 'open' && o.side === 'buy')
-    .reduce((sum, o) => {
-      const price = o.type === 'market' ? (account.positions.find((p) => p.symbol === o.symbol)?.lastPrice ?? account.quotes?.[o.symbol]?.price ?? o.price ?? 0) : (o.price ?? 0)
-      return sum + o.shares * price
-    }, 0)
-}
+export function paperOverview(accounts: PaperAccount[], funds?: PaperFunds): PaperOverview {
+  const totals: MarketTotal[] = marketsOf(accounts, funds).map((market) => {
+    const pool = poolOf(accounts, market, funds)
+    const mine = accounts.filter((a) => a.market === market).map(strategyPnl)
+    return {
+      ...pool,
+      strategies: mine.length,
+      unrealized: mine.reduce((s, r) => s + r.unrealized, 0),
+      realized: mine.reduce((s, r) => s + r.realized, 0),
+      totalReturn: ratio(pool.pnl, pool.capital),
+      cashShare: ratio(pool.cash, pool.equity),
+      openRiskShare: ratio(pool.openRisk, pool.equity),
+    }
+  })
+  const totalOf = (m: Market) => totals.find((t) => t.market === m)
 
-function accountRow(a: PaperAccount): AccountRow {
-  const equity = equityOf(a)
-  const holdings = equity - a.cash
-  const unrealized = a.positions.reduce((s, p) => s + (p.lastPrice - p.avgCost) * p.shares, 0)
-  const realized = a.orders.reduce((s, o) => s + (o.status === 'filled' && o.side === 'sell' ? (o.realizedPnl ?? 0) : 0), 0)
-  const pendingBuys = pendingBuyValue(a)
-  return {
-    id: a.id,
-    name: a.name,
-    market: a.market,
-    ...(a.strategyId ? { strategyId: a.strategyId } : {}),
-    initialCash: a.initialCash,
-    cash: a.cash,
-    holdings,
-    equity,
-    unrealized,
-    realized,
-    pnl: equity - a.initialCash,
-    totalReturn: ratio(equity - a.initialCash, a.initialCash),
-    cashShare: ratio(a.cash, equity),
-    pendingBuys,
-    available: a.cash - pendingBuys,
-  }
-}
+  const strategies: StrategyRow[] = accounts.map((a) => {
+    const { pnl, realized, unrealized } = strategyPnl(a)
+    return {
+      id: a.id,
+      name: a.name,
+      market: a.market,
+      ...(a.strategyId ? { strategyId: a.strategyId } : {}),
+      positions: a.positions.length,
+      holdings: holdingsOf(a),
+      unrealized,
+      realized,
+      pnl,
+      pnlShare: ratio(pnl, totalOf(a.market)?.capital ?? 0),
+      pendingBuys: pendingBuyValue(a),
+    }
+  })
 
-export function paperOverview(accounts: PaperAccount[]): PaperOverview {
-  const rows = accounts.map(accountRow)
   const holdings: HoldingRow[] = accounts
-    .flatMap((a, i) =>
+    .flatMap((a) =>
       a.positions.map((p) => {
         const value = p.shares * p.lastPrice
         return {
@@ -140,7 +119,8 @@ export function paperOverview(accounts: PaperAccount[]): PaperOverview {
           value,
           unrealized: (p.lastPrice - p.avgCost) * p.shares,
           gain: ratio(p.lastPrice, p.avgCost) - 1,
-          weight: ratio(value, rows[i].equity),
+          ...(p.stopLoss !== undefined ? { stopLoss: p.stopLoss } : {}),
+          weight: ratio(value, totalOf(a.market)?.equity ?? 0),
         }
       }),
     )
@@ -158,39 +138,8 @@ export function paperOverview(accounts: PaperAccount[]): PaperOverview {
     bySymbol.set(key, t)
   }
 
-  const totals: MarketTotal[] = (['TW', 'US'] as const).flatMap((market) => {
-    const rs = rows.filter((r) => r.market === market)
-    if (rs.length === 0) return []
-    const sum = (f: (r: AccountRow) => number) => rs.reduce((s, r) => s + f(r), 0)
-    const equity = sum((r) => r.equity)
-    const initialCash = sum((r) => r.initialCash)
-    const cash = sum((r) => r.cash)
-    const pendingBuys = sum((r) => r.pendingBuys)
-    const sleeve = sleeveOf(accounts, market)
-    return [
-      {
-        market,
-        accounts: rs.length,
-        initialCash,
-        cash,
-        holdings: sum((r) => r.holdings),
-        equity,
-        unrealized: sum((r) => r.unrealized),
-        realized: sum((r) => r.realized),
-        pnl: equity - initialCash,
-        totalReturn: ratio(equity - initialCash, initialCash),
-        cashShare: ratio(cash, equity),
-        pendingBuys,
-        available: cash - pendingBuys,
-        openRisk: sleeve.openRisk,
-        openRiskShare: ratio(sleeve.openRisk, equity),
-        unstopped: sleeve.unstopped,
-      },
-    ]
-  })
-
   return {
-    accounts: rows,
+    strategies,
     holdings,
     shared: [...bySymbol.values()].filter((t) => t.accounts > 1).sort((x, y) => y.value - x.value),
     totals,

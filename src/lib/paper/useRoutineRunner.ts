@@ -37,6 +37,7 @@ export function useRoutineRunner() {
         onStep: setStep,
         weeklyDecisionDay,
         latest: (id) => useAppStore.getState().paperAccounts.find((a) => a.id === id)!,
+        funds: useAppStore.getState().paperFunds,
         save: replacePaperAccount,
         onProgress: setProgress,
       })

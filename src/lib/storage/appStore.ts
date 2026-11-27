@@ -186,6 +186,8 @@ interface AppStore extends AppData {
   // Paper-account changes are computed by pure functions and saved whole.
   replacePaperAccount: (account: PaperAccount) => void
   removePaperAccount: (id: string) => void
+  // The pool's capital of one market (handbook 10 §7).
+  setPaperCapital: (market: 'TW' | 'US', capital: number) => void
   // Adding a symbol already on the list keeps the original entry.
   addWatchItem: (entry: Omit<WatchItem, 'addedAt'>) => void
   updateWatchItem: (symbol: string, entry: Partial<Omit<WatchItem, 'symbol' | 'addedAt'>>) => void
@@ -250,6 +252,7 @@ function toAppData(state: AppData): AppData {
     dailyResearchImported: state.dailyResearchImported,
     paperRoutineRanAt: state.paperRoutineRanAt,
     paperAccounts: state.paperAccounts,
+    paperFunds: state.paperFunds,
     watchlist: state.watchlist,
     ideaNotes: state.ideaNotes,
     tradePlans: state.tradePlans,
@@ -698,6 +701,8 @@ export const useAppStore = create<AppStore>()(
 
       removePaperAccount: (id) =>
         set((state) => ({ paperAccounts: state.paperAccounts.filter((a) => a.id !== id) })),
+
+      setPaperCapital: (market, capital) => set((state) => ({ paperFunds: { ...state.paperFunds, [market]: { capital } } })),
 
       removeFubonOutlook: (id) =>
         set((state) => ({ fubonOutlooks: state.fubonOutlooks.filter((o) => o.id !== id) })),

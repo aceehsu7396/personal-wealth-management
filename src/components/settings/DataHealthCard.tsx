@@ -30,7 +30,7 @@ export function DataHealthCard() {
       label: '虛擬帳戶收盤更新',
       latest: ranAt ? shortTime(ranAt) : '—',
       status: !hasAccounts ? 'ok' : routineDue(now, ranAt) ? 'late' : 'ok',
-      note: !hasAccounts ? '沒有虛擬帳戶' : routineDue(now, ranAt) ? `${closeDue(now)} 的收盤還沒更新：打開任一頁就會自動執行` : '已更新到最近一次收盤',
+      note: !hasAccounts ? '沒有虛擬交易中的策略' : routineDue(now, ranAt) ? `${closeDue(now)} 的收盤還沒更新：打開任一頁就會自動執行` : '已更新到最近一次收盤',
     },
     {
       label: '每日自動研究匯入',

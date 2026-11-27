@@ -255,7 +255,7 @@ export function computeJourney(state: JourneyState, today: string): JourneyRepor
           done: bestPaper?.qualifies ?? false,
           detail: bestPaper
             ? `最佳帳戶：${Math.min(bestPaper.months, bestPaper.rules.months)}/${bestPaper.rules.months} 個月、${Math.min(bestPaper.fills, bestPaper.rules.fills)}/${bestPaper.rules.fills} 筆成交`
-            : '建立虛擬帳戶並照策略卡下單',
+            : '把策略卡加入虛擬交易並照卡下單',
           page: PAGES.paper,
           handbookSlug: '10',
         },

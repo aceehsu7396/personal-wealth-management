@@ -53,14 +53,28 @@ describe('paper account', () => {
     expect(equityOf(a)).toBeCloseTo(a.cash)
   })
 
-  it('summarizes fills, wins and drawdown', () => {
+  it('summarizes fills, wins and the strategy profit', () => {
     let a = placeOrder(account(), { symbol: 'TW:0050', name: '', side: 'buy', type: 'market', shares: 100, stopLoss: 90, reason: '' }, { price: 100, date: '2026-07-01' })
     a = updatePrices(a, { 'TW:0050': { price: 80, date: '2026-07-02', low: 79 } })
     const s = paperStats(a, '2026-10-12')
-    expect(s).toMatchObject({ fills: 2, closed: 1, winRate: 0, months: 3 })
-    // The stop at 90 capped the loss near 1R (≈ 1% of the account plus costs).
-    expect(s.maxDrawdown).toBeLessThan(-0.01)
-    expect(s.maxDrawdown).toBeGreaterThan(-0.03)
+    expect(s).toMatchObject({ fills: 2, closed: 1, winRate: 0, months: 3, holdings: 0, unrealized: 0 })
+    // The day opened at 80, below the stop at 90: sold at 80, about 2R.
+    expect(s.pnl).toBeCloseTo(s.realized)
+    expect(s.pnl).toBeLessThan(-2000)
+    expect(s.pnl).toBeGreaterThan(-2100)
+  })
+
+  it('buys on the pool cash a strategy without money of its own is given', () => {
+    const sleeve: PaperAccount = { ...account(0), initialCash: 0 }
+    const order = { symbol: 'TW:0050', name: '', side: 'buy' as const, type: 'market' as const, shares: 100, stopLoss: 90, reason: '' }
+    expect(() => placeOrder(sleeve, order, { price: 100, date: '2026-10-01' })).toThrow('現金不足')
+    const a = placeOrder(sleeve, order, { price: 100, date: '2026-10-01' }, undefined, 50_000)
+    expect(a.cash).toBeCloseTo(-10_000 - fee(10_000))
+    expect(paperStats(a, '2026-10-01').pnl).toBeCloseTo(-fee(10_000))
+    // A limit buy fills on later bars only while the pool has the cash.
+    let b = placeOrder(sleeve, { ...order, type: 'limit', price: 95 }, undefined, '2026-10-01T15:00:00Z')
+    b = updatePrices(b, { 'TW:0050': { price: 94, date: '2026-10-02', low: 93 } }, 5000)
+    expect(b.orders[0].status).toBe('cancelled')
   })
 })
 

@@ -840,12 +840,25 @@ export const PaperOrderSchema = z.object({
 })
 export type PaperOrder = z.infer<typeof PaperOrderSchema>
 
+// One cash pool per market (handbook 10 §7): every strategy in paper
+// trading draws on it. capital is the money put in.
+export const PaperFundSchema = z.object({ capital: z.number() })
+export type PaperFund = z.infer<typeof PaperFundSchema>
+export const PaperFundsSchema = z.object({ TW: PaperFundSchema.optional(), US: PaperFundSchema.optional() })
+export type PaperFunds = z.infer<typeof PaperFundsSchema>
+
+// A strategy's part of the paper money: its positions, orders and
+// suggestions, without money of its own. cash is the net cash it moved
+// (sales less purchases, so negative while it holds), and equity history
+// its profit; the market's pool cash is the fund's capital plus every
+// strategy's cash. Accounts from before the pool had their own money in
+// initialCash; loading moves it into the fund (poolPaperCash).
 export const PaperAccountSchema = z.object({
   id: z.string(),
   name: z.string(),
   strategyId: z.string().optional(),
   market: z.enum(['TW', 'US']),
-  initialCash: z.number(),
+  initialCash: z.number().default(0),
   cash: z.number(),
   positions: z.array(PaperPositionSchema),
   orders: z.array(PaperOrderSchema),
@@ -1209,6 +1222,7 @@ export const AppDataSchema = z.object({
   // When 更新收盤價並產生建議 last ran (by hand or automatically), ISO time.
   paperRoutineRanAt: z.string().optional(),
   paperAccounts: z.array(PaperAccountSchema).default([]),
+  paperFunds: PaperFundsSchema.default({}),
   watchlist: z.array(WatchItemSchema).default([]),
   ideaNotes: z.array(IdeaNoteSchema).default([]),
   tradePlans: z.array(TradePlanSchema).default([]),
@@ -1218,8 +1232,28 @@ export const AppDataSchema = z.object({
   pauseReviews: z.array(PauseReviewSchema).default([]),
   decisions: z.array(DecisionSchema).default([]),
   scenarioSets: z.array(ScenarioSetSchema).default([]),
-})
+}).transform(poolPaperCash)
 export type AppData = z.infer<typeof AppDataSchema>
+
+// Paper accounts with money of their own (before the shared pool): each
+// market's initial cash goes into its fund, and every account keeps only
+// what it moved, so the pool's cash, equity and the strategies' profits are
+// what they were. Data already pooled is returned as is.
+export function poolPaperCash<T extends { paperAccounts: PaperAccount[]; paperFunds: PaperFunds }>(data: T): T {
+  if (!data.paperAccounts.some((a) => a.initialCash !== 0)) return data
+  const funds: PaperFunds = { ...data.paperFunds }
+  const paperAccounts = data.paperAccounts.map((a) => {
+    if (a.initialCash === 0) return a
+    funds[a.market] = { capital: (funds[a.market]?.capital ?? 0) + a.initialCash }
+    return {
+      ...a,
+      cash: a.cash - a.initialCash,
+      initialCash: 0,
+      equityHistory: a.equityHistory.map((p) => ({ ...p, equity: p.equity - a.initialCash })),
+    }
+  })
+  return { ...data, paperAccounts, paperFunds: funds }
+}
 
 export function createDefaultAppData(): AppData {
   const now = new Date().toISOString()
@@ -1271,6 +1305,7 @@ export function createDefaultAppData(): AppData {
     backtestRuns: [],
     strategyComparisons: [],
     paperAccounts: [],
+    paperFunds: {},
     watchlist: [],
     ideaNotes: [],
     tradePlans: [],

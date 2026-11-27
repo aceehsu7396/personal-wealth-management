@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { AssistantItem, InvestmentPolicy, PaperAccount, TradingStrategy } from '../../lib/storage/schema'
+import type { AssistantItem, InvestmentPolicy, PaperAccount, PaperFunds, TradingStrategy } from '../../lib/storage/schema'
 import type { RegimeContext } from '../../lib/market/regime'
 import { ASSISTANT_KIND_LABELS, NEAR_STOP, OUTCOME_LABELS, adviceSummary, blocked, executionOf, explainItem, orderChecks, priceLevels, weeklyReview, type OrderCheck } from '../../lib/paper/assistant'
 import { coachPrompt } from '../../lib/ai/prompts/agents'
@@ -46,6 +46,7 @@ interface Ctx {
   account: PaperAccount
   // Every paper account: the trading capital (handbook 10 §7).
   accounts?: PaperAccount[]
+  funds?: PaperFunds
   strategy: TradingStrategy
   backtestPassed: boolean
   regime: RegimeContext | null
@@ -92,10 +93,11 @@ function ActionRow({ item, ctx }: { item: AssistantItem; ctx: Ctx }) {
         backtestPassed: ctx.backtestPassed,
         regime: ctx.regime,
         accounts: ctx.accounts,
+        funds: ctx.funds,
       })
     : []
   const canAct = item.kind === 'enter' || item.kind === 'exit' || item.kind === 'raise_stop'
-  const ex = explainItem(item, ctx.account, ctx.accounts)
+  const ex = explainItem(item, ctx.account, ctx.accounts, ctx.funds)
   const lv = priceLevels(item, ctx.account)
 
   return (
@@ -212,7 +214,7 @@ export function PaperAssistant(ctx: Ctx) {
           {snap && `・資料日期 ${snap.date}`}
         </span>
       </div>
-      {!backtestPassed && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">「{strategy.name}」還沒有通過回測：可以照練，但這個帳戶的結果不能用來解鎖實單。</p>}
+      {!backtestPassed && <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">「{strategy.name}」還沒有通過回測：可以照練，但這張卡的虛擬交易結果不能用來解鎖實單。</p>}
 
       {!snap ? (
         <p className={`mt-3 ${mutedClass}`}>交易日收盤後打開網站會自動執行「更新收盤價並產生建議」（也可以按頁首的按鈕，或「今日」頁的「執行今日例行」）：助手會依策略卡規則逐檔判斷，並以每筆風險計算股數、設好停損。</p>
@@ -230,7 +232,7 @@ export function PaperAssistant(ctx: Ctx) {
             <ol className="list-decimal space-y-1 pl-5 text-xs text-gray-600 dark:text-gray-400">
               <li>逐檔套用策略卡的進出場規則：持股看出場訊號與停損，未持有的看進場訊號。</li>
               <li>停損 = 收盤 − k × ATR(14)：k 用策略卡的倍數，局勢表有設時改用局勢的；策略卡沒有停損規則時給 2.5 倍的保護停損。</li>
-              <li>股數 = 總資金（全部虛擬帳戶合計）× 每筆風險 ÷（價格 − 停損），再乘局勢的部位倍數；所有帳戶的未平倉停損風險合計不超過總資金 6%，並受這個帳戶的現金、單一部位上限與持有檔數限制。</li>
+              <li>股數 = 總資金（現金池加上全部持股）× 每筆風險 ÷（價格 − 停損），再乘局勢的部位倍數；全部策略的未平倉停損風險合計不超過總資金 6%，並受現金池的可用現金、單一部位上限與持有檔數限制。</li>
               <li>進場價、出場價：下一次判斷時（日頻是下個交易日收盤，週頻是判斷日收盤）收盤要到多少才觸發，由策略卡的規則反推，另附離今天收盤多遠；外資買賣超、動能排名、持有天數這類不是價格的條件直接寫出來。出場價同時列出停損。</li>
               <li>持股的吊燈停損（進場後最高價 − k × ATR）高於目前停損時，建議上調；收盤離停損不到 {Math.round(NEAR_STOP * 100)}% 時提醒。</li>
               <li>下單前檢查：價格是否最新、有沒有停損、風險是否超過上限、現金夠不夠；必須項沒過就不能下單。</li>
@@ -262,7 +264,7 @@ export function PaperAssistant(ctx: Ctx) {
                   </thead>
                   <tbody>
                     {[...holds, ...waits].map((i) => {
-                      const e = explainItem(i, account, ctx.accounts)
+                      const e = explainItem(i, account, ctx.accounts, ctx.funds)
                       const lv = priceLevels(i, account)
                       return (
                         <tr key={`${i.kind}${i.symbol}`} className="border-b border-gray-100 align-top last:border-0 dark:border-gray-700">
@@ -316,7 +318,7 @@ export function PaperAssistant(ctx: Ctx) {
           </ul>
           <p className="mt-1">依上面的數字補一句：這週最想改的一件事，以及下週怎麼做。</p>
           <div className="mt-2">
-            <PromptPanel label="AI 交易教練" build={() => coachPrompt({ groups: [], execution: [`虛擬帳戶「${account.name}」（策略卡「${strategy.name}」）`, ...week], pauses: [] })} />
+            <PromptPanel label="AI 交易教練" build={() => coachPrompt({ groups: [], execution: [`虛擬交易策略「${account.name}」（策略卡「${strategy.name}」）`, ...week], pauses: [] })} />
           </div>
         </Disclosure>
       </div>

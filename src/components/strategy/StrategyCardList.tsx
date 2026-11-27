@@ -169,7 +169,7 @@ export function StrategyCardList({ onEdit, focusId }: Props) {
             <StrategyResearchLinks strategy={s} />
             <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
               {gate.backtestPassed ? '✓' : '☐'} 回測樣本外勝過買進持有（報酬或風險調整後；{ownRuns} 次回測）
-              {gate.paperProven ? '✓' : '☐'} 虛擬交易 {paperRulesFor(s).months} 個月、{paperRulesFor(s).fills} 筆（{ownAccounts} 個帳戶）
+              {gate.paperProven ? '✓' : '☐'} 虛擬交易 {paperRulesFor(s).months} 個月、{paperRulesFor(s).fills} 筆{ownAccounts > 0 ? '' : '（還沒加入虛擬交易）'}
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               {def.backtestable && (

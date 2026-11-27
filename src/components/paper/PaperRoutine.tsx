@@ -23,7 +23,7 @@ export function PaperRoutine() {
       <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-gray-600 dark:text-gray-400">
         {!step && !result && (
           <span>
-            {regimeLoading ? '讀取局勢中…' : `虛擬帳戶 ${count} 個：更新收盤價${advised > 0 ? `，${advised} 個產生建議` : ''}`}
+            {regimeLoading ? '讀取局勢中…' : `虛擬交易 ${count} 個策略：更新收盤價${advised > 0 ? `，${advised} 個產生建議` : ''}`}
             <AutoRanNote />
           </span>
         )}

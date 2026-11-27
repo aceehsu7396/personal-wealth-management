@@ -1,4 +1,4 @@
-import type { InvestmentPolicy, PaperAccount, TradingStrategy } from '../storage/schema'
+import type { InvestmentPolicy, PaperAccount, PaperFunds, TradingStrategy } from '../storage/schema'
 import type { RegimeContext } from '../market/regime'
 import { fetchLatestTwseBar, isoDaysAgo, TWSE_REQUEST_GAP_MS } from '../market/priceHistory'
 import { fetchDataset } from '../research/finmind'
@@ -7,6 +7,7 @@ import { loadChipData, loadPriceData } from '../backtest/data'
 import { STRATEGY_TEMPLATES, formatSymbol } from '../backtest/templates'
 import { updatePrices, type Quote } from './paperAccount'
 import { assistantItems, withSnapshot } from './assistant'
+import { poolOf } from './fund'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -92,12 +93,14 @@ export interface AdviceInput {
   onStep: (s: string) => void
   // The site-wide weekly decision day, for weekly cards without their own.
   weeklyDecisionDay?: number
-  // Every paper account, for the trading capital (handbook 10 §7).
+  // Every paper account and the cash pool, for the trading capital
+  // (handbook 10 §7).
   accounts?: PaperAccount[]
+  funds?: PaperFunds
 }
 
 // Today's suggestions for an account (handbook 10 §7), saved on it.
-export async function adviseAccount({ account, strategy, policy, regime, today, onStep, weeklyDecisionDay, accounts }: AdviceInput, deps: RoutineDeps = defaultDeps): Promise<PaperAccount> {
+export async function adviseAccount({ account, strategy, policy, regime, today, onStep, weeklyDecisionDay, accounts, funds }: AdviceInput, deps: RoutineDeps = defaultDeps): Promise<PaperAccount> {
   const symbols = [...new Set([...strategy.symbols, ...account.positions.map((p) => p.symbol)])]
   const data = await deps.loadPriceData(symbols, isoDaysAgo(today, 1), today, (p) => onStep(`下載 ${formatSymbol(p.symbol)} ${p.done}/${p.total}`))
   const held = Object.fromEntries(account.positions.map((p) => [p.symbol, { shares: p.shares, openedAt: p.openedAt }]))
@@ -109,7 +112,7 @@ export async function adviseAccount({ account, strategy, policy, regime, today, 
     decisionDay: strategy.decisionDay ?? weeklyDecisionDay,
     today,
   })
-  return withSnapshot(account, assistantItems({ strategy, account, statuses, data, policy, regime, accounts }), new Date().toISOString())
+  return withSnapshot(account, assistantItems({ strategy, account, statuses, data, policy, regime, accounts, funds }), new Date().toISOString())
 }
 
 // Accounts the daily routine gives suggestions: linked to a card in paper
@@ -152,6 +155,8 @@ export interface RoutineInput {
   weeklyDecisionDay?: number
   // Prices typed in by hand (US accounts), over what was fetched.
   manual?: Record<string, Quote>
+  // The cash pools: buys and sizing draw on the market's pool.
+  funds?: PaperFunds
   // The latest saved account, and where to save it: each step builds
   // on what the previous one saved.
   latest: (id: string) => PaperAccount
@@ -215,11 +220,12 @@ export async function runPaperRoutine(input: RoutineInput, deps: RoutineDeps = d
         quotes[s] = typed
         setSymbol(s, { status: 'manual', price: typed.price, date: typed.date })
       }
-      input.save(updatePrices(input.latest(account.id), quotes))
+      const all = input.accounts.map((a) => input.latest(a.id))
+      input.save(updatePrices(input.latest(account.id), quotes, poolOf(all, account.market, input.funds).cash))
       if (strategy && advised.some((x) => x.account.id === account.id) && STRATEGY_TEMPLATES[strategy.template].backtestable) {
         progress.phase = 'advice'
         setAccount(account.id, { status: 'advising' })
-        input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay, accounts: input.accounts.map((a) => input.latest(a.id)) }, deps))
+        input.save(await adviseAccount({ account: input.latest(account.id), strategy, policy: input.policy, regime: input.regime, today: input.today, onStep: step, weeklyDecisionDay: input.weeklyDecisionDay, accounts: input.accounts.map((a) => input.latest(a.id)), funds: input.funds }, deps))
         progress.phase = 'prices'
       }
       result.done.push(account.name)

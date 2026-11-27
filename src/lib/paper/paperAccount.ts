@@ -1,6 +1,7 @@
 import type { PaperAccount, PaperOrder, PaperPosition } from '../storage/schema'
 import { marketCosts, type BacktestCosts } from '../backtest/engine'
 import { monthsBetween } from '../calculations/traderReadiness'
+import { strategyPnl } from './fund'
 
 // Paper trading: pure functions that take an account and return the
 // updated account. Fills use daily data: market orders at the latest
@@ -60,13 +61,15 @@ function newId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2)
 }
 
-// Fills an order at `price` on `date`, updating cash and positions.
-function fill(account: PaperAccount, order: PaperOrder, price: number, date: string): PaperAccount {
+// Fills an order at `price` on `date`, updating cash and positions. A buy
+// needs that much of `buyingPower`: the market's pool cash (handbook 10
+// §7), or the account's own cash for one that still has money of its own.
+function fill(account: PaperAccount, order: PaperOrder, price: number, date: string, buyingPower = account.cash): PaperAccount {
   const value = order.shares * price
   const position = account.positions.find((p) => p.symbol === order.symbol)
   if (order.side === 'buy') {
     const buyFee = fee(order.symbol, value)
-    if (value + buyFee > account.cash + 1e-6) throw new PaperOrderError('現金不足')
+    if (value + buyFee > buyingPower + 1e-6) throw new PaperOrderError('現金不足')
     const shares = (position?.shares ?? 0) + order.shares
     const next: PaperPosition = {
       symbol: order.symbol,
@@ -118,8 +121,8 @@ function fill(account: PaperAccount, order: PaperOrder, price: number, date: str
 }
 
 // Places an order. A market order needs a quote and fills at once; limit
-// and stop orders wait for updatePrices.
-export function placeOrder(account: PaperAccount, input: NewOrder, quote?: Quote, now = new Date().toISOString()): PaperAccount {
+// and stop orders wait for updatePrices. buyingPower: the pool's cash.
+export function placeOrder(account: PaperAccount, input: NewOrder, quote?: Quote, now = new Date().toISOString(), buyingPower = account.cash): PaperAccount {
   if (!(input.shares > 0) || !Number.isInteger(input.shares)) throw new PaperOrderError('股數須為正整數')
   if (input.type !== 'market' && !(input.price && input.price > 0)) throw new PaperOrderError('限價單與停損單需要價格')
   if (input.side === 'buy' && input.stopLoss !== undefined && quote && input.stopLoss >= quote.price) {
@@ -130,7 +133,7 @@ export function placeOrder(account: PaperAccount, input: NewOrder, quote?: Quote
   const withOrder = { ...account, orders: [...account.orders, order] }
   if (input.type !== 'market' || input.fillAt === 'open') return withOrder
   if (!quote) throw new PaperOrderError('市價單需要最新價格')
-  return snapshot(fill(withOrder, order, quote.price, quote.date), quote.date)
+  return snapshot(fill(withOrder, order, quote.price, quote.date, buyingPower), quote.date)
 }
 
 export function cancelOrder(account: PaperAccount, orderId: string): PaperAccount {
@@ -155,8 +158,10 @@ function snapshot(account: PaperAccount, date: string): PaperAccount {
 
 // Applies new daily quotes: marks positions, triggers stops (position stop
 // losses and stop orders), fills limit orders, then records equity. Every
-// quote is kept as the symbol's latest close.
-export function updatePrices(account: PaperAccount, quotes: Record<string, Quote>): PaperAccount {
+// quote is kept as the symbol's latest close. buyingPower: the pool's cash
+// before this account's fills; each fill here adds to or takes from it.
+export function updatePrices(account: PaperAccount, quotes: Record<string, Quote>, buyingPower = account.cash): PaperAccount {
+  const power = (next: PaperAccount) => buyingPower + next.cash - account.cash
   const kept = { ...account.quotes }
   for (const [s, q] of Object.entries(quotes)) if (!kept[s] || kept[s].date <= q.date) kept[s] = { price: q.price, date: q.date }
   let next: PaperAccount = {
@@ -176,7 +181,7 @@ export function updatePrices(account: PaperAccount, quotes: Record<string, Quote
       try {
         // A buy whose stop the open already broke waits for a new decision.
         if (order.side === 'buy' && order.stopLoss !== undefined && open <= order.stopLoss) next = cancelOrder(next, order.id)
-        else next = fill(next, order, open, q.date)
+        else next = fill(next, order, open, q.date, power(next))
       } catch {
         next = cancelOrder(next, order.id)
       }
@@ -189,7 +194,7 @@ export function updatePrices(account: PaperAccount, quotes: Record<string, Quote
         : touched(q, order.price, 'down')
     if (price === null) continue
     try {
-      next = fill(next, order, price, q.date)
+      next = fill(next, order, price, q.date, power(next))
     } catch {
       next = cancelOrder(next, order.id)
     }
@@ -220,9 +225,11 @@ export function updatePrices(account: PaperAccount, quotes: Record<string, Quote
 }
 
 export interface PaperStats {
-  equity: number
-  totalReturn: number
-  maxDrawdown: number
+  // The strategy's profit (handbook 10 §7): realized plus unrealized.
+  pnl: number
+  realized: number
+  unrealized: number
+  holdings: number
   fills: number
   closed: number
   winRate: number | null
@@ -231,21 +238,13 @@ export interface PaperStats {
 }
 
 export function paperStats(account: PaperAccount, today: string): PaperStats {
-  const equity = equityOf(account)
-  let peak = account.initialCash
-  let maxDrawdown = 0
-  for (const p of account.equityHistory) {
-    peak = Math.max(peak, p.equity)
-    maxDrawdown = Math.min(maxDrawdown, p.equity / peak - 1)
-  }
   const filled = account.orders.filter((o) => o.status === 'filled')
   const sells = filled.filter((o) => o.side === 'sell' && o.realizedPnl !== undefined)
   const rs = sells.map((o) => o.rMultiple).filter((r): r is number => r !== undefined)
   const first = filled.map((o) => o.filledAt ?? '').sort()[0]
   return {
-    equity,
-    totalReturn: account.initialCash > 0 ? equity / account.initialCash - 1 : 0,
-    maxDrawdown,
+    ...strategyPnl(account),
+    holdings: account.positions.reduce((a, p) => a + p.shares * p.lastPrice, 0),
     fills: filled.length,
     closed: sells.length,
     winRate: sells.length > 0 ? sells.filter((o) => (o.realizedPnl ?? 0) > 0).length / sells.length : null,
