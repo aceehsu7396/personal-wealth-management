@@ -15,6 +15,8 @@ describe('template library', () => {
     expect(one.filter((e) => e.cadence === 'weekly')).toHaveLength(3)
     expect(compareEntriesOf(lib, 2).some((e) => e.template === 'weekly_rotation')).toBe(true)
     expect(lib.find((t) => t.id === 'ma_200')?.builtIn).toBe('tw50-200d-filter')
+    // The 120-day filter is a starter of its own, not in comparisons.
+    expect(lib.find((t) => t.id === 'tw50-120d-filter')).toMatchObject({ params: { fast: 1, slow: 120, atrStop: 0 }, inCompare: false })
   })
 
   it('adds rotation only with two or more symbols and never a written plan', () => {
